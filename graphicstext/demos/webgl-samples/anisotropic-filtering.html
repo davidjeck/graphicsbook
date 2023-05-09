@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Anisotropic Filtering Demo</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+</style>
+
+<!--
+    An example of using the WebGL anisotropic filtering extension.
+-->
+
+<script src="simple-rotator.js"></script>
+<script src="gl-matrix-min.js"></script>
+
+<script>
+
+"use strict";
+
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    uniform mat4 modelviewProjection;
+    varying vec2 v_coords;  // xz object coordinates
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        v_coords = a_coords.xz;
+        gl_Position = modelviewProjection * coords;
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    uniform sampler2D texture;
+    varying vec2 v_coords; // Use xz object coordinates as texture coordinates.
+    void main() {
+        gl_FragColor = texture2D( texture, v_coords );
+    }`;
+
+
+let gl;   // The webgl context.
+
+let a_coords_loc;          // Location of the a_coords attribute variable in the shader program.
+let a_coords_buffer;       // Buffer to hold the values for a_coords.
+let u_texture;             // Location of the sampler2D uniform representing the image texture.
+let u_modelviewProjection; // Location of the uniform matrix representing the combined transformation.
+
+const textureURL = "textures/brick001.jpg";
+let textureLoaded = false;  // Will be set to true after texture image has loaded.
+
+let anisotropyExtension = null;  // The object that represents the anisotropic filtering extension.
+let anisotropyMax;  // The maximum degree of anisotropy supported by the implementation.
+
+const projection = mat4.create();  // projection matrix
+const modelviewProjection = mat4.create();  // combined matrix
+
+let rotator;  // A SimpleRotator object that lets the user rotate the view by mouse.
+
+
+
+/* Draws a large rectangle that extends into the distance in the negative z-direction.
+ */
+function draw() { 
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    if ( ! textureLoaded ) {
+        return; // Don'e draw anything if the texture hasn't finished loading.
+    }
+    
+    /* Set the value of projection to represent the projection transformation */
+    
+    mat4.perspective(projection, Math.PI/8, 1, 0.1, 200);
+    
+    /* Get the view matrix from the SimpleRotator object.
+       There is no modeling transformation in this program. */
+    
+    let modelview = rotator.getViewMatrix();
+        
+    /* Multiply the projection matrix times the modelview matrix to give the
+       combined transformation matrix, and send that to the shader program. */
+       
+    mat4.multiply( modelviewProjection, projection, modelview );
+    gl.uniformMatrix4fv(u_modelviewProjection, false, modelviewProjection );
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);  // Draw the textured rectangle.
+
+}
+
+
+/* Called when the texture has loaded and when user changes the setting of
+ * the "Use Anistropic Filtering" checkbox.  Turns anisotropic filtering
+ * on and off as appropriate.
+ */
+function doAnisotropy() {
+    if ( ! anisotropyExtension ) {
+        return;  // anisotropic filtering is not available; scene will be drawn without it.
+    }
+    if (document.getElementById("useAF").checked) {
+        gl.texParameteri(gl.TEXTURE_2D, anisotropyExtension.TEXTURE_MAX_ANISOTROPY_EXT, anisotropyMax); // use anisotropic filtering
+    }
+    else {
+        gl.texParameteri(gl.TEXTURE_2D, anisotropyExtension.TEXTURE_MAX_ANISOTROPY_EXT, 1); // Turns anisotropic filtering off.
+    }
+    draw();
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    u_modelviewProjection = gl.getUniformLocation(prog, "modelviewProjection");
+    u_texture =  gl.getUniformLocation(prog, "texture");
+    gl.enable(gl.DEPTH_TEST);
+    
+    // Set up the data for drawing the rectangle.  The data never changes.
+    
+    let vertices = [ -100,0,50, 100,0,50, 100,0,-100, -100,0,-100 ];
+    gl.enableVertexAttribArray(a_coords_loc);
+    a_coords_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+    gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+    
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(u_texture, 0);
+    let tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);  // texture will say bound for the entire program.
+    
+    // Check whether the anistropic filtering extension is available, and if so, get
+    // a reference to the extension object.
+    
+    anisotropyExtension = gl.getExtension("EXT_texture_filter_anisotropic");
+    if ( ! anisotropyExtension ) {
+        document.getElementById("useAF").disabled = true;
+        document.getElementById("useAF").checked = false;
+        document.getElementById("message").innerHTML =
+            "Drag your mouse on the canvas to rotate the scene.<br>" +
+            "Anisotropic filtering not available. Showing texture without it.";
+    }
+    else {
+        anisotropyMax = gl.getParameter(anisotropyExtension.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+    }
+    
+    // Start loading the texture.
+    
+    let img = new Image();
+    img.onload = function() {
+        try {
+            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+        }
+        catch (e) {
+            document.getElementById("message").innerHTML =
+               "<span style='color:red'>Sorry, an error occurred.  Could not load texture image.<br>" +
+               "Note that some browsers can't load images from the local file system.</span>";
+            return;
+        }
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        doAnisotropy();  // Will turn on anisotropic filtering, if available.
+        if (anisotropyExtension) { // Don't replace error message about missing extension.
+            document.getElementById("message").innerHTML =
+                  "Drag your mouse on the canvas to rotate the scene.";
+        }
+        textureLoaded = true;
+        draw();
+    };
+    img.onerror = function() {
+        document.getElementById("message").innerHTML =
+             "<span style='color:red'>Sorry, an error occurred.  Could not load texture image.</span>";
+    };
+    img.src = textureURL;
+    
+} // end initGL
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    document.getElementById("useAF").checked = true; // will be unchecked if extension can't be loaded
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("useAF").onchange = doAnisotropy;
+    rotator = new SimpleRotator(canvas, draw, 2, 0, 10);
+    rotator.setXLimit(20);
+    draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>Anisotropic Filtering Demo</h2>
+
+<p id=message>Loading Texture Image...</p>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p><label><input type="checkbox" id="useAF"> <b>Use Anisotropic Filtering</b></label></p>
+
+<div id="canvas-holder">
+   <canvas width=600 height=600 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+
+</body>
+</html>
+

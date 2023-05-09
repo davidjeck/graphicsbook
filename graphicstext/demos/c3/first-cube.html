@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Cube and Depth Test</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var camera;
+
+function draw() {
+
+    glClearColor(0,0,0,1);
+    
+    camera.apply();
+    glScalef(1,1,-1);  // Camera actually applies a non-default, right-handed coordinate system;
+                       // This restores the default left-handed system.
+    
+    if (document.getElementById("bufferCB").checked) {
+       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+    else {
+       glClear(GL_COLOR_BUFFER_BIT);
+    }
+    
+    if (document.getElementById("testCB").checked) {
+       glEnable(GL_DEPTH_TEST);
+    }
+    else {
+       glDisable(GL_DEPTH_TEST);
+    }
+    
+    var s;
+    if (document.getElementById("bigCB").checked) {
+       s = 0.8;
+    }
+    else {
+       s = 0.55;
+    }
+    
+    glColor3d(1,0,0);     // Front
+    glBegin(GL_QUADS);
+    glVertex3d(-s,-s,-s);
+    glVertex3d(-s,s,-s);
+    glVertex3d(s,s,-s);
+    glVertex3d(s,-s,-s);
+    glEnd();
+    
+    glColor3d(0,1,1);   // Back
+    glBegin(GL_QUADS);
+    glVertex3d(-s,-s,s);
+    glVertex3d(-s,s,s);
+    glVertex3d(s,s,s);
+    glVertex3d(s,-s,s);
+    glEnd();
+    
+    glColor3d(0,1,0);   // Left
+    glBegin(GL_QUADS);
+    glVertex3d(-s,-s,-s);
+    glVertex3d(-s,-s,s);
+    glVertex3d(-s,s,s);
+    glVertex3d(-s,s,-s);
+    glEnd();
+    
+    glColor3d(1,0,1);  // Right
+    glBegin(GL_QUADS);
+    glVertex3d(s,-s,-s);
+    glVertex3d(s,-s,s);
+    glVertex3d(s,s,s);
+    glVertex3d(s,s,-s);
+    glEnd();
+    
+    glColor3d(0,0,1);  // Top
+    glBegin(GL_QUADS);
+    glVertex3d(-s,s,-s);
+    glVertex3d(-s,s,s);
+    glVertex3d(s,s,s);
+    glVertex3d(s,s,-s);
+    glEnd();
+    
+    glColor3d(1,1,0);  // Bottom
+    glBegin(GL_QUADS);
+    glVertex3d(-s,-s,-s);
+    glVertex3d(-s,-s,s);
+    glVertex3d(s,-s,s);
+    glVertex3d(s,-s,-s);
+    glEnd();
+}
+
+
+function init() {
+    try {
+        glsimUse("maincanvas", { alpha:false, preserveDrawingBuffer: true });
+           // Note that the second parameter is used here to turn on the preserveDrawingBuffer
+           // option, which is necessary in this example to retain the depth buffer between
+           // renderings.  The option in glsim is that all buffers are cleared after
+           // rendering, which differs from OpenGL, but is the default in WebGL.
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+	return;
+    }
+    document.getElementById("testCB").checked = true;
+    document.getElementById("testCB").onchange = draw;
+    document.getElementById("bufferCB").checked = true;
+    document.getElementById("bufferCB").onchange = function() {
+        if (document.getElementById("bufferCB").checked) {
+            draw();
+        }
+    };
+    document.getElementById("bigCB").checked = false;
+    document.getElementById("bigCB").onchange = draw;
+    document.getElementById("reset").onclick = function() {
+        camera.lookAt(0,0,1,0,0,0,0,1,0);
+	draw();
+    };
+    camera = new Camera();
+    camera.setOrthographic(true);     // Matches default coordinate system.
+    camera.setLimits(-1,1,-1,1,-1,1); // Matches limits on default coordinate system.
+    camera.lookAt(0,0,1,0,0,0,0,1,0);
+    camera.installTrackball(draw);
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Depth Test Demo with Cube</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools">
+<h3>Options:</h3>
+<p><label><input type="checkbox" id="testCB">Enable Depth Test</label></p>
+<p><label><input type="checkbox" id="bufferCB">Clear Depth Buffer</label></p>
+<p><label><input type="checkbox" id="bigCB">Use Bigger Cube</label></p>
+<p><b>Note</b>:<br>
+Drag your mouse on<br>
+the cube to rotate it!</p>
+<p><button id="reset">Reset Rotatation</button></p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo draws a cube in OpenGL's default coordinate system, where the
+visible x, y, and z coordinates are limited to the range minus one to one.
+When the demo loads, you can only see one face of the cube.  You can rotate
+the cube by dragging with the mouse to see it from other directions.
+(On a touch screen, you can drag using your finger.)
+</p>
+
+<p>Try turning off the depth test, and rotate the cube.  You won't get a physically
+correct image.  The sides are actually drawn in the order red, cyan, green,
+magenta, blue, yellow -- does that help you understand what you see?</p>
+
+<p>Clearing the depth buffer has no effect if the depth test is not enabled.
+Try turning off "Clear Depth Buffer", but leave "Depth Test Enabled" turned on.
+Rotate the cube for a while.  What happens?  What happens if you switch to a bigger
+cube after a while?  Think about what's left in the depth buffer when it is not
+cleared, and about how it is used the next time something is drawn.</p>
+
+<p>If you turn on the "Use Bigger Cube" option, and if you rotate the cube, then
+it's possible for part of the cube to be cut off because it is outside the visible
+range of z-values.  See how it looks!  The effect is called "clipping."</p>
+
+<p>One point of this demo is that you will probably encounter similar problems with your
+own programs.  It's a good idea to see what can go wrong and what the results
+can look like.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../threejs-samples/three.min.js"></script>
+<script src="../threejs-samples/OrbitControls.js"></script>
+<script>
+
+var canvas, scene, renderer, camera;
+
+var controls;
+
+function render() {  
+    renderer.render(scene,camera);
+}
+
+
+function installControls() {
+    controls = new THREE.OrbitControls(camera,canvas);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.addEventListener("change", render);
+}
+
+function createWorld() {
+
+    renderer.setClearColor( "white" );  // Set background color (0x444444 is dark gray).
+	scene = new THREE.Scene();
+    
+//    let light = new THREE.PointLight();
+    let light = new THREE.DirectionalLight();
+    light.position.set(1,2,3);
+    scene.add(light);
+    
+    camera = new THREE.PerspectiveCamera(45, 1, 1, 10);
+    camera.position.z = 4;
+	
+    let geom = new THREE.BufferGeometry();
+    let vertices = new Float32Array([
+            1,0,1,  1,0,-1,  -1,0,-1,  -1,0,1,  0,1,0
+        ]);
+    geom.setAttribute("position", new THREE.BufferAttribute(vertices,3));
+    geom.setIndex( [
+            3,2,1,
+            3,1,0,
+            3,0,4,
+            0,1,4,
+            1,2,4,
+            2,3,4
+        ] );
+    let geom3 = geom.clone();
+    let geom4 = geom.toNonIndexed();
+    geom4.computeVertexNormals();
+    geom.computeVertexNormals();
+    
+    let geom1 = new THREE.BufferGeometry();
+    let vertices1 = new Float32Array([
+        -1,0,1, -1,0,-1, 1,0,-1, 
+        -1,0,1, 1,0,-1, 1,0,1, 
+        -1,0,1,  1,0,1,  0,1,0,
+        1,0,1, 1,0,-1,  0,1,0,
+        1,0,-1, -1,0,-1,  0,1,0,
+        -1,0,-1,  -1,0,1,  0,1,0
+    ]);
+    geom1.setAttribute("position", new THREE.BufferAttribute(vertices1,3));
+    geom1.computeVertexNormals();
+    
+    geom3.addGroup(0,6,0);
+    geom3.addGroup(6,3,1);
+    geom3.addGroup(9,3,2);
+    geom3.addGroup(12,3,3);
+    geom3.addGroup(15,3,4);
+    
+    //let pyr = new THREE.Mesh(geom3, [
+    //    new THREE.MeshBasicMaterial( { color: "yellow" }),
+    //    new THREE.MeshBasicMaterial( { color: "red" }),
+    //    new THREE.MeshBasicMaterial( { color: "blue" }),
+    //    new THREE.MeshBasicMaterial( { color: "green" }),
+    //    new THREE.MeshBasicMaterial( { color: "cyan" }),
+    //]);
+    
+    let pyr = new THREE.Mesh( new THREE.BoxGeometry(2,2,2), [
+        new THREE.MeshBasicMaterial( { color: "yellow" }),
+        new THREE.MeshBasicMaterial( { color: "red" }),
+        new THREE.MeshBasicMaterial( { color: "blue" }),
+        new THREE.MeshBasicMaterial( { color: "green" }),
+        new THREE.MeshBasicMaterial( { color: "cyan" }),
+        new THREE.MeshBasicMaterial( { color: "magenta" }),
+    ])
+    
+    let mat = new THREE.MeshLambertMaterial({ color: "yellow" });  
+   // let pyr = new THREE.Mesh(geom1, mat);
+    scene.add(pyr);
+    
+    pyr.rotation.set(0.2,0.5,0);
+    
+
+}
+
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+	    renderer = new THREE.WebGL1Renderer({
+	     canvas: canvas,
+	     antialias: true
+	});
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+	return;
+    }
+    createWorld();
+    render();
+    installControls();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="500" height="400"></canvas>
+</div>
+
+</div>
+
+</body>
+</html>

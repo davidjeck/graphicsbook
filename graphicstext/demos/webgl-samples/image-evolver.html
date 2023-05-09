@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+    This page was written as a demonstration of using the
+    WebGL extension WEBGL_color_buffer_float, which allows
+    floating-point values for color components in a color
+    buffer, including a texture that is attached as a color
+    buffer to a framebuffer.  (This is instead of the usual
+    8-bit integer color components.)  It is used here for
+    the increased accuracy of arithmetic operations with
+    32-bit floating-point values.
+    
+    The application is an attempt to apply the genetic algorithm
+    to evolve an approximation for a given simple picture.
+    It works to some extent, but in spite of my efforts to
+    tune the algorithm, the evolution slows down too quickly.
+    (Note added later:  I did get a decent approximation after
+    5,000 generations.)
+-->
+
+<head>
+<meta charset="UTF-8">
+<title>Evolving Images in WebGL</title>
+<style>
+body {
+    background-color: lightblue;
+    -webkit-user-select: none; /* turning off text selection  / Webkit */
+    -moz-user-select: none;    /* Firefox */
+    user-select: none;
+}
+canvas {
+    display: block;
+    background-color: black;
+}
+</style>
+
+
+<!-- A vertex and fragment shader for drawing a POINT primitive with color
+     and size attributes.  The color is a grayscale value, represented by a float.
+     The fragment shader uses the interpolated color value for all three
+     color components in the fragment color.  The coordinates for the points
+     are assumed to be in the range 0 to 1.  The shader scales that to the
+     usual clip coordinate range, -1 to 1.
+-->
+<script type="x-shader/x-vertex" id="vshader-draw">
+    attribute vec2 a_coords;  // coordinates on square, ranging from 0 to 1
+    attribute float a_color;  // grayscale value only
+    attribute float a_size;   // point size
+    varying float v_color;
+    void main() {
+        gl_Position = vec4( 2.0*a_coords - 1.0, 0, 1 ); 
+        v_color = a_color;
+        gl_PointSize = a_size;
+    }
+</script>
+<script type="x-shader/x-fragment" id="fshader-draw">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying float v_color;
+    void main() {
+        gl_FragColor = vec4(v_color,v_color,v_color,1.0);
+    }
+</script>
+
+
+<!-- A vertex shader used with the fragment shaders fshader-diff and fshader-average.
+     It scales the square with xy-coords from 0 to 1 to fill the default
+     OpenGL clip coordinate rectangle, which has coords in the range -1 to 1.
+     The original coords are passed as a varying variable to the fragment shader.
+     The output color is computed entirely in the fragment shader.
+-->
+<script type="x-shader/x-vertex" id="vshader">
+    attribute vec2 a_coords;  // coordinates on square, ranging from 0 to 1
+    varying vec2 v_coords;
+    void main() {
+        gl_Position = vec4( 2.0*a_coords - 1.0, 0, 1 ); 
+        v_coords = a_coords;
+    }
+</script>
+
+<!-- A fragment shader to compute the difference between two textures.
+     The absolute value of the difference between the samples from the
+     two textures becomes the fragment color.
+-->
+<script type="x-shader/x-fragment" id="fshader-diff">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec2 v_coords;
+    uniform sampler2D texture1, texture2;
+    void main() {
+        vec4 a = texture2D(texture1, v_coords);
+        vec4 b = texture2D(texture2, v_coords);
+        gl_FragColor = abs(a - b);
+    }
+</script>
+
+<!-- A fragment shader that is used during the computation of the average
+     color of an image.  The shader samples a texture at four points and
+     sets the fragment color equal to the average of those four samples.
+     This is applied to set the rectangle with vertices at (0,0) and
+     (offset,offset) equal to the average of that rectangle and the
+     three neighboring rectangles of the same size in the texture.
+-->
+<script type="x-shader/x-fragment" id="fshader-average">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec2 v_coords;
+    uniform sampler2D texture;
+    uniform float offset;
+    void main() {
+        vec4 a = texture2D(texture, v_coords);
+        vec4 b = texture2D(texture, v_coords + vec2(offset,0));
+        vec4 c = texture2D(texture, v_coords + vec2(0,offset));
+        vec4 d = texture2D(texture, v_coords + vec2(offset,offset));
+        gl_FragColor = (a + b + c + d)/4.0;
+    }
+</script>
+
+
+<script>
+
+// Note: This script assumes that the canvases and textures are of
+// size 256-by-256.
+
+"use strict";
+
+let gl;  // The WebGL graphics context.
+
+let diffProg;     // An object holding a shader program and attribute/uniform locations for differencing two textures.
+let averageProg;  // A similar object for averaging the colors in a texture.
+let drawProg;     // A similar object drawing primitives with color attribute.
+
+let fb1, fb2;    // framebuffer objects
+let tex1, tex2;  // texture objects bound as floating point color buffers to fb1, fb2
+
+let colorBuffer, coordsBuffer, sizeBuffer, squaresBuffer;  // VBOs for attributes.
+let texture;  // A texture object holding a copy of the original image, for use in evaluating individuals.
+
+const POINTS = 500;  // An "individual" in the genetic algorithm is a gl.POINTS primitive with this many triangles. 
+const POPULATION_SIZE = 200;  // The number of individuals in the population.
+const CROSSOVER_PROBABILITY = 0.9; // Individuals are paired, and each pair has this probability of being crossed over
+const MUTATION_PROBABILITY = 0.8; // Each individual has this probability of being mutated at least once.
+
+let population;  // An array of objects of length POPULATION_SIZE representing the individuals in the current generation.
+let generation = 1;  // Generation number
+let avgFitness; // The average fitness of the individuals in the current generation.
+
+
+/**
+ * Called once during initialization to draw the original image.  It is drawn to the
+ * canvas on the left of the web page, using canvas graphics, not WebGL.  The image
+ * is then copied to a texture that will be used to compute the difference between
+ * the original image and the individuals in the population.
+ */
+function createOriginal(canvas, graphics) {
+    graphics.fillStyle = "white";
+    graphics.fillRect(0,0,256,256);
+    graphics.fillStyle = "black";
+    graphics.beginPath();
+    graphics.arc(150,75,75,0,2*Math.PI,false);
+    graphics.fill();
+    graphics.fillStyle = "#777777";
+    graphics.fillRect(0,180,200,80);
+    gl.activeTexture(gl.TEXTURE0);  // Copy image to texture.
+    texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.LUMINANCE,gl.LUMINANCE,gl.UNSIGNED_BYTE,canvas);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+}
+
+/**
+ *  Compute the fitness of an individual.  An individual is an image made up of
+ *  triangles.  This function computes the average color difference between that
+ *  image and the original image.  The fitness is the square of one minus that average.
+ *  That formula is used so that higher fitness is better, and the value is squared
+ *  to increase the relative advantage of more highly fit individuals (to give selection
+ *  a larger difference to work with).  The fitness value is always in the range 0 to 1.
+ */
+function individualFitness(individual) {
+    draw(individual, fb1);  // Draw the image for this individual into frame buffer number 1.
+    doDiff();  // Compute the difference between frame buffer 1 and the original image,
+               // as an image stored in frame buffer number 2.
+    let avgColor = getAverageColor(fb2,fb1);  // Get average color of the difference image in fb2.
+    return Math.pow(1 - avgColor, 2);
+}
+
+/**
+ * Draw the image for an individual in the given framebuffer.  When framebuffer is null,
+ * the image is drawn to the canvas on the right of the web page.
+ */
+function draw(individual, framebuffer) { 
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.useProgram(drawProg.prog);
+    gl.clearColor(1,1,1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindBuffer(gl.ARRAY_BUFFER, coordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, individual.coords, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(drawProg.a_coords);
+    gl.vertexAttribPointer(drawProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, individual.colors, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(drawProg.a_color);
+    gl.vertexAttribPointer(drawProg.a_color, 1, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, individual.sizes, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(drawProg.a_size);
+    gl.vertexAttribPointer(drawProg.a_size, 1, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, POINTS);
+    gl.disableVertexAttribArray(drawProg.a_coords);
+    gl.disableVertexAttribArray(drawProg.a_color);
+    gl.disableVertexAttribArray(drawProg.a_size);
+}
+
+/**
+ *  Compute the average color of an image.  The parameters src and dest are
+ *  frame buffers, where src contains the image and the image in dest is not used.
+ *  The image in both framebuffers is modified during the computation.
+ *     The algorithm starts by drawing a half-size image in dest that is the
+ *  average of the four quadrants in the original image.  It then swaps the src
+ *  and dest and draws a quarter-size image that is the average of the
+ *  four quadrants of the half-size image.  And so, unitil the image size
+ *  is 4-by-4 pixels.  It the reads the color data for that four-by-four
+ *  image and returns the average of the red color components of the
+ *  16 color values.  (Since the colors are grayscale, the three color
+ *  components would be the same.)  It stops with a 4-by-4 rectangle because
+ *  it seems likely that reading 16 color values from the GPU will probably
+ *  be faster than doing two more draw operations to reduce the size to 1 pixel,
+ *  and then reading one pixel.  This is totally a guess.
+ */
+function getAverageColor(src, dest) {
+    gl.useProgram(averageProg.prog);
+    let size = 0.5; // Full image is 256-by-256, so size = 0.5 corresponds to a 128-by-128 image.
+    gl.uniform1i(averageProg.u_texture,1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.enableVertexAttribArray(averageProg.a_coords);
+    gl.vertexAttribPointer(averageProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+        // The VBO for the attribute averageProg.a_coords contains the coordinates for
+        // the corners of 7 squares, starting with the square with vertices at (0,0) and (1,1).
+        // Each square is half the size of the previous one.  As level goes from one to six
+        // in the following for loop, the squares that are drawn are 128-by-128 pixels,
+        // 64-by-64 pixels, ..., 4-by-4 pixels.
+    for (let level = 1; level < 7; level++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dest);
+        if (src == fb1) {
+            gl.bindTexture(gl.TEXTURE_2D, tex1);
+        }
+        else {
+            gl.bindTexture(gl.TEXTURE_2D, tex2);
+        }
+        gl.uniform1f(averageProg.u_offset, size);
+        gl.drawArrays(gl.TRIANGLE_FAN, level*4, 4);
+        let temp = src;
+        src = dest;
+        dest = temp;
+        size /= 2;
+    }
+    gl.disableVertexAttribArray(averageProg.a_coords);
+
+    let data = new Float32Array( 4*4*4 ); // To hold the color data in from the 4 pixel by 4 pixel image.
+    gl.readPixels(0,0,4,4,gl.RGBA,gl.FLOAT,data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) { // Add up the red color component values.
+        sum += data[i];
+    }
+    return sum/16;
+}
+
+
+/**
+ *  Compute a difference image between the image in frame buffer 1 and the original image 
+ *  from the canvas.  The original image is in the texture object named "texture".
+ *  The difference is sent to frame buffer 2.
+ */
+function doDiff() {
+    gl.useProgram(diffProg.prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb2);  // draw to frame buffer 2
+    gl.bindBuffer(gl.ARRAY_BUFFER, squaresBuffer);
+    gl.enableVertexAttribArray(diffProg.a_coords);
+    gl.vertexAttribPointer(diffProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, texture);  // Contains the original image.
+    gl.uniform1i(diffProg.u_texture1, 1);  // use original image as texture1 in the difference shader
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D,tex1);  // tex1 is the color buffer in framebuffer 1.
+    gl.uniform1i(diffProg.u_texture2, 2); // use image from frame buffer 1 as texture1 in the differnece shader.
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4); // draw the square that exactly covers the image, to hit each pixel once.
+    gl.disableVertexAttribArray(diffProg.a_coords);
+}
+
+/**
+ *  Compute a fitness value for each individual in the population, and store that value
+ *  as a property of the object that represents that individual.  The generation number,
+ *  maximum fitness, and average fitness are reported on the web page, and the generation
+ *  number is incremented.  The individual with the highest fitness is moved to index 0 in
+ *  the population array and is drawn in the second canvas on the web page.
+ */
+function doFitness() {
+    let max = 0;
+    let maxLoc;
+    let sum = 0;
+    for (let i = 0; i < POPULATION_SIZE; i++) {
+         population[i].fitness = individualFitness(population[i]);
+         sum += population[i].fitness;
+         if (population[i].fitness >= max) {
+            max = population[i].fitness;
+            maxLoc = i;
+         }
+    }
+    let tmp = population[0];
+    population[0] = population[maxLoc];
+    population[maxLoc] = tmp;
+    avgFitness = sum/population.length;
+    document.getElementById("message").innerHTML = "Generation " +
+               generation + ", maximum fitness = " + population[0].fitness.toFixed(4) +
+               ", average fitness = " + avgFitness.toFixed(4);
+    draw(population[0],null);
+    generation++;
+}
+
+
+/**
+ *  Create the initial data for the population array.  This is called once during
+ *  initialization.  An individual contains arrays of vertex coordinates, vertex
+ *  colors, and point sizes.  There is only one color component per
+ *  point, representing a grayscale value.  A fitness value will be added to
+ *  each individual later.  Coordinates and colors are in the range 0 to 1.
+ *  point sizes are in the range 1 to 32.
+ */
+function createInitialPopulation() {
+    population = new Array(POPULATION_SIZE);
+    for (let j = 0; j < POPULATION_SIZE; j++) {
+        let ind = {};
+        ind.coords = new Float32Array( POINTS*2 ); // 2 coords for the 3 2D vertices of each point
+        ind.colors = new Float32Array( POINTS ); // 1 grayscale color value each point
+        ind.sizes = new Float32Array( POINTS );  // 1 point size for each point
+        let i;
+        for (i = 0; i < POINTS*2; i++) {
+            ind.coords[i] = Math.random();
+        }
+        for (i = 0; i < POINTS; i++) {
+            ind.colors[i] = Math.random();
+        }
+        for (i = 0; i < POINTS; i++) {
+            ind.sizes[i] = 32*Math.random() + 1;
+        }
+        population[j] = ind;
+    }
+    doFitness();
+}
+
+/**
+ *  Apply a mutation to a, which is one of the individuals in the population.
+ *  Four kinds of mutation are possible.
+ */
+function mutate(a) {
+    let x;
+    switch (Math.floor(3.5*Math.random())) {
+    case 0:  // change a random vertex color
+        x = Math.floor( Math.random()*a.colors.length);
+        a.colors[x] = Math.random();
+        break;
+    case 1:  // change a random vertex coordinate
+        x = Math.floor( Math.random()*a.coords.length);
+        a.coords[x] = Math.random();
+        break;
+    case 2:  // change a random point size
+        x = Math.floor(Math.random()*a.sizes.length);
+        a.sizes[x] = 32*Math.random() + 1;
+        break;
+    case 3:  // completely replace a point -- only half as likely as the other three
+        x = Math.floor( Math.random()*POINTS );
+        a.colors[x] = Math.random();
+        a.sizes[x] = 32*Math.random() + 1;
+        a.coords[2*x] = Math.random();
+        a.coords[2*x+1] = Math.random();
+        break;
+    }
+}
+
+/**
+ *  Apply a crossover operation to a and b, which are individuals from the population.
+ *  The two individuals swap parts of their data, modifying both individuals. 
+ */
+function crossover(a,b) {
+    let cut = Math.floor( Math.random()*(POINTS-2) + 1 );
+    for (let k = 2*cut; k < 2*POINTS; k++) {
+        let tmp = a.coords[k];
+        a.coords[k] = b.coords[k];
+        b.coords[k] = tmp;
+    }
+    for (let k = cut; k < POINTS; k++) {
+        let tmp = a.colors[k];
+        a.colors[k] = b.colors[k];
+        b.colors[k] = tmp;
+        tmp = a.sizes[k];
+        a.sizes[k] = b.sizes[k];
+        b.sizes[k] = tmp;
+    }
+}
+
+/**
+ *  Produce a new generation by copying individuals from the current
+ *  population.  The number of copies of an individual depends on
+ *  its fitness.  An array containing the new population is returned.
+ *  Every individual in the new array is a copy of some individual
+ *  from the current population.  A copy of population[0], which
+ *  is the most fit individual in the current population will be
+ *  at index 0 in the new array.
+ */
+function reproduce(population, averageFitness) {
+    function copy(a) {
+           // Copy individual a to the new population array.
+           // If this is the first copy of that individual,
+           // just copy the pointer.  If it's not the first,
+           // make the new individual out of new copies of the
+           // data from a.  Fitnesses are not copied; they
+           // will be recomputed after crossover and mutation
+           // in the evolve() function, which calls this function.
+        if (first) {
+            newPop.push(a);
+        }
+        else {
+            newPop.push( {
+                coords: new Float32Array(a.coords),
+                colors: new Float32Array(a.colors),
+                sizes: new Float32Array(a.sizes)
+            } );
+        }
+    }
+    let first;
+    let newPop = [];  // The new population array.
+    for (let i = 0; i < population.length; i++) {
+        let a = population[i];
+        let f = a.fitness/averageFitness; 
+           // f is the ratio of the fitness of a to the average
+           // fitness of the population.  There will be at least
+           // Math.floor(f) copies of a added to newPop (which can
+           // be zero.)  And there is a ( f - Math.floor(f) ) probabilty
+           // of adding another copy.  Note that since population[0]
+           // has the highest fitness, there will be at least one
+           // copy of population[0] in the new population (at index 0).
+        first = true;  // true when first copy of a is made
+        while (f >= 1) {
+            copy(a);
+            first = false;
+            f -= 1;
+        }
+        if (Math.random() < f) {
+            copy(a);
+        }
+    }
+    
+    // The above procedure should have produced a new population with
+    // about the same size as the current population.  But the
+    // size is adjusted to exactly equal POPULATION_SIZE
+    while (newPop.length < POPULATION_SIZE) {
+           // Add extra copies to fill the population, without regard to fitness.
+        first = false;
+        copy(population[ Math.floor(population.length*Math.random()) ]);
+    }
+    while (newPop.length > POPULATION_SIZE) {
+           // Delete extras from population, chosen at random (except not population[0]).
+        let del = 1 + Math.floor((newPop.length-1)*Math.random());
+        newPop.splice(del,1);
+    }
+    return newPop;
+}
+
+
+/**
+ * Produce the population of individuals for the next generation, by reproducing
+ * the current population then applying crossover and mutation.  This function is
+ * called by a timeout that is set in the init() function, and a timeout is used
+ * at the end of this function to schedule another call to this function.
+ */
+function evolve() {
+    let start = new Date().getTime();  // For measuring the compute time.
+    
+    let best = {  // save a copy of the highest fitness individual, which is in population[0]
+        colors: new Float32Array(population[0].colors),
+        coords: new Float32Array(population[0].coords),
+        sizes: new Float32Array(population[0].sizes),
+        fitness: population[0].fitness
+    };
+        
+    // Make the new population; avgFitness was computed in doFitness().
+    population = reproduce(population,avgFitness);
+    
+    // Apply crossover to pairs of individuals in the population, but not to population[0].
+    // As a fudge, the highest fitness individual, population[0], can be mutated
+    // but not crossed over.  Crossover will almost always decrease its fitness,
+    // while mutation has a good chance of increasing it.  It seems like after
+    // the first few hundred generations, most of the increase in fitness is coming
+    // from mutation (pretty slowly), so avoiding crossover on population[0] speeds
+    // things up in the long run.
+    let indices; // Will contain 1, 2, 3, ..., POPULATION_SIZE
+    indices = new Uint32Array(population.length - 1);
+    for (let i = 0; i < indices.length; i++) { 
+        indices[i] = i + 1; // leave out index 0 
+    }
+    let top = indices.length;  // number of unused items in indices
+    while (top > 1) {
+        // i and j will be two distinct, randomly selected indices into the population array.
+        let i = Math.floor(top*Math.random());
+        let a = population[indices[i]];
+        indices[i] = indices[--top];  // removes indices[i] from further consideration, so we don't use it again
+        let j = Math.floor(top*Math.random());
+        let b = population[indices[j]];
+        indices[j] = indices[--top]; // removes indices[j] from further consideration
+        if (Math.random() < CROSSOVER_PROBABILITY) {
+              // apply crossover, with probability = CROSSOVER_PROBABILITY
+            crossover( a, b );
+        }
+    }
+    
+    // Apply mutation to individuals.
+    for (let i = 0; i < population.length; i++) {
+            // With probability MUTATION_PROBABILITY, individual i has at least one mutation.
+            // but if it has one, it can have up to 9 additional mutations.
+        let ct = 0;
+        while (ct < 10 && Math.random() < MUTATION_PROBABILITY) {
+            mutate(population[i]);
+            ct++;
+        }
+    }
+    
+    population[0].fitness = individualFitness(population[0]);
+    if (best.fitness > population[0].fitness) { // population[0] got worse!
+        population[0] = best; // replace with old value, to avoid having maximum fitness go down.
+    }
+   
+    // Compute (and report) the fitness values for the new population.
+    doFitness();
+
+    // There will be a delay of between 10 and 100 milliseconds before this function
+    // is called.  The delay is the time spent in this function, divided by 4, then
+    // clamped to the range 10 to 100.  (Longer compute times give longer wait times,
+    // to be fair to other processes.)
+    let computetime = (new Date().getTime()) - start;
+    let waittime = Math.max(10,Math.min(100,computetime/4));
+//    console.log("compute time = " + computetime + ", wait = " + waittime);
+    setTimeout(evolve, waittime);
+}
+
+
+
+/**
+ * Initialize the WebGL graphics context; create shader programs, buffers, and framebuffers...
+ */
+function initGL() {
+    
+    // Start by activating the two extensions that are needed.  gl.getExtension activates the
+    // extension, if it is available.  The return value is null if the extension is not
+    // available.  (Otherwise, it is an object that can contain data needed to use the
+    // extension.  In this case, we don't need any of the data.)  The effect of activating
+    // the extensions is to make it possible to use gl.FLOAT as the color component type
+    // for RGBA colors in a texture, to use such a texture as a color buffer for a
+    // framebuffer, and to read floating-point values from the framebuffer with gl.readPixels.
+    //    Note: OES_texture_float has in the past implicitly activated functionality
+    // similar to WEBGL_color_buffer_float for using floating point textures as color
+    // buffers with framebuffers, but this has been deprecated.  Officially, both
+    // should be explicitly activated.
+    let EXTcbf = gl.getExtension("WEBGL_color_buffer_float");
+    let EXTtf = gl.getExtension("OES_texture_float"); // Should always be available if EXTcbf is.
+    if (!EXTcbf || !EXTtf) {
+        throw new Error("<br>This program require the WebGL extension WEBGL_color_buffer_float," +
+              "<br>which is not available in this browser.");
+    }
+    
+    gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1 );  // so the original image isn't upside down when copied to the texture.
+
+    // This application uses three different shader programs, each with its own
+    // attribute and uniform locations.  A shader program and associated locations
+    // are stored in an object.
+    drawProg = {};
+    drawProg.prog = createProgram( gl, "vshader-draw", "fshader-draw");
+    drawProg.a_coords = gl.getAttribLocation(drawProg.prog, "a_coords");
+    drawProg.a_color = gl.getAttribLocation(drawProg.prog, "a_color");
+    drawProg.a_size = gl.getAttribLocation(drawProg.prog, "a_size");
+    
+    averageProg = {};
+    averageProg.prog = createProgram( gl, "vshader", "fshader-average" );
+    averageProg.a_coords = gl.getAttribLocation(averageProg.prog, "a_coords");
+    averageProg.u_texture = gl.getUniformLocation(averageProg.prog, "texture");
+    averageProg.u_offset = gl.getUniformLocation(averageProg.prog, "offset");
+    
+    diffProg = {};
+    diffProg.prog = createProgram( gl, "vshader", "fshader-diff");
+    diffProg.a_coords = gl.getAttribLocation(diffProg.prog, "a_coords");
+    diffProg.u_texture1 = gl.getUniformLocation(diffProg.prog, "texture1");
+    diffProg.u_texture2 = gl.getUniformLocation(diffProg.prog, "texture2");
+    
+    // Create a VBO to hold vertices for 7 squares staring with the square
+    // with vertices (0,0) and (1,1). All the squares have a vertex at (0,0),
+    // and the size of each square is half of the preceding one.  This is
+    // used in getAverageColor()
+    let coords = new Float32Array( 7*4*2 );  
+    let size = 1;
+    let j = 0;
+    for (let level = 0; level < 7; level++) {
+        coords[j++] = 0;     // first vertex
+        coords[j++] = 0;
+        coords[j++] = size;  // second vertex
+        coords[j++] = 0;
+        coords[j++] = size;  // third vertex
+        coords[j++] = size;
+        coords[j++] = 0;     // fourth vertex
+        coords[j++] = size;
+        size /= 2;
+     }
+    squaresBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, squaresBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+
+    coordsBuffer = gl.createBuffer();  // VBO for the coordinates of the points primitive of an individual.
+    colorBuffer = gl.createBuffer();   // VBO for the color values of the points primitive.
+    sizeBuffer = gl.createBuffer();    // VBO for the point size values
+    
+    // Create frame buffer 1 and the floating-point texture that serves as its color buffer.
+    // Note that it is important to use gl.NEAREST texture filters thoughout this program,
+    // so that sampling a texture returns the exact color value of a single texel, not an average.
+    tex1 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.FLOAT, null);
+         //With null as the last parameter, the previous method allocates memory for the texture and fills it with zeros.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    fb1 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fb1);  // select the framebuffer, so we can attach the texture to it
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex1, 0);
+
+    // Create frame buffer 1 and the floating-point texture that serves as its color buffer.
+    tex2 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex2);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.FLOAT, null);
+         //With null as the last parameter, the previous method allocates memory for the texture and fills it with zeros.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    fb2 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fb2);  // select the framebuffer, so we can attach the texture to it
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex2, 0);
+
+}  // end initGL()
+
+
+/* A standard function that creates a shader program for use in the WebGL
+ * context gl, and returns the identifier for that program. 
+ *    The second and third parameters are the id attributes for the script
+ * elements that contain the source code for the vertex and fragment shaders.
+ */
+function createProgram(gl, vertexShaderID, fragmentShaderID) {
+    function getTextContent( elementID ) { // Get text content of an HTML element.
+        let element = document.getElementById(elementID);
+        let node = element.firstChild;
+        let str = "";
+        while (node) {
+            if (node.nodeType == 3) // this is a text node
+                str += node.textContent;
+            node = node.nextSibling;
+        }
+        return str;
+    }
+    let vertexShaderSource, fragmentShaderSource;
+    try {
+        vertexShaderSource = getTextContent( vertexShaderID );
+        fragmentShaderSource = getTextContent( fragmentShaderID );
+    }
+    catch (e) {
+        throw new Error("Error: Could not get shader source code from script elements " +
+                   vertexShaderID + " and " + fragmentShaderID + ": " + e);
+    }
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vertexShaderSource);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader with id=" + vertexShaderID +" :  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader with id=" + fragmentShaderID + ":  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    let canvas, graphics; // for drawing the original image
+    try {
+        let options = {  
+            depth: false
+        };
+        let glcanvas = document.getElementById("c2");
+        gl = glcanvas.getContext("webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+        canvas = document.getElementById("c1");
+        graphics = canvas.getContext("2d");
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "Sorry, could not get a WebGL graphics context.";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "Sorry, could not initialize the WebGL graphics context: " + e;
+        return;
+    }
+    createOriginal(canvas,graphics);
+    createInitialPopulation();
+    setTimeout(evolve, 500); // wait 1/2 second after createing the first generation.
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<h2 id="headline">WebGL Genetic Algorithm: Evolving an Image</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<p id="message">Initializing</p>
+
+<table border=0 cellpadding=0 cellspacing=10>
+<tr>
+   <td><p><b>Original Image:</b></p><canvas id="c1" width="256" height="256"></canvas></td>
+   <td><p><b>Best Approximation So Far:</b></p><canvas id="c2" width="256" height="256"></canvas></td>
+</tr>
+</table>
+
+<p style="width:600px">This is an only-partly successful attempt to apply the genetic algorithm
+to evolve an approximation of a given image.  The original image is very simple.  The candidate
+approximations are grayscale images made up of 500 small squares.  As time goes on, for example,
+you should see a darker region emerging in the upper right corner, corresponding to the black disk
+in the original image.  However, big improvements don't seem to come up much after
+the first couple of hundred generations.  (Still, you might get a decent approximation after
+several thousand generations.)</p>
+<p style="width:600px">In any case, the main point of this exercise was to use an optional
+extension to the WebGL 3D graphics system that makes it possible to work with a "floating-point
+color buffer", and to demonstrate some techniques for doing computational work in WebGL.
+The page is not functional if the required extension is not available, even if your browser
+does support WebGL.</p>
+</body>
+</html>

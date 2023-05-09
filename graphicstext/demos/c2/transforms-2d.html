@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>2D Transforms</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+#transforms {
+   width: 200px;
+   height: 190px;
+   overflow: auto;
+   margin: 0;
+   padding: 4px;
+   background-color: white;
+   border: thin solid #740b0b;
+}
+#transforms p {
+    margin: 0px;
+    padding: 1px;
+}
+#tools p {
+    margin: 2px;
+    padding: 0px;
+    text-indent: 0px;
+}
+#transforms p.selected {
+    background-color: #DDDDFF;
+}
+.input {
+    margin-top:5px;
+    margin-right:4px;
+    padding: 2px;
+    background-color: white;
+    border: thin solid black;
+    font-size:80%;
+    float: left;
+}
+</style>
+<script src="../script/demo-core.js"></script>
+<script>
+
+var canvas;
+var graphics;
+var shape = 0;
+var transforms = [];
+var transformParagraphs = [];
+var transformContainer;
+var selectedTransform = -1;
+var animating = false;
+var animationStep;
+var showResultOnly = false;
+
+var colors = ["black", "#AA0000", "#00AA00", "#0000AA", "#00AAAA", "#AA00AA", "#AAAA00", "#885500", "#AAAAAA"];
+
+function draw() {
+    var i,j;
+    graphics.clearRect(0,0,400,400);
+    graphics.strokeStyle = "black";
+
+    graphics.save();
+    graphics.translate(200.5,200.5);
+    graphics.scale(40,-40);
+    graphics.beginPath();
+    graphics.moveTo(-5,0);
+    graphics.lineTo(5,0);
+    graphics.moveTo(0,5);
+    graphics.lineTo(0,-5);
+    graphics.restore();
+    graphics.lineWidth = 2;
+    graphics.stroke();
+
+    graphics.save();
+    graphics.translate(200.5,200.5);
+    graphics.scale(40,-40);
+    graphics.beginPath();
+    for (i = -4; i <= 4; i++) {
+        graphics.moveTo(-5,i);
+        graphics.lineTo(5,i);
+        graphics.moveTo(i,-5);
+        graphics.lineTo(i,5);
+    }
+    graphics.restore();
+    graphics.lineWidth = 1;
+    graphics.stroke();
+
+    graphics.fillStyle = "#8080FF";
+    for (i = -5; i <= 5; i++) {
+        if (i != 0) {
+            graphics.fillText(String(i), 40*(i+5)+2, 198);
+            graphics.fillText(String(i), 202, 400 - 40*(i+5)-2);
+        }
+    }
+    
+    graphics.save();
+    
+    graphics.translate(200.5,200.5);
+    graphics.scale(40,-40);
+    if (!showResultOnly || animating) {
+        graphics.save();
+        drawShape(0);
+        graphics.restore();
+    }
+    
+    if (showResultOnly) {
+        for (j = transforms.length-1; j >= 0; j--) {
+           applyTransform(transforms[j]);
+        }
+        drawShape(transforms.length);
+    }
+    else {
+        var top = animating? animationStep : transforms.length;
+        for (i = 0; i < top; i++) {
+            graphics.save();
+            for (j = i; j >= 0; j--) {
+               applyTransform(transforms[j]);
+            }
+            drawShape(i+1);
+            graphics.restore();
+        }
+    }
+    
+    graphics.restore();
+    
+}
+
+function drawShape(versionNumber) {
+    if (shape == 5) { 
+        graphics.scale(.05,-.05);
+        if ( !animating || (versionNumber == animationStep) ) {
+            graphics.fillStyle = colors[versionNumber];
+        }
+        else {
+            graphics.fillStyle = "#CCCCCC";
+        }
+        graphics.font = "12pt bold serif";
+        graphics.fillText("Hello!", 1, 1);
+        return;
+    }
+    graphics.beginPath();
+    switch (shape) {
+    case 0:
+        graphics.translate(1,1);
+    case 1:
+        graphics.moveTo(-1,-1);
+        graphics.lineTo(-1,1);
+        graphics.lineTo(1,1);
+        graphics.lineTo(1,0.5);
+        graphics.lineTo(-0.2,0.5);
+        graphics.lineTo(-0.2,0.1);
+        graphics.lineTo(0.6,0.1);
+        graphics.lineTo(0.6,-0.3);
+        graphics.lineTo(-0.2,-0.3);
+        graphics.lineTo(-0.2,-1);
+        graphics.closePath();
+        break;
+    case 2:
+        graphics.rect(-1,-1,2,2);
+        break;
+    case 3:
+        graphics.rect(-1,-0.5,2,1);
+        break;
+    case 4:
+        graphics.moveTo(-1,-1);
+        graphics.lineTo(1,-1);
+        graphics.lineTo(1,0);
+        graphics.lineTo(0.5,0);
+        graphics.lineTo(0.5,1);
+        graphics.lineTo(-1,1);
+        graphics.closePath();
+        break;
+    }
+    graphics.lineWidth = 1/20;
+    graphics.strokeStyle = "black";
+    graphics.stroke();
+    if ( !animating || (versionNumber == animationStep) ) {
+        graphics.globalAlpha = 0.6;
+        graphics.fillStyle = colors[versionNumber];
+        graphics.fill();
+    }
+}
+
+function applyTransform(transform) {
+    switch (transform.type) {
+    case "translate":
+        graphics.translate(transform.a,transform.b);
+        break;
+    case "scale":
+        graphics.scale(transform.a,transform.b);
+        break;
+    case "rotate":
+        graphics.rotate(Math.PI*transform.a/180);
+        break;
+    }
+}
+
+var errorTimeout = null;
+function setErrorMessage(message) {
+    if (errorTimeout) {
+        clearTimeout(errorTimeout);
+        errorTimeout = null;
+    }
+    var s = message || "Modeling Transforms in 2D";
+    document.getElementById("headline").innerHTML = s;
+    document.getElementById("headline").style.color = message? "red" : "black";
+    if (message) {
+        errorTimeout = setTimeout(function() { setErrorMessage() }, 5000);        
+    }
+}
+
+function clearTransforms() {
+    setErrorMessage();
+    stopAnimation();
+    transforms = [];
+    transformParagraphs = [];
+    selectedTransform = -1;
+    document.getElementById("transforms").innerHTML = "";
+    draw();
+    document.getElementById("rotBut").disabled = false;
+    document.getElementById("transBut").disabled = false;
+    document.getElementById("scaleBut").disabled = false;
+    document.getElementById("deleteButton").disabled = true;
+    document.getElementById("upButton").disabled = true;
+    document.getElementById("downButton").disabled = true;
+    document.getElementById("animateCheckbox").disabled = true;
+}
+
+function deleteLast() {
+    setErrorMessage();
+    if (transforms.length == 0) {
+        return;
+    }
+    if (transforms.length == 1) {
+        stopAnimation();
+    }
+    transforms.pop();
+    var p = transformParagraphs.pop();
+    document.getElementById("transforms").removeChild(p);
+    if (selectedTransform >= transforms.length) {
+        selectedTransform = -1;
+        document.getElementById("upButton").disabled = true;
+        document.getElementById("downButton").disabled = true;
+    }
+    document.getElementById("rotBut").disabled = false;
+    document.getElementById("transBut").disabled = false;
+    document.getElementById("scaleBut").disabled = false;
+    document.getElementById("deleteButton").disabled = (transforms.length == 0);
+    document.getElementById("animateCheckbox").disabled = (transforms.length == 0);
+    draw();
+}
+
+function moveTransformUp() {
+    setErrorMessage();
+    if (selectedTransform <= 0) {
+        return;
+    }
+    var p = transformParagraphs[selectedTransform];
+    transformParagraphs[selectedTransform] = transformParagraphs[selectedTransform-1];
+    transformParagraphs[selectedTransform-1] = p;
+    var t = transforms[selectedTransform];
+    transforms[selectedTransform] = transforms[selectedTransform-1];
+    transforms[selectedTransform - 1] = t;
+    selectedTransform -= 1;
+    document.getElementById("upButton").disabled = (selectedTransform == 0);
+    document.getElementById("downButton").disabled = (selectedTransform == transforms.length-1);
+    var tr = document.getElementById("transforms");
+    if (selectedTransform == 0) {
+        tr.removeChild(p);
+        tr.insertBefore(p,tr.firstElementChild);
+    }
+    else {
+        var prev = p.previousElementSibling;
+        tr.removeChild(p);
+        tr.insertBefore(p,prev);
+    }
+    transformParagraphs[selectedTransform].style.color = colors[selectedTransform+1];
+    transformParagraphs[selectedTransform+1].style.color = colors[selectedTransform+2];
+    transformParagraphs[selectedTransform].numberInList = selectedTransform;
+    transformParagraphs[selectedTransform+1].numberInList = selectedTransform+1;
+    draw();
+}
+
+function moveTransformDown() {
+    setErrorMessage();
+    if (selectedTransform >= transforms.length - 1) {
+        return;
+    }
+    var p = transformParagraphs[selectedTransform];
+    transformParagraphs[selectedTransform] = transformParagraphs[selectedTransform+1];
+    transformParagraphs[selectedTransform+1] = p;
+    var t = transforms[selectedTransform];
+    transforms[selectedTransform] = transforms[selectedTransform+1];
+    transforms[selectedTransform + 1] = t;
+    selectedTransform += 1;
+    document.getElementById("upButton").disabled = (selectedTransform == 0);
+    document.getElementById("downButton").disabled = (selectedTransform == transforms.length-1);
+    var tr = document.getElementById("transforms");
+    if (selectedTransform == transforms.length - 1) {
+        tr.removeChild(p);
+        tr.appendChild(p);
+    }
+    else {
+        var next = p.nextElementSibling.nextElementSibling;
+        tr.removeChild(p);
+        tr.insertBefore(p,next);
+    }
+    transformParagraphs[selectedTransform-1].style.color = colors[selectedTransform];
+    transformParagraphs[selectedTransform].style.color = colors[selectedTransform+1];
+    transformParagraphs[selectedTransform-1].numberInList = selectedTransform-1;
+    transformParagraphs[selectedTransform].numberInList = selectedTransform;
+    draw();
+}
+
+function addTransform(type /* plus data */) {
+    setErrorMessage();
+    if (transforms.length == 8) {
+        return;
+    }
+    var tr = { type: type };
+    tr.a = arguments[1];
+    if (type == "translate" || type == "scale") {
+        tr.b = arguments[2];
+    }
+    transforms.push(tr);
+    var p = document.createElement("p");
+    transformParagraphs.push(p);
+    switch (type) {
+    case "rotate":
+        p.innerHTML = "rotate " + tr.a + " degrees";
+        break;
+    case "scale":
+        p.innerHTML = "scale by " + tr.a + "," + tr.b;
+        break;
+    case "translate":
+        p.innerHTML = "translate by " + tr.a + "," + tr.b;
+        break;
+    }
+    if (selectedTransform >= 0) {
+        transformParagraphs[selectedTransform].className = "notselected";
+    }
+    selectedTransform = transforms.length - 1;
+    p.numberInList = transforms.length - 1;
+    p.className = "selected";
+    p.style.cursor = "pointer";
+    p.style.color = colors[transforms.length];
+    transformContainer.appendChild(p);
+    p.onclick = function() {
+        if (selectedTransform >= 0) {
+            transformParagraphs[selectedTransform].className = "notselected";
+        }
+        p.className = "selected";
+        selectedTransform = p.numberInList;
+        document.getElementById("downButton").disabled = (selectedTransform == transforms.length-1);
+        document.getElementById("upButton").disabled = (selectedTransform == 0);
+        draw();
+    }
+    if (transforms.length == 8) {
+        document.getElementById("rotBut").disabled = true;
+        document.getElementById("transBut").disabled = true;
+        document.getElementById("scaleBut").disabled = true;
+    }
+    document.getElementById("deleteButton").disabled = false;
+    document.getElementById("downButton").disabled = true;
+    document.getElementById("upButton").disabled = (transforms.length == 0);
+    document.getElementById("animateCheckbox").disabled = false;
+}
+
+function addRotate() { 
+    if (transforms.length == 8) {
+        return;
+    }
+    var degrees = Number(document.getElementById("deg").value);
+    if (isNaN(degrees)) {
+        setErrorMessage("Rotation input must be a number!");
+        return;
+    }
+    if (degrees == 0) {
+        setErrorMessage("Enter a non-zero number of degrees!");
+        return;
+    }
+    addTransform("rotate", degrees);
+    draw();
+}
+
+function addScale() {
+    if (transforms.length == 8) {
+        return;
+    }
+    var sx = Number(document.getElementById("sx").value);
+    var sy = Number(document.getElementById("sy").value);
+    if (isNaN(sx) || isNaN(sy)) {
+        setErrorMessage("Scale inputs must be numbers!");
+        return;
+    }
+    if (sx == 0 || sy == 0) {
+        setErrorMessage("Enter a non-zero scale factors!");
+        return;
+    }
+    addTransform("scale", sx, sy);
+    draw();
+}
+
+function addTranslate() {
+    if (transforms.length == 8) {
+        return;
+    }
+    var tx = Number(document.getElementById("tx").value);
+    var ty = Number(document.getElementById("ty").value);
+    if (isNaN(tx) || isNaN(ty)) {
+        setErrorMessage("Translate inputs must be numbers!");
+        return;
+    }
+    if (tx == 0 && ty == 0) {
+        setErrorMessage("Both translation amounts can't be zero.");
+        return;
+    }
+    addTransform("translate", tx, ty);
+    draw();
+}
+
+function changeShape() {
+    setErrorMessage();
+    var newshape = Number(document.getElementById("shapeSelect").value);
+    if (newshape != shape) {
+        shape = newshape;
+        draw();
+    }
+}
+
+function doResultOnly() {
+    showResultOnly = document.getElementById("resultOnlyCB").checked;
+    draw();
+}
+
+function doAnimateCB() {
+    setErrorMessage();
+    var anim = document.getElementById("animateCheckbox").checked;
+    if (anim == animating) {
+        return;
+    }
+    if (anim && transforms.length > 0) {
+        animating = true;
+        animationStep = 0;
+        draw();
+        setTimeout(doAnimationStep, 500);
+    }
+    else {
+        animating = false;
+        draw();
+    }
+}
+
+function doAnimationStep() {
+    if (animating == true) {
+        if (document.getElementById("resultOnlyCB").checked) {
+            if (animationStep == 0) {
+                animationStep = transforms.length;
+            }
+            else {
+                animationStep = 0;
+            }
+        }
+        else {
+            animationStep++;
+            if (animationStep > transforms.length) {
+                animationStep = 0;
+            }
+        }
+        draw();
+        setTimeout(doAnimationStep, 500);
+    }
+}
+
+function stopAnimation() {
+    if (animating) {
+        document.getElementById("animateCheckbox").checked = false;
+        doAnimateCB();
+    }
+}
+
+function init() {
+    canvas = document.getElementById("maincanvas");
+    if (!maincanvas.getContext) {
+        document.getElementById("headline").innerHTML = "ERROR: Canvas not supported";
+        return;
+    }
+    graphics = canvas.getContext('2d');
+    graphics.font = "10pt monospace";
+    transformContainer = document.getElementById("transforms");
+    document.getElementById("shapeSelect").value = "0";
+    document.getElementById("upButton").disabled = false;    
+    document.getElementById("downButton").disabled = false;    
+    document.getElementById("rotBut").disabled = false;    
+    document.getElementById("transBut").disabled = false;    
+    document.getElementById("scaleBut").disabled = false;
+    document.getElementById("animateCheckbox").checked = false;
+    document.getElementById("resultOnlyCB").checked = false;
+    addTransform("translate", 3, 0);
+    addTransform("rotate", 90);
+    addTransform("translate", -2, -5);
+    addTransform("scale", 0.5, 0.5);
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Modeling Transforms in 2D</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="400" height="400"></canvas>
+</div>
+
+<div id="tools">
+<h4 style="margin-top:0pt; margin-bottom:3px">Transforms</h4>
+
+<div id="transforms"width="150" height="200">
+
+</div>
+<p><button id="upButton" onclick="moveTransformUp()">Move Up</button>
+   <button id="downButton" onclick="moveTransformDown()">Move Down</button></p>
+<p><button onclick="clearTransforms()">Clear</button>
+   <button onclick="deleteLast()" id="deleteButton">Delete Last</button></p>
+<p style="margin-top:10px">Shape: <select id="shapeSelect" onChange="changeShape()">
+   <option value="0">Letter F</option>
+   <option value="1">Centered F</option>
+   <option value="2">Square</option>
+   <option value="3">Rectangle</option>
+   <option value="4">Step</option>
+   <option value="5">"Hello!"</option>
+</select></p>
+<p style="margin-top:5px"><label><input type="checkbox" id="animateCheckbox" onchange="doAnimateCB()">Animate</label></p>
+<p style="margin-top:5px"><label><input type="checkbox" id="resultOnlyCB" onchange="doResultOnly()">Show Result Only</label></p>
+</div>
+
+<div class="input" style="clear:both">
+Rotate&nbsp;<input type="text" size="3" id="deg"><button id="rotBut" onclick="addRotate()">Add</button>
+</div>
+<div class="input">
+Translate&nbsp;<input type="text" size="3" id="tx">,<input itype="text" size="3" id="ty"><button id="transBut" onclick="addTranslate()"">Add</button>
+</div>
+<div class="input">
+Scale&nbsp;<input type="text" size="3" id="sx">,<input type="text" size="3" id="sy"> <button id="scaleBut" onclick="addScale()">Add</button>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>The demo shows an original object as a gray shape near the center of the
+coordinate grid on the left.  On the right, there is a list of transforms.
+The results of transforming the original shape are shown as colored shapes
+on the coordinate grid.  The red shape is the result of transforming the
+original shape by the <b>first</b> transform in the list.  The green shape is
+the result of applying the second transform to the red shape; that is,
+it is the result of applying <b>the first two</b> transforms to the original
+shape.  The blue shape is the result of applying the <b>first three</b> transforms
+to the original shape. Note that the transforms accumulate!  If you find
+the colors hard to follow, turn on the "Animate" option.  You will see a
+looping animation in which the shapes are added to the picture in the order in which
+they are created.</p>
+<p>One of the transforms in the list can be "selected." The selected transform
+has a light blue background.  You can select a transform by clicking it.
+Use the "Move up" and "Move down" buttons to move the selected transform
+up or down in the list.  This will change the order in which the transforms
+are applied, and so will change the sequence of shapes that is generated.</p>
+<p>The tree small input panels on the bottom can be used to add transforms
+to the list.  To add  a rotation, enter the number of <b>degrees</b>,
+and click the "Add" button that is next to the input box.  For translation
+and scale, enter two numbers, and click the corresponding "Add" button.
+Be careful! The coordinate grid only shows coordinates in the range -5
+to 5, so it's easy to get a shape that lies outside the visible grid.
+The demo doesn't stop you from doing that.</p>
+<p>You might start by moving transforms around in the original list.
+Make sure that you understand how the shapes are produced.  Then
+clear the list and make up your own transform.  Try comparing
+rotate-then-translate to translate-then-rotate.  Try rotating
+the object about a point other than the origin.  Try some negative
+scale factors. Try arranging eight objects in a circle around
+the origin.  (There is a limit of eight transforms.)  Try
+to make a shear transformation from rotations and scalings.
+(Hint: Start with a 45-degree rotation, followed by a
+non-uniform scaling.)</p>
+<p>Note by the way that transforms are applied to the object in
+the order that they occur in the list.  Remember that if you
+want to achieve the same effect in your code, you would have
+to specify the transforms in the opposite order, and you
+would have to do that before drawing the object.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

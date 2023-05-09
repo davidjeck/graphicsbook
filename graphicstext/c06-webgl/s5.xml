@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Implementing 2D Transforms" id="webgl.5">
+
+<p1>This chapter uses WebGL for 2D drawing.  Of course, the real motivation
+for using WebGL is to have high-performance 3D graphics on the web.
+We will turn to that in the <localref href="webgl3d">next chapter</localref>.
+With WebGL, implementing <word term="geometric transform">transformations</word> is the
+responsibility of the programmer, which adds a level of complexity 
+compared to OpenGL&nbsp;1.1.  But before we attempt to deal with that complexity
+in three dimensions, this short section shows how to implement
+transforms and <word>hierarchical modeling</word> in a 2D context.</p1>
+
+<subsection title="Transforms in GLSL" id="webgl.5.1">
+
+<p>Transforms in 2D were covered in <localref href="graphics2d.3"/>.  To review: The basic
+transforms are scaling, rotation, and translation.  A sequence of such transformations
+can be combined into a single <word>affine transform</word>.  A&nbsp;2D affine transform maps
+a point (<i>x1,y1</i>) to the point (<i>x2,y2</i>) given by formulas of the form</p>
+
+<pre>x2 = a*x1 + c*y1 + e
+y2 = b*x1 + d*y1 + f</pre>
+
+<np>where <i>a</i>, <i>b</i>, <i>c</i>, <i>d</i>, <i>e</i>, and <i>f</i> are constants.
+As explained in <localref href="graphics2d.3.8"/>, this transform can be represented as
+the 3-by-3 matrix</np>
+
+<img src="affine-transform-matrix-2d.png" width="71" height="73" tex="affine-transform-matrix-2d.eps" texscale="0.75"/>
+
+<np>With this representation, a point (<i>x,y</i>) becomes the three-dimensional vector
+(<i>x,y,1</i>), and the transformation can be implemented as multiplication of the vector
+by the matrix.</np>
+
+<p>To apply a transformation to a primitive, each vertex of the primitive has to be
+multiplied by the transformation matrix.  In GLSL, the natural place to do that
+is in the vertex shader.  Technically, it would be possible to do the multiplication
+on the JavaScript side, but GLSL can do it more efficiently, since it can work on multiple
+vertices in parallel, and it is likely that the GPU has efficient hardware support for
+matrix math.  (It is, by the way, a property of affine transformations that it suffices
+to apply them at the vertices of a primitive. Interpolation of the transformed vertex coordinates
+to the interior pixels of the primitive will give the correct result; that is, it gives the same
+answer as interpolating the original vertex coordinates and then applying the transformation
+in the fragment shader.)</p>
+
+<p>In GLSL, the type <i>mat3</i> represents 3-by-3 matrices, and <i>vec3</i> represents three-dimensional
+vectors.  When applied to a <i>mat3</i> and a <i>vec3</i>, the multiplication operator <code>*</code>
+computes the product.  So, a transform can applied using a simple GLSL assignment statement such as</p>
+
+<pre>transformedCoords = transformMatrix * originalCoords;</pre>
+
+<np>For 2D drawing, the original coordinates are likely to come into the vertex shader
+as an <word term="attribute variable">attribute</word> of type <i>vec2</i>.  
+We need to make the attribute value into a 
+<i>vec3</i> by adding 1.0 as the <i>z</i>-coordinate.  The transformation matrix
+is likely to be a <word>uniform variable</word>, to allow the JavaScript side
+to specify the transformation.  This leads to the following minimal GLSL&nbsp;ES&nbsp;1.00 vertex shader
+for working with 2D transforms. (For a GLSL&nbsp;ES&nbsp;3.00 version, the "attribute" qualifier
+is replaced by "in", and a first line "#version&nbsp;300&nbsp;es" is added.)</np>
+
+<pre>attribute vec2 a_coords;
+uniform mat3 u_transform;
+void main() {
+   vec3 transformedCoords = u_transform * vec3(a_coords,1.0);
+   gl_Position = vec4(transformedCoords.xy, 0.0, 1.0);
+}</pre>
+
+<np>The input coordinates are given as a <ptype>vec2</ptype>, (<i>x,y</i>), but we need a
+<ptype>vec3</ptype>, (<i>x,y,1</i>), to multiply by the matrix, so the first line of
+<i>main</i>() adds 1.0 as the <i>z</i>-coordinate. 
+In the next line, the value for <i>gl_Position</i> must be a <i>vec4</i>.  For a 2D point,  the
+<i>z</i>-coordinate should be 0.0, not 1.0, so we use only the <i>x</i>- and <i>y</i>-coordinates
+from <i>transformedCoords</i>.</np>
+
+<p>On the JavaScript side, the function <i>gl.uniformMatrix3fv</i> is used to specify a
+value for a uniform of type <i>mat3</i> (<localref href="webgl.3.3"/>).
+To use it, the nine elements of the matrix should be
+stored in an array in <word>column-major order</word>.  For loading an affine transformation matrix into
+a <i>mat3</i>, the command would be something like this:</p>
+
+<pre>gl.uniformMatrix3fv(u_transform_location, false, [ a, b, 0, c, d, 0, e, f, 1 ]);</pre>
+
+</subsection>
+
+
+<subsection title="Transforms in JavaScript" id="webgl.5.2">
+
+<p>To work with transforms on the JavaScript side, we need a way to represent
+the transforms.  We also need to keep track of a
+"current transform" that is the product all the individual
+<word term="modeling transformation">modeling transformations</word> that are in effect.
+The current transformation changes whenever a transformation such as rotation or
+translation is applied.  We need a way to save a copy of the current transform
+before drawing a complex object and to restore it after drawing.  Typically, a
+stack of transforms is used for that purpose.  You should be well familiar 
+with this pattern from both 2D and 3D graphics.  The difference here is that
+the data structures and operations that we need are not built into the
+standard API, so we need some extra JavaScript code to implement them.</p>
+
+<p>As an example, I have written a JavaScript class, <classname>AffineTransform2D</classname>,
+to represent affine transforms in 2D.  This is a very minimal implementation.
+The data for an object of type <classname>AffineTransform2D</classname>
+consists of the numbers <i>a</i>, <i>b</i>, <i>c</i>, <i>d</i>, <i>e</i>, and <i>f</i>
+in the transform matrix.  There are methods in the class for multiplying the transform
+by scaling, rotation, and translation transforms.  These methods modify the transform
+to which they are applied, by multiplying it on the right by the appropriate matrix.
+Here is a full description of the API, where <i>transform</i> is an object of type 
+<classname>AffineTransform2D</classname>:</p>
+
+<ul>
+<li><codedef>transform = new AffineTransform2D(a,b,c,d,e,f)</codedef> &mdash; creates a <classname>AffineTransform2D</classname>
+with the matrix shown at the beginning of this section.</li>
+<li><codedef>transform = new AffineTransform2D()</codedef> &mdash; creates an <classname>AffineTransform2D</classname>
+representing the <word>identity transform</word>.</li>
+<li><codedef>transform = new AffineTransform2D(original)</codedef> &mdash; where <i>original</i> is
+an <classname>AffineTransform2D</classname>, creates a copy of <i>original</i>.</li>
+<li><codedef>transform.rotate(r)</codedef> &mdash; modifies <i>transform</i> by composing it
+with the rotation matrix for a rotation by <i>r</i> radians.</li>
+<li><codedef>transform.translate(dx,dy)</codedef> &mdash; modifies <i>transform</i> by composing it with the 
+translation matrix for a translation by (<i>dx,dy</i>).</li>
+<li><codedef>transform.scale(sx,sy)</codedef> &mdash; modifies <i>transform</i> by composing it with the
+scaling matrix for scaling by a factor of <i>sx</i> horizontally and <i>sy</i> vertically.</li>
+<li><codedef>transform.scale(s)</codedef> &mdash; does a uniform scaling, the same as 
+<i>transform.scale</i>(<i>s,s</i>).</li>
+<li><codedef>array = transform.getMat3()</codedef> &mdash; returns an array of nine numbers containing the matrix 
+for <i>transform</i> in column-major order.</li>
+</ul>
+
+<p>In fact, an <classname>AffineTransform2D</classname> object does not represent an affine
+transformation as a matrix.  Instead, it stores the coefficients <i>a</i>, <i>b</i>, <i>c</i>, 
+<i>d</i>, <i>e</i>, and <i>f</i> as properties of the object.  With this representation,
+the <i>scale</i> method in the <classname>AffineTransform2D</classname> class can defined as
+follows:</p>
+
+<pre>scale(sx, sy = sx) { // Default value for sy is the value of sx.
+    this.a *= sx;
+    this.b *= sx;
+    this.c *= sy;
+    this.d *= sy;
+    return this;
+}</pre>
+
+<np>This code multiplies the transform represented by "this" object by a scaling matrix,
+on the right.  Other methods have similar definitions, but you don't need to understand
+the code in order to use the API.</np>
+
+<break/>
+
+<p>Before a primitive is drawn, the current transform must be sent as a <i>mat3</i> into the
+vertex shader, where the <i>mat3</i> will be used to transform 
+the vertices of the primitive.  The method <i>transform.getMat3</i>() returns the 
+transform as an array that can be passed to <i>gl.uniformMatrix3fv</i>, which sends
+it to the shader program.</p>
+
+<p>To implement the stack of transformations, we can use an array of objects of
+type <classname>AffineTransform2D</classname>.  In JavaScript, an array does not
+have a fixed length, and it comes with <i>push</i>() and <i>pop</i>() methods
+that make it possible to use the array as a stack.  For convenience,
+we can define functions <i>pushTransform</i>() and <i>popTransform</i>()
+to manipulate the stack.  Here, the current transform is stored in a global
+variable named <i>transform</i>:</p>
+
+<pre>let transform = new AffineTransform2D();  // Initially the identity.
+
+const transformStack = [];  // An array to serve as the transform stack.
+
+/**
+ *  Push a copy of the current transform onto the transform stack.
+ */
+function pushTransform() {
+    transformStack.push( new AffineTransform2D(transform) );
+}
+
+/**
+ *  Remove the top item from the transform stack, and set it to be the current
+ *  transform.  If the stack is empty, nothing is done (and there is no error).
+ */
+function popTransform() {
+    if (transformStack.length > 0) {
+        transform = transformStack.pop();
+    }
+}</pre>
+
+<p>This code is from the sample program <sourceref href="webgl/simple-hierarchy2D.html"/>,
+which demonstrates using <classname>AffineTransform2D</classname> and a stack of 
+transforms to implement hierarchical modeling. Here is a screenshot of one of the objects
+drawn by that program:</p>
+
+<img src="nested-squares.png" width="269" height="268" tex="nested-squares.eps" texscale="0.6"/>
+
+<np>and here's the code that draws it:</np>
+
+<pre>function square() { 
+    gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());
+    gl.bindBuffer(gl.ARRAY_BUFFER, squareCoordsVBO);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINE_LOOP, 0, 4);
+}
+
+function nestedSquares() {
+    gl.uniform3f( u_color_loc, 0, 0, 1); // Set color to blue.
+    square();
+    for (let i = 1; i &lt; 16; i++) {
+        gl.uniform3f( u_color_loc, i/16, 0, 1 - i/16); // Red/Blue mixture.
+        transform.scale(0.8);
+        transform.rotate(framenumber / 200);
+        square();
+    }
+}</pre>
+
+<p>The function <i>square</i>() draws a square that has size 1 and is centered at (0,0) in its
+own object coordinate system.  The coordinates for the square have been stored in a
+buffer, <i>squareCoordsVBO</i>, and <i>a_coords_loc</i> is the location of an attribute variable
+in the shader program.  The variable <i>transform</i> holds the current modeling transform that
+must be applied to the square.  It is sent to the shader program by calling</p>
+
+<pre>gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());</pre>
+
+<np>The second function, <i>nestedSquares</i>(), draws
+16 squares.  Between the squares, it modifies the modeling transform with</np>
+
+<pre>transform.scale(0.8);
+transform.rotate(framenumber / 200);</pre>
+
+<np>The effect of these commands is cumulative, so that each square is a little smaller than 
+the previous one, and is rotated a bit more than the previous one.  The amount of rotation
+depends on the frame number in an animation.</np>
+
+<p>The nested squares are one of three compound objects drawn by the program.  The function
+draws the nested squares centered at (0,0).  In the main <i>draw</i>() routine, I wanted to
+move them and make them a little smaller.  So, they are drawn using the code:</p>
+
+<pre>pushTransform();
+    
+transform.translate(-0.5,0.5);  // Move center of squares to (-0.5, 0.5).
+transform.scale(0.85);          // Reduce size from 1 to 0.85.
+nestedSquares();
+    
+popTransform();</pre>
+
+<np>The <i>pushTransform</i>() and <i>popTransform</i>() ensure that all of the changes
+made to the modeling transform while drawing the squares will have no effect on 
+other objects that are drawn later.  Transforms are, as always, applied to objects in the
+opposite of the order in which they appear in the code.</np>
+
+<p>I urge you to read the <sourceref href="webgl/simple-hierarchy2D.html">source code</sourceref>
+and take a look at what it draws.  The essential ideas for working with transforms are
+all there.  It would be good to understand them before we move on to 3D.</p>
+
+</subsection>
+
+
+</section>

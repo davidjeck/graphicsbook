@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+
+<!--
+   This page is an example of implementing hierarchical transformation
+   for 2D graphics in WebGL.  The transforms are implemented as objects
+   of type AffineTransform2D.  The class is defined in AffineTransform2D.js.
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>2D Affine Transforms in WebGL</title>
+
+<script src="AffineTransform2D.js"></script>
+
+<script>
+
+"use strict";
+
+const vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "uniform mat3 u_transform;\n" +
+       "void main() {\n" +
+       "   vec3 transformedCoords = u_transform * vec3(a_coords,1.0);\n" +
+       "   gl_Position = vec4(transformedCoords.xy, 0.0, 1.0);\n" +
+       "}\n";
+
+const fragmentShaderSource =
+       "precision mediump float;\n" +
+       "uniform vec3 u_color;\n" +
+       "void main() {\n" +
+       "   gl_FragColor = vec4(u_color, 1.0);\n" +
+       "}\n";
+
+let  gl;  // The WebGL graphics context.
+
+let  a_coords_loc;    // Location for "a_coords" attribute.
+let  u_transform_loc; // Location for "u_transform" uniform.
+let  u_color_loc;     // Location for "u_color" uniform.
+
+let  squareCoordsVBO; // Buffers holding coordinates for basic objects.
+let  diskCoordsVBO;
+let  spokesCoordsVBO;
+
+let  animating = false;  // Set to true when the animation is running.
+let  framenumber = 0;    // Current frame number in the animation.
+
+
+/*----------------------- Current transform and transform stack --------------*/
+
+let  transform = new AffineTransform2D();  // Current AffineTransform2D, initially the identity.
+
+const  transformStack = [];  // An array to serve as the transform stack.
+
+/**
+ *  Push a copy of the current transform onto the transform stack.
+ */
+function pushTransform() {
+    transformStack.push( new AffineTransform2D(transform) );
+}
+
+/**
+ *  Remove the top item from the transform stack, and set it to be the current
+ *  transform.  If the stack is empty, nothing is done (and no error is generated).
+ */
+function popTransform() {
+    if (transformStack.length > 0) {
+        transform = transformStack.pop();
+    }
+}
+
+
+/*---------------------------- routine for drawing five basic objects -------------*/
+
+/**
+ * Draws a set of 12 "spokes" -- lines of length 0.5 radiating out from the
+ * origin.  (Actually drawing as 6 lines of length 1 centered at the origin.)
+ * Uses the current color and line width.
+ */
+function spokes() {
+    gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());
+    gl.bindBuffer(gl.ARRAY_BUFFER, spokesCoordsVBO);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, 12);
+}
+
+/**
+ *  Draws a filled square of size 1 centered at the origin.
+ *  Uses the current color.
+ */
+function filledSquare() {
+    gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());
+    gl.bindBuffer(gl.ARRAY_BUFFER, squareCoordsVBO);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+}
+
+/**
+ *  Draws the outline of a square of size 1 centered at the origin.
+ *  Uses the current color and line width.
+ */
+function square() { 
+    gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());
+    gl.bindBuffer(gl.ARRAY_BUFFER, squareCoordsVBO);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINE_LOOP, 0, 4);
+}
+
+/**
+ *  Draws a filled circle of radius 1 centered at the origin.
+ *  Uses the current color.
+ */
+function filledCircle() {
+    gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());
+    gl.bindBuffer(gl.ARRAY_BUFFER, diskCoordsVBO);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 32);
+}
+
+/**
+ *  Draws the circumference of a circle of radius 1 centered at the origin.
+ *  Uses the current color and line width.
+ */
+function circle() {
+    gl.uniformMatrix3fv(u_transform_loc, false, transform.getMat3());
+    gl.bindBuffer(gl.ARRAY_BUFFER, diskCoordsVBO);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINE_LOOP, 0, 32);
+}
+
+
+/*------------------------ routines for drawing hierarchical objects ----------*/
+/* (note that calling one of these can change the current color and transform) */
+
+/**
+ * Draws a set of nested squares.  The size of the outermost square is 1, and the
+ * squares are centered at the origin.  Each square is 0.8 times the size of the
+ * previous square and is rotated by an an angle eqault to (framenumber/200) radians.
+ * The rotations and size changes are cumulative.
+ */
+function nestedSquares() {
+    gl.uniform3f( u_color_loc, 0, 0, 1);
+    square();
+    for (let  i = 1; i < 16; i++) {
+        gl.uniform3f( u_color_loc, i/16, 0, 1 - i/16);
+        transform.scale(0.8);
+        transform.rotate(framenumber / 200);
+        square();
+    }
+}
+
+/**
+ * Draws a wheel of radius 1 centered at the origin.  The wheel is made up of three
+ * filled circles and a set of spokes.  The parameter gives the number of radians
+ * to rotate the wheel.
+ */
+function wheel(angle) {
+    transform.rotate(angle);
+    gl.uniform3f(u_color_loc, 0,0,0);
+    filledCircle();
+    pushTransform();
+    transform.scale(0.8);
+    gl.uniform3f(u_color_loc, 0.8,0.8,0.8);
+    filledCircle();
+    transform.scale(0.3);
+    gl.uniform3f(u_color_loc, 0,0,0);
+    filledCircle();
+    popTransform(); 
+    transform.scale(0.9);
+    spokes();
+}
+
+/**
+ *  Draws a bar with a rotating wheel on each end.  The bar is rotating, with
+ *  angle of rotation given by (framenumber/127) radians.  The bar is 2 units
+ *  long.  With the wheels, the object is 3 units long.
+ */
+function axel() {
+    transform.rotate( framenumber/127 );
+    pushTransform();
+    gl.uniform3f(u_color_loc, 0.8,0.8,0.8 );
+    transform.scale(2, 0.2);
+    filledSquare();
+    popTransform();
+    pushTransform();
+    transform.translate(-1,0);
+    wheel(framenumber/50);
+    popTransform();
+    pushTransform();
+    transform.translate(1,0);
+    wheel(framenumber/33);
+    popTransform();
+}
+
+/**
+ * Draws a "cart" made up of two red rectangles and two rotating wheels.
+ * The cart is 6 units long.
+ */
+function cart() {
+    pushTransform();
+    transform.translate(1.65,-0.05);
+    transform.scale(1.6);
+    wheel(-framenumber/30);
+    popTransform();
+    pushTransform();
+    transform.translate(-1.65,-0.05);
+    transform.scale(1.6);
+    wheel(-framenumber/30);
+    popTransform();
+    gl.uniform3f(u_color_loc, 1, 0, 0);
+    pushTransform();
+    transform.translate(0,1);
+    transform.scale(6,1.5);
+    filledSquare();
+    popTransform();
+    pushTransform();
+    transform.translate(-1,2);
+    transform.scale(2.6,1);
+    filledSquare();
+    popTransform();
+}
+
+
+/*---------------------- common WebGL routines ------------------------*/
+
+/**
+ *  Draws the content of the canvas, consisting of three hierarchical objects.
+ *  Uses the default coordinate system in which x and y range from -1.0 to 1.0.
+ *  Modeling transformations are used to scale the objects and position them
+ *  on the canvas.
+ */
+function draw() { 
+
+    gl.clearColor(1,1,1,1); 
+    gl.clear(gl.COLOR_BUFFER_BIT); 
+
+    pushTransform();
+    
+    transform.translate(-0.5,0.5);  // move center of nested squares to (-0.5,0.5)
+    transform.scale(0.85);          // reduce size from 1 to 0.85.
+    nestedSquares();
+    
+    popTransform();
+    pushTransform();
+    
+    transform.translate(0.5,0.5);   // move center of axel to (0.5,0.5)
+    transform.scale(0.3);           // reduce size from 3 to 0.9
+    axel();
+    
+    popTransform();
+    pushTransform();
+    
+    transform.translate( -1.6 + 3.2*((150+framenumber) % 300)/300,-0.6 ); // move car repeatedly from left to right
+    transform.scale(0.2);   // reduce size from 6 to 1.2
+    cart();
+    
+    popTransform();  
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context, including creating and filling the
+ * VBOs that hold the coordinates for vertices of basic objects.
+ */
+function initGL() {
+    const  prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    a_coords_loc = gl.getAttribLocation(prog, "a_coords");
+    gl.enableVertexAttribArray(a_coords_loc); 
+    u_color_loc = gl.getUniformLocation(prog, "u_color");
+    u_transform_loc = gl.getUniformLocation(prog, "u_transform");
+    squareCoordsVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, squareCoordsVBO);
+    let  squareCoords = new Float32Array( [ -0.5,-0.5, 0.5,-0.5, 0.5,0.5, -0.5,0.5 ] );
+    gl.bufferData(gl.ARRAY_BUFFER, squareCoords, gl.STATIC_DRAW);
+    diskCoordsVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, diskCoordsVBO);
+    let  circleCoords = new Float32Array( 64 );
+    for (let  i = 0; i < 32; i++) {
+        let  angle = (2*Math.PI)/32 * i;
+        circleCoords[2*i] = 0.5 * Math.cos(angle);
+        circleCoords[2*i+1] = 0.5 * Math.sin(angle);
+    }
+    gl.bufferData(gl.ARRAY_BUFFER, circleCoords, gl.STATIC_DRAW);
+    spokesCoordsVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, spokesCoordsVBO);
+    let  spokesCoords = new Float32Array( 24 );
+    for (let  i = 0; i < 6; i++) {
+        let  angle = (2*Math.PI)/12 * i;
+        spokesCoords[4*i] = 0.5 * Math.cos(angle);
+        spokesCoords[4*i+1] = 0.5 * Math.sin(angle);
+        spokesCoords[4*i+2] = -0.5 * Math.cos(angle);
+        spokesCoords[4*i+3] = -0.5 * Math.sin(angle);
+    }
+    gl.bufferData(gl.ARRAY_BUFFER, spokesCoords, gl.STATIC_DRAW);
+    gl.lineWidth(2);
+}
+
+
+/*--------------------------- animation support ----------------------------------*/
+
+function doFrame() {  
+    if (animating) {
+        framenumber++;
+        draw();
+        requestAnimationFrame(doFrame); 
+    }
+}
+
+function startAnimation() {
+    if (!animating) {
+       animating = true;
+       requestAnimationFrame(doFrame);
+    }
+}
+
+function pauseAnimation() {
+    animating = false;
+}
+
+function doAnimationCheckbox() { 
+    if ( document.getElementById("animationCheckbox").checked )
+        startAnimation();
+    else
+        pauseAnimation();
+}
+
+
+/*--------------------------- initialization ----------------------------------*/
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        let  canvas = document.getElementById("webglcanvas");
+        let  options = {  // no need for depth buffer in this program
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    document.getElementById("animationCheckbox").checked = false;
+    document.getElementById("animationCheckbox").onchange = doAnimationCheckbox;
+    draw();    // draw the image
+}
+
+window.onload = init;  // Arrange for init() to be called after page has been loaded.
+
+</script>
+</head>
+<body style="background-color: lightGray">
+
+<h2>WebGL Hierarchy2D</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<h2><label><input type="checkbox" id="animationCheckbox"><b>Animate</b></label></h2>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="600" height="600"></canvas>
+</div>
+
+</body>
+</html>

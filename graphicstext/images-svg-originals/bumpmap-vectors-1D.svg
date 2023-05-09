@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="515.29688"
+   height="232.01514"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.4 r9939"
+   sodipodi:docname="bumpmap-vectors-1D.svg"
+   inkscape:export-filename="/home/eck/eclipse-workspace/graphicstext/c07-webgl3d/bumpmap-vectors-1D.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1"
+     inkscape:cx="155.06104"
+     inkscape:cy="-62.861816"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:window-width="1680"
+     inkscape:window-height="995"
+     inkscape:window-x="0"
+     inkscape:window-y="30"
+     inkscape:window-maximized="1"
+     showguides="true"
+     inkscape:guide-bbox="true"
+     fit-margin-top="2"
+     fit-margin-left="2"
+     fit-margin-right="2"
+     fit-margin-bottom="4" />
+  <defs
+     id="defs4">
+    <marker
+       style="overflow:visible"
+       id="Arrow1Send"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Send">
+      <path
+         transform="matrix(-0.2,0,0,-0.2,-1.2,0)"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt"
+         d="M 0,0 5,-5 -12.5,0 5,5 0,0 z"
+         id="path3807"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Mend"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Mend"
+       style="overflow:visible">
+      <path
+         id="path3801"
+         d="M 0,0 5,-5 -12.5,0 5,5 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient3778">
+      <stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop3780" />
+      <stop
+         style="stop-color:#000000;stop-opacity:0;"
+         offset="1"
+         id="stop3782" />
+    </linearGradient>
+    <marker
+       inkscape:stockid="Arrow1Mendv"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Mendv"
+       style="overflow:visible">
+      <path
+         id="path4241"
+         d="M 0,0 5,-5 -12.5,0 5,5 0,0 z"
+         style="fill:#000080;fill-rule:evenodd;stroke:#000080;stroke-width:1pt"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <linearGradient
+       gradientTransform="translate(-0.4714355,22)"
+       y2="182.36218"
+       x2="202"
+       y1="182.36218"
+       x1="83"
+       gradientUnits="userSpaceOnUse"
+       id="linearGradient4269"
+       xlink:href="#linearGradient3778"
+       inkscape:collect="always" />
+    <marker
+       inkscape:stockid="Arrow1Mend8"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Mend8"
+       style="overflow:visible">
+      <path
+         id="path4877"
+         d="M 0,0 5,-5 -12.5,0 5,5 0,0 z"
+         style="fill:#008000;fill-rule:evenodd;stroke:#008000;stroke-width:1pt"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+  </defs>
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-51.938965,-38.485229)">
+    <rect
+       y="197.36218"
+       x="82.528564"
+       height="14"
+       width="119"
+       id="rect3000"
+       style="color:#000000;fill:url(#linearGradient4269);fill-opacity:1;stroke:none;stroke-width:2;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
+    <g
+       id="g4271">
+      <path
+         inkscape:connector-curvature="0"
+         id="path3786"
+         d="m 142,157.36218 0,-81.999997"
+         style="fill:none;stroke:#000080;stroke-width:2.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Mendv)" />
+      <rect
+         y="153.36218"
+         x="83"
+         height="6"
+         width="119"
+         id="rect2985"
+         style="color:#000000;fill:#800000;stroke:none;stroke-width:2;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
+    </g>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4265"
+       y="229.36218"
+       x="142"
+       style="font-size:13px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Sans"
+       xml:space="preserve"><tspan
+         y="229.36218"
+         x="142"
+         id="tspan4267"
+         sodipodi:role="line">Height Map, with a vector</tspan><tspan
+         id="tspan4669"
+         y="245.61218"
+         x="142"
+         sodipodi:role="line">that points in the direction</tspan><tspan
+         id="tspan4671"
+         y="261.86218"
+         x="142"
+         sodipodi:role="line">height should decrease.</tspan></text>
+    <g
+       transform="matrix(0.94835874,-0.31719979,0.31719979,0.94835874,138.62725,42.181012)"
+       id="g4275">
+      <path
+         style="fill:none;stroke:#000080;stroke-width:2.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Mendv)"
+         d="m 142,157.36218 0,-81.999997"
+         id="path4277"
+         inkscape:connector-curvature="0" />
+      <rect
+         style="color:#000000;fill:#800000;stroke:none;stroke-width:2;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+         id="rect4279"
+         width="119"
+         height="6"
+         x="83"
+         y="153.36218" />
+    </g>
+    <g
+       transform="translate(348,0)"
+       id="g4281">
+      <path
+         style="fill:none;stroke:#000080;stroke-width:2.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Mendv)"
+         d="m 142,157.36218 0,-81.999997"
+         id="path4283"
+         inkscape:connector-curvature="0" />
+      <rect
+         style="color:#000000;fill:#800000;stroke:none;stroke-width:2;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+         id="rect4285"
+         width="119"
+         height="6"
+         x="83"
+         y="153.36218" />
+    </g>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4287"
+       y="50.362183"
+       x="141"
+       style="font-size:13px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#000080;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Sans"
+       xml:space="preserve"><tspan
+         y="50.362183"
+         x="141"
+         id="tspan4289"
+         sodipodi:role="line">Surface with the</tspan><tspan
+         id="tspan4291"
+         y="66.612183"
+         x="141"
+         sodipodi:role="line">original normal vector</tspan></text>
+    <path
+       inkscape:connector-curvature="0"
+       id="path4293"
+       d="m 141,188.36218 -40,0"
+       style="fill:none;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Mend)" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Mend)"
+       d="m 490.00001,73.36218 -27.46988,0"
+       id="path4673"
+       inkscape:connector-curvature="0" />
+    <path
+       inkscape:connector-curvature="0"
+       id="path4675"
+       d="M 490,159.36218 460,76.362183"
+       style="fill:none;stroke:#008000;stroke-width:2.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Mend8)"
+       sodipodi:nodetypes="cc" />
+    <text
+       xml:space="preserve"
+       style="font-size:13px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#008000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Sans"
+       x="486"
+       y="59.362183"
+       id="text4936"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4938"
+         x="486"
+         y="59.362183">Modifying the normal.</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:13px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Sans"
+       x="323"
+       y="182.36218"
+       id="text4940"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4942"
+         x="323"
+         y="182.36218">We want the</tspan><tspan
+         sodipodi:role="line"
+         x="323"
+         y="198.61218"
+         id="tspan4944">surface to look</tspan><tspan
+         sodipodi:role="line"
+         x="323"
+         y="214.86218"
+         id="tspan4946">as if it's tilted,</tspan><tspan
+         sodipodi:role="line"
+         x="323"
+         y="231.11218"
+         id="tspan4948">like this.</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:13px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Sans"
+       x="491"
+       y="182.36218"
+       id="text4950"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         x="491"
+         y="182.36218"
+         id="tspan4954">To achieve the effect,</tspan><tspan
+         sodipodi:role="line"
+         x="491"
+         y="198.61218"
+         id="tspan4958">add a muliple of the</tspan><tspan
+         sodipodi:role="line"
+         x="491"
+         y="214.86218"
+         id="tspan4960">vector from the height</tspan><tspan
+         sodipodi:role="line"
+         x="491"
+         y="231.11218"
+         id="tspan4962">map to the normal.</tspan><tspan
+         sodipodi:role="line"
+         x="491"
+         y="247.36218"
+         id="tspan4964">The new normal is</tspan><tspan
+         sodipodi:role="line"
+         x="491"
+         y="263.61218"
+         id="tspan4966">shown in green.</tspan></text>
+  </g>
+</svg>

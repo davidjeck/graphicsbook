@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>Page Title</title>
+    <meta charset="UTF-8">
+<script src="glsim.js"></script>
+<script src="simple-rotator.js"></script>
+<script>
+var sphereVertexArray, sphereNormalArray;
+
+function createSphereArrays() {
+    var i,j;
+    var radius = 0.4;
+    var stacks = 16;
+    var slices = 32;
+    var size = stacks * (slices+1) * 2 * 3;
+    sphereVertexArray = new Float32Array(size);
+    sphereNormalArray = new Float32Array(size);
+    var PI = Math.PI;
+    var k = 0;
+    for (j = 0; j < stacks; j++) {
+        var latitude1 = (PI/stacks) * j - PI/2;
+        var latitude2 = (PI/stacks) * (j+1) - PI/2;
+        var sinLat1 = Math.sin(latitude1);
+        var cosLat1 = Math.cos(latitude1);
+        var sinLat2 = Math.sin(latitude2);
+        var cosLat2 = Math.cos(latitude2);
+        for (i = 0; i <= slices; i++) {
+            var longitude = (2*PI/slices) * i;
+            var sinLong = Math.sin(longitude);
+            var cosLong = Math.cos(longitude);
+            var x1 = cosLong * cosLat1;
+            var y1 = sinLong * cosLat1;
+            var z1 = sinLat1;
+            var x2 = cosLong * cosLat2;
+            var y2 = sinLong * cosLat2;
+            var z2 = sinLat2;
+            sphereNormalArray[k] =  x2;
+            sphereNormalArray[k+1] =  y2;
+            sphereNormalArray[k+2] =  z2;
+            sphereVertexArray[k] =  (radius*x2);
+            sphereVertexArray[k+1] =  (radius*y2);
+            sphereVertexArray[k+2] =  (radius*z2);
+            k += 3;
+            sphereNormalArray[k] =  x1;
+            sphereNormalArray[k+1] =  y1;
+            sphereNormalArray[k+2] =  z1;
+            sphereVertexArray[k] =  (radius*x1);
+            sphereVertexArray[k+1] =  (radius*y1);
+            sphereVertexArray[k+2] =  (radius*z1);
+            k += 3;
+        }
+    }
+}
+createSphereArrays();
+    
+    function uvSphere(radius, slices, stacks) {
+    var i,j;
+    var PI = Math.PI;
+    for (j = 0; j < stacks; j++) {
+        var latitude1 = (PI/stacks) * j - PI/2;
+        var latitude2 = (PI/stacks) * (j+1) - PI/2;
+        var sinLat1 = Math.sin(latitude1);
+        var cosLat1 = Math.cos(latitude1);
+        var sinLat2 = Math.sin(latitude2);
+        var cosLat2 = Math.cos(latitude2);
+        glBegin(GL_QUAD_STRIP);
+        for (i = 0; i <= slices; i++) {
+            var longitude = (2*PI/slices) * i;
+            var sinLong = Math.sin(longitude);
+            var cosLong = Math.cos(longitude);
+            var x1 = cosLong * cosLat1;
+            var y1 = sinLong * cosLat1;
+            var z1 = sinLat1;
+            var x2 = cosLong * cosLat2;
+            var y2 = sinLong * cosLat2;
+            var z2 = sinLat2;
+            glNormal3d(x2,y2,z2);
+            glVertex3d(radius*x2,radius*y2,radius*z2);
+            glNormal3d(x1,y1,z1);
+            glVertex3d(radius*x1,radius*y1,radius*z1);
+        }
+        glEnd();
+    }
+} // end uvSphere
+
+    var rotator;
+    
+  
+    function display() {
+        glClearColor(0.5,0.5,0.5,1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        GLSim.currentContext.modelviewMatrix = rotator.getViewMatrix();
+//        glPushMatrix();
+//        glTranslated(0,0,-10);
+//        console.log(mat4.str(GLSim.currentContext.modelviewMatrix));
+//        console.log(mat4.str(GLSim.currentContext.projectionMatrix));
+        glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, [0.6, 0.6, 0]);
+        glMaterialfv(GL_BACK, GL_AMBIENT_AND_DIFFUSE, [0, 0.6, 0.6]);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.5,0.5,0.5]);
+        glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 10);
+        //glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [0.2,0.2,0.2]);
+        glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 1);
+        //glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, 1);
+        glColor3d(1,1,1);
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex3d(-0.7,-0.5,0);
+        glVertex3d(0.7,-0.5,0);
+        glVertex3d(0,0.7,0);
+        glEnd();
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [0.6,0,0.6]);
+        uvSphere(0.3,16,16); 
+    }
+        
+    function foo() {
+        new GLSim(document.getElementById("glcanvas"));
+        rotator = new SimpleRotator(document.getElementById("glcanvas"),display);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, [1,1,1]);
+        glEnable(GL_NORMALIZE);
+        glColor3d(1,0,1);
+        glLineWidth(4);
+        glPointSize(16);
+        glEnable(GL_DEPTH_TEST);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(-1,1,-1,1,5,15);
+        glMatrixMode(GL_MODELVIEW);
+        display();
+    }
+    
+    
+    
+    function foo2() {
+        new GLSim("glcanvas");
+        glEnable(GL_DEPTH_TEST);
+        glClearColor(0.3,0.3,0.3,1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//        glPointSize(20);
+//        glEnable(GL_POINT_SMOOTH);
+//        glBegin(GL_POINTS);
+        glBegin(GL_QUADS);
+        glColor3d(1,0,0);
+        glVertex2f(-0.5,-0.5);
+        glColor3d(0,1,0);
+        glVertex2f(0.5,-0.5);
+        glColor3d(0,0,1);
+        glVertex2f(0,0.5);
+        glColor3f(1,1,1);
+        glVertex2f(-0.7,0.7)
+        glVertex2f(0, 0.8);
+        glVertex2f(0.8, 0.8);
+        glVertex2f(0.8, 0.9);
+        glVertex2f(0, 0.9);
+        glEnd();
+        glColor4d(1,1,1,0.3);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBegin(GL_POLYGON);
+        glVertex3f(-0.8,-0.2,0.1);
+        glVertex3f(0.8,-0.2,-0.1);
+        glVertex3f(0.8,0.2,-0.1);
+        glVertex3f(-0.8,0.2,0.1);
+        glEnd();
+    }
+    
+    function init() {
+        new GLSim("glcanvas");
+        glClearColor(0.3,0.3,0.3,1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_COLOR_ARRAY);
+        glVertexPointer(2,GL_DOUBLE,0,[ -0.7,-0.7, 0.7,-0.7, 0,0.7]);
+        glColorPointer(3,GL_UNSIGNED_BYTE,0,[ 255,255,255, 0,200,200, 150,0,150 ]);
+//        glVertexPointer(3,GL_FLOAT,0,[ -0.7,-0.7,0, 0.7,-0.7,0, 0,0.7,0]);
+//        glColorPointer(4,GL_FLOAT,0,[ 1,0,0,1, 0,1,0,1, 0,0,1,1 ]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDisableClientState(GL_COLOR_ARRAY);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glVertexPointer(3,GL_FLOAT,0,sphereVertexArray);
+        glNormalPointer(GL_FLOAT,0,sphereNormalArray);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glMaterialfv(GL_FRONT,GL_DIFFUSE,[1,0,1,1]);
+        var i;
+        var slices = 32;
+        var stacks = 16;
+        var vertices = (slices+1)*2;
+        for (i = 0; i < stacks; i++) {
+            var pos = i*(slices+1)*2;
+            glDrawArrays(GL_QUAD_STRIP, pos, vertices);
+        }
+    }
+</script>
+<body onload="init()">
+
+<canvas width=640 height=480 id="glcanvas"></canvas>
+
+
+</body>
+</html>

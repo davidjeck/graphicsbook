@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>This appendix contains brief introductions to three programming languages that are used in the
+textbook: Java, C, and JavaScript.   You should be very familiar with at least one of the
+three languages before reading this textbook.  The three languages have something in common, so that
+knowing one will make it easier to learn the others.  You should also be at least somewhat 
+familiar with classes, objects, and object-oriented programming.</p1>
+
+<p>The appendix is meant to help you 
+get started with the languages that you don't already know.  Only some basic information about each
+language is given&mdash;but hopefully enough to let you understand examples in the
+book and to write some programs that use the graphics techniques that are covered.
+You should at least be able to work with the sample programs that accompany this textbook.</p>
+
+<p>Java is obligatory only for <localref href="graphics2d.5"/>.  For the material on
+<word>OpenGL</word>&nbsp;1.1 in <localref href="gl1geom"/> and <localref href="gl1light"/>, 
+either Java or C can be used, but you will need to be at least somewhat familiar with
+C to follow the discussion.  The <word>shader</word> programming language that is used
+with <word>WebGL</word> is based on C, so some knowledge of C will also be useful
+there.  (However, for writing WebGL shaders, you will not need to know one of the most
+confusing aspects of C, namely the details of how it uses pointers).
+JavaScript is essential for <word>WebGL</word> programming (<localref href="webgl"/> and <localref href="webgl3d"/>), 
+and for programming with <word>three.js</word> (<localref href="threejs"/>).  It is also used for
+<word>HTML canvas</word> graphics in <localref href="graphics2d.6"/>.</p>
+
+</intro>

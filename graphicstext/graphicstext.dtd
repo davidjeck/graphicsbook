@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!ENTITY pi "&#960;">       <!-- these are used by graphicstext.xml but are redefined in graphicstext-tex.xml -->
+<!ENTITY Omega "&#937;">
+<!ENTITY Theta "&#920;">
+<!ENTITY nbsp "&#160;">
+<!ENTITY BigOh "O">
+<!ENTITY dots "...">
+<!ENTITY mdash "&#8212;">
+<!ENTITY middot "&#183;">
+<!ENTITY minus "&#8722;">
+<!ENTITY times "&#215;">
+<!ENTITY leftquote '"'>
+<!ENTITY textitlebreak "">
+<!ENTITY newcodestyle "red">
+
+<!ENTITY includes SYSTEM "graphicstext-xml-includes.txt">
+
+<!ENTITY % simpletextitem "b|i|u|big|sub|sup|code|web|tex|sourceref|demoref|ptype|classname|atype|word|tag">
+<!ENTITY % textitem "b|i|u|big|sub|sup|code|br|a|localref|web|tex|sourceref|demoref|ptype|newword|word|tag|codedef|bnf|newcode|classname|atype|prog">
+<!ENTITY % innertext "(#PCDATA|%textitem;)*">
+<!ENTITY % simpletext "(#PCDATA|%simpletextitem;)*">
+<!ENTITY % text "(p|p1|np|pre|break|img|ul|ol|narrower|centered|imageclear|webdiv|texdiv|demo)*">
+
+<!ELEMENT graphicstext (preface?,chapter*,appendix*,source?,glossary?)>
+<!ELEMENT preface (%text;)>
+<!ELEMENT intro (%text;)>
+
+<!ELEMENT chapter (intro,section*,exercises?,quiz?)>
+<!ATTLIST chapter 
+	id ID #REQUIRED
+	title CDATA #REQUIRED
+	shorttitle CDATA #IMPLIED>
+
+<!ELEMENT appendix (intro,section*)>
+<!ATTLIST appendix 
+	id ID #REQUIRED
+	title CDATA #REQUIRED
+	shorttitle CDATA #IMPLIED>
+
+<!ELEMENT section (%text;,subsection*,endchapter?)>
+<!ATTLIST section 
+	id ID #REQUIRED
+	title CDATA #REQUIRED
+	shorttitle CDATA #IMPLIED>
+
+<!ELEMENT subsection (%text;)>
+<!ATTLIST subsection 
+	id ID #REQUIRED
+	title CDATA #REQUIRED
+	shorttitle CDATA #IMPLIED>
+<!ELEMENT endchapter EMPTY>
+
+<!ELEMENT source (%text;,subsection*)>
+
+<!ELEMENT glossary (gitem*)>
+
+<!ELEMENT gitem (#PCDATA)>
+<!ATTLIST gitem
+   term CDATA #REQUIRED>
+
+<!ELEMENT newword %simpletext;>  <!-- the term is the corresponding glossary item, used when it is not identical to the element content -->
+<!ATTLIST newword
+   term CDATA #IMPLIED>
+
+<!ELEMENT word %simpletext;>  <!-- the term is the corresponding glossary item, used when it is not identical to the element content -->
+<!ATTLIST word
+   term CDATA #IMPLIED>
+
+<!ELEMENT fudgeref EMPTY>
+<!ATTLIST fudgeref
+   id ID #REQUIRED
+   text CDATA #REQUIRED>
+
+<!ELEMENT exercises (exercise*)>
+<!ELEMENT exercise (exercise-question,exercise-discuss,exercise-code)>
+<!ATTLIST exercise
+    id ID #IMPLIED>
+<!ELEMENT exercise-question %text;>
+<!ELEMENT exercise-discuss %text;>
+<!ELEMENT exercise-code %text;>
+
+<!ELEMENT quiz (question*)>
+<!ELEMENT question (ques,ans)>
+<!ELEMENT ques %text;>
+<!ELEMENT ans %text;>
+
+<!ELEMENT pre %innertext;>
+<!ATTLIST pre
+	xml:space CDATA #FIXED "preserve">
+	
+<!ELEMENT prog %innertext;>
+<!ATTLIST prog
+	xml:space CDATA #FIXED "preserve"
+	name CDATA #REQUIRED>
+
+<!ELEMENT p %innertext;>
+<!ATTLIST p 
+    align CDATA #IMPLIED>
+<!ELEMENT p1 %innertext;>  <!-- first paragraph, for separate styling -->
+<!ELEMENT np %innertext;>  <!-- unindented paragraph -->
+
+<!ELEMENT narrower %text;>
+<!ATTLIST narrower
+   margin CDATA #IMPLIED>
+
+<!ELEMENT centered %text;>
+
+<!ELEMENT localref (#PCDATA)>
+<!ATTLIST localref
+    href CDATA #REQUIRED>
+
+<!ELEMENT sourceref (#PCDATA)>
+<!ATTLIST sourceref
+    href CDATA #REQUIRED>
+
+<!ELEMENT demoref (#PCDATA)>
+<!ATTLIST demoref
+    href CDATA #REQUIRED>
+
+<!ELEMENT a (#PCDATA)>
+<!ATTLIST a
+    href CDATA #REQUIRED>
+
+<!ELEMENT img EMPTY>
+<!ATTLIST img
+    src CDATA #IMPLIED
+    alt CDATA #IMPLIED
+    width CDATA #IMPLIED
+    height CDATA #IMPLIED
+    bordered CDATA #IMPLIED
+    align CDATA #IMPLIED
+    tex CDATA #IMPLIED
+    texscale CDATA #IMPLIED>
+    
+<!ELEMENT demo %text;>
+<!ATTLIST demo
+    src CDATA #REQUIRED
+    width CDATA #REQUIRED
+    height CDATA #REQUIRED>
+    
+<!ELEMENT ul (li*)>
+<!ELEMENT ol (li*)>
+<!ELEMENT li %innertext;>
+
+<!ELEMENT br EMPTY>
+<!ELEMENT break EMPTY>
+<!ELEMENT imageclear EMPTY> <!-- adds a "br clear=all" in the web version -->
+<!ELEMENT i %innertext;>
+<!ELEMENT b %innertext;>
+<!ELEMENT u %innertext;>
+<!ELEMENT big %innertext;>
+<!ELEMENT sup %innertext;>
+<!ELEMENT sub %innertext;>
+<!ELEMENT code %innertext;>
+<!ELEMENT newcode %innertext;>
+<!ELEMENT web %innertext;>   <!-- appears only in web version -->
+<!ELEMENT tex %innertext;>   <!-- appears only in tex version -->
+<!ELEMENT ptype %innertext;>   <!-- primitive type -->
+<!ELEMENT bnf %innertext;>
+<!ELEMENT classname (#PCDATA)>
+<!ELEMENT atype (#PCDATA)>       <!-- array type -->
+<!ELEMENT tag (#PCDATA)>   <!-- an HTML tag -->
+<!ELEMENT codedef %innertext;>
+<!ELEMENT webdiv %text;>   <!-- appears only in web version -->
+<!ELEMENT texdiv %text;>   <!-- appears only in tex version -->
+
+<!ENTITY source SYSTEM "source/source.xml">
+<!ENTITY preface SYSTEM "preface.xml">
+<!ENTITY glossary SYSTEM "glossary.xml">
+
+<!ENTITY proglang_intro SYSTEM "a1-proglang/intro.xml">
+<!ENTITY proglang_s1 SYSTEM "a1-proglang/s1.xml">
+<!ENTITY proglang_s2 SYSTEM "a1-proglang/s2.xml">
+<!ENTITY proglang_s3 SYSTEM "a1-proglang/s3.xml">
+
+<!ENTITY blender_intro SYSTEM "a2-blender/intro.xml">
+<!ENTITY blender_s1 SYSTEM "a2-blender/s1.xml">
+<!ENTITY blender_s2 SYSTEM "a2-blender/s2.xml">
+<!ENTITY blender_s3 SYSTEM "a2-blender/s3.xml">
+<!ENTITY blender_s4 SYSTEM "a2-blender/s4.xml">
+
+<!ENTITY gimp_intro SYSTEM "a3-gimp-inkscape/intro.xml">
+<!ENTITY gimp_s1 SYSTEM "a3-gimp-inkscape/s1.xml">
+<!ENTITY gimp_s2 SYSTEM "a3-gimp-inkscape/s2.xml">
+
+<!ENTITY introduction_intro SYSTEM "c01-introduction/intro.xml">
+<!ENTITY introduction_s1 SYSTEM "c01-introduction/s1.xml">
+<!ENTITY introduction_s2 SYSTEM "c01-introduction/s2.xml">
+<!ENTITY introduction_s3 SYSTEM "c01-introduction/s3.xml">
+<!ENTITY introduction_s4 SYSTEM "c01-introduction/s4.xml">
+
+<!ENTITY graphics2d_intro SYSTEM "c02-graphics2d/intro.xml">
+<!ENTITY graphics2d_s1 SYSTEM "c02-graphics2d/s1.xml">
+<!ENTITY graphics2d_s2 SYSTEM "c02-graphics2d/s2.xml">
+<!ENTITY graphics2d_s3 SYSTEM "c02-graphics2d/s3.xml"> 
+<!ENTITY graphics2d_s4 SYSTEM "c02-graphics2d/s4.xml">
+<!ENTITY graphics2d_s5 SYSTEM "c02-graphics2d/s5.xml">
+<!ENTITY graphics2d_s6 SYSTEM "c02-graphics2d/s6.xml">
+<!ENTITY graphics2d_s7 SYSTEM "c02-graphics2d/s7.xml">
+
+<!ENTITY gl1geom_intro SYSTEM "c03-gl1geom/intro.xml">
+<!ENTITY gl1geom_s1 SYSTEM "c03-gl1geom/s1.xml">
+<!ENTITY gl1geom_s2 SYSTEM "c03-gl1geom/s2.xml">
+<!ENTITY gl1geom_s3 SYSTEM "c03-gl1geom/s3.xml">
+<!ENTITY gl1geom_s4 SYSTEM "c03-gl1geom/s4.xml">
+<!ENTITY gl1geom_s5 SYSTEM "c03-gl1geom/s5.xml">
+<!ENTITY gl1geom_s6 SYSTEM "c03-gl1geom/s6.xml">
+
+<!ENTITY gl1light_intro SYSTEM "c04-gl1light/intro.xml">
+<!ENTITY gl1light_s1 SYSTEM "c04-gl1light/s1.xml">
+<!ENTITY gl1light_s2 SYSTEM "c04-gl1light/s2.xml">
+<!ENTITY gl1light_s3 SYSTEM "c04-gl1light/s3.xml">
+<!ENTITY gl1light_s4 SYSTEM "c04-gl1light/s4.xml">
+
+<!ENTITY threejs_intro SYSTEM "c05-threejs/intro.xml">
+<!ENTITY threejs_s1 SYSTEM "c05-threejs/s1.xml">
+<!ENTITY threejs_s2 SYSTEM "c05-threejs/s2.xml">
+<!ENTITY threejs_s3 SYSTEM "c05-threejs/s3.xml">
+
+<!ENTITY webgl_intro SYSTEM "c06-webgl/intro.xml">
+<!ENTITY webgl_s1 SYSTEM "c06-webgl/s1.xml">
+<!ENTITY webgl_s2 SYSTEM "c06-webgl/s2.xml">
+<!ENTITY webgl_s3 SYSTEM "c06-webgl/s3.xml">
+<!ENTITY webgl_s4 SYSTEM "c06-webgl/s4.xml">
+<!ENTITY webgl_s5 SYSTEM "c06-webgl/s5.xml">
+
+<!ENTITY webgl3d_intro SYSTEM "c07-webgl3d/intro.xml">
+<!ENTITY webgl3d_s1 SYSTEM "c07-webgl3d/s1.xml">
+<!ENTITY webgl3d_s2 SYSTEM "c07-webgl3d/s2.xml">
+<!ENTITY webgl3d_s3 SYSTEM "c07-webgl3d/s3.xml">
+<!ENTITY webgl3d_s4 SYSTEM "c07-webgl3d/s4.xml">
+<!ENTITY webgl3d_s5 SYSTEM "c07-webgl3d/s5.xml">
+
+<!ENTITY advanced_intro SYSTEM "c08-advanced/intro.xml">
+<!ENTITY advanced_s1 SYSTEM "c08-advanced/s1.xml">
+<!ENTITY advanced_s2 SYSTEM "c08-advanced/s2.xml">

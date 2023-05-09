@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<!--
+   This page uses a cube map in 2D graphics by converting
+   2D texture coordinates to 3D vectors, wrapping the
+   texture coordinate square around a sphere, to get the
+   vec3 needed to do cubemap lookup.  The effect is
+   something like a fisheye camera.  Two versions of the
+   result are shown, one with a 170 degree field of view
+   and one with a 330 degree field of view.
+   
+   The texture images are in the folder cubemap-textures/park
+   See the file cubemap-textures/park/readme.txt for the license.
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Basic Texturing in WebGL</title>
+
+<script>
+
+"use strict";
+
+const vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "attribute vec2 a_texCoords;\n" +
+       "varying vec2 v_texCoords;\n" +
+       "void main() {\n" +
+       "   v_texCoords = a_texCoords;\n" +
+       "   gl_Position = vec4(a_coords, 0.0, 1.0);\n" +
+       "}\n";
+
+const fragmentShaderSource =
+       "#ifdef GL_FRAGMENT_PRECISION_HIGH\n" +
+       "    precision highp float;\n" +
+       "#else\n" +
+       "    precision mediump float;\n" +
+       "#endif\n" +
+       "uniform samplerCube u_texture;\n" +  
+       "uniform float u_angle;\n" +  // field of view angle
+       "varying vec2 v_texCoords;\n" +  
+       "void main() {\n" +
+       "   float dist =  distance( v_texCoords, vec2(0.5) );\n" +
+       "   if (dist > 0.5)\n" +
+       "       gl_FragColor = vec4(1.0);\n" +  // white
+       "   else {\n" +
+       "       float x,y;\n" + // coords relative to a center at (0.5,0.5)
+       "       x = v_texCoords.x - 0.5;\n" + 
+       "       y = v_texCoords.y - 0.5;\n" +
+       "       vec2 circ = normalize(vec2(x,y));\n" +  // on the unit circle
+       "       float phi = radians(u_angle/2.0)*(2.0*dist);\n" +  // latitude
+       "       vec3 vector = vec3(sin(phi)*circ.x, sin(phi)*circ.y, cos(phi));\n" +
+       "       gl_FragColor = textureCube( u_texture, vector );\n" +  
+       "    }\n" + 
+       "}\n";
+
+let  gl;  // The WebGL graphics context.
+
+let  a_coords_location;      // location of the "a_coords" attribute variable
+let  a_coords_buffer;        // a VBO to hold the vertex coordinates
+let  a_texCoords_location;   // location of the "a_texCoords" attribute variable
+let  a_texCoords_buffer;     // a VBO to hold the texture coordinates
+
+let  u_angle_location;     // the location of the "u_angle" uniform variable
+let  u_texture_location;     // the location of the "u_texture" uniform variable
+
+let  textureObject = null;   // A texture object to hold the texture image.
+                            // Will be created after images have been loaded.
+
+
+/**
+ * Draws two squares that cover the viewport. Each one shows a view of the
+ * cubemap texture that is similar to a photo made with a fisheye lens.
+ * Note that the fragment shader colors pixels white if they lie outide a disk
+ * inscribed in the square.  
+ */
+function draw() {
+
+    gl.clearColor(1,1,1,1);  // glClear will fill the canvas with white
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas
+
+    if ( ! textureObject ) {
+        return;
+    }
+    
+    // Note: textureObject was created and bound in the loadCubemapTexture function.
+    
+     /* Set up values for the "a_texCoords" attribute, for both squares */
+   
+    let  texCoords = new Float32Array( [ 0,0, 1,0, 1,1, 0,1 ] );
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_texCoords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(a_texCoords_location, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_texCoords_location);
+
+    /* Set up values for the "a_coords" attribute  to draw a square covering the left half of the viewport */
+
+    let  coords = new Float32Array( [ -1,-1, 0,-1, 0,1, -1,1 ] );
+   
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(a_coords_location, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords_location);
+    
+
+    gl.uniform1f( u_angle_location, 170 );  // For a 170-degree fisheye view
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    /* Set up values for the "a_coords" attribute  to draw a square covering the right half of the viewport*/
+
+    coords = new Float32Array( [ 0,-1, 1,-1, 1,1, 0,1 ] );
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STREAM_DRAW);
+    
+    /* Draw the second square */    
+    
+    gl.uniform1f( u_angle_location, 330 ); // For a 330-degree fisheye view
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+/**
+ * Loads the six images for the cubemap texture asynchronously.  When all six
+ * have finished loading, the image is drawn using the texture.
+ */
+function loadCubemapTexture() {
+    const  tex = gl.createTexture();
+    let  imageCt = 0;
+    load( "cubemap-textures/park/negx.jpg", gl.TEXTURE_CUBE_MAP_NEGATIVE_X );
+    load( "cubemap-textures/park/posx.jpg", gl.TEXTURE_CUBE_MAP_POSITIVE_X );
+    load( "cubemap-textures/park/negy.jpg", gl.TEXTURE_CUBE_MAP_NEGATIVE_Y );
+    load( "cubemap-textures/park/posy.jpg", gl.TEXTURE_CUBE_MAP_POSITIVE_Y );
+    load( "cubemap-textures/park/negz.jpg", gl.TEXTURE_CUBE_MAP_NEGATIVE_Z );
+    load( "cubemap-textures/park/posz.jpg", gl.TEXTURE_CUBE_MAP_POSITIVE_Z );
+    function load(url, target) {
+        let  img = new Image();
+        img.onload = function() {
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, tex);
+            try {
+                gl.texImage2D(target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            }
+            catch (e) {
+                document.getElementById("headline").innerHTML =
+                   "Can't access texture.  Note that some browsers" +
+                   " can't use  a texture from a local file.";
+                return;
+            }
+            imageCt++;
+            if (imageCt === 6) {  // all 6 images have been loaded
+                gl.generateMipmap( gl.TEXTURE_CUBE_MAP );
+                document.getElementById("headline").innerHTML = 
+                                      "Funny Cubemap (Fisheye Camera Effect)";
+                textureObject = tex;
+                draw();
+            }
+        };
+        img.onerror = function() {
+            document.getElementById("headline").innerHTML = 
+                                              "SORRY, COULDN'T LOAD TEXTURES";
+        };
+        img.src = url;
+    }
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    let  prog = createProgram( gl, vertexShaderSource, fragmentShaderSource ); 
+    gl.useProgram(prog);
+    
+    a_coords_location = gl.getAttribLocation(prog, "a_coords");
+    a_coords_buffer = gl.createBuffer();
+    a_texCoords_location = gl.getAttribLocation(prog, "a_texCoords");
+    a_texCoords_buffer = gl.createBuffer();
+    
+    u_texture_location = gl.getUniformLocation(prog, "u_texture");
+    gl.uniform1i( u_texture_location, 0 );
+    
+    u_angle_location = gl.getUniformLocation(prog, "u_angle");
+        
+    draw();  // draw without the textures; just fills the canvas with white
+    loadCubemapTexture();
+}
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        let  canvas = document.getElementById("webglcanvas");
+        let  options = {  // no need for depth buffer in this program
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:"  + e + "</p>";
+        return;
+    }
+}
+
+window.onload = init;  // Arrange for init() to be called after page has loaded.
+
+
+</script>
+</head>
+<body style="background-color: lightGray">
+
+<h2 id="headline">Funny Cubemap -- LOADING TEXTURE</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="800" height="400"></canvas>
+</div>
+
+</body>
+</html>

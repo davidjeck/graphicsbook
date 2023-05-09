@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Lights, Camera, Action" id="gl1light.4">
+
+<p1>A scene in computer graphics can be a complex collection of objects, each with
+its own <word term="attribute">attributes</word>.  In <localref href="graphics2d.4.2"/>,
+we saw how a <word>scene graph</word> can be used to organize all the objects in a 2D
+scene.  <word term="rendering">Rendering</word> a scene means traversing the
+scene graph, rendering each object in the graph as it is encountered.
+For 3D graphics, scene graphs must deal with a larger variety of objects,
+attributes, and transforms.  For example, it is often useful to consider lights
+and cameras to be objects and to be able to include them in scene graphs.  In this
+section, we consider scene graphs in 3D, and how to treat cameras and lights
+as objects.</p1>
+
+<p>When designing scene graphs, there are many options to consider.  For example,
+should transforms be properties of object nodes, or should there be separate nodes
+to represent transforms?  The same question can be asked about attributes.
+Another question is whether an attribute value should apply only to the node
+of which it is a property, or should it be inherited by the children of that node?</p>
+
+<p>A fundamental choice is the shape of the graph.  In general, a scene graph can
+be a <word>directed acyclic graph</word>, or "dag," which is a tree-like structure except
+that a node can have several parents in the graph.  The scene graphs in
+<localref href="graphics2d.4.2"/> were dags.  This has the advantage that a
+single node in the graph can represent several objects in the scene, since in a
+dag, a node can be encountered several times as the graph is traversed.  On the other
+hand, representing several objects with one scene graph node can lead to a lack of flexibility,
+since those objects will all have the same value for any property encoded in
+the node.  So, in some applications, scene graphs are required to be trees.  
+In a tree, each node has a unique parent, and the node will be encountered only
+once as the tree in traversed.  The distinction between trees and dags will show
+up when we discuss camera nodes in scene graphs.</p>
+
+
+<subsection title="Attribute Stack" id="gl1light.4.1">
+
+<p>We have seen how the functions <i>glPushMatrix</i> and <i>glPopMatrix</i> are used
+to manipulate the transform stack.  These functions are useful when traversing a
+scene graph: When a node that contains a transform is encountered during a traversal
+of the graph, <i>glPushMatrix</i> can be called before applying the transform.  Then, after the
+node and its descendants have been rendered, <i>glPopMatrix</i> is called to restore the
+previous modelview transformation.</p>
+
+<p>Something similar can be done for attributes such as color and material, if it is assumed 
+that an attribute value in a scene graph node should be inherited as the default value of
+that attribute for children of the node.  OpenGL 1.1 maintains an attribute stack, which is
+manipulated using the functions <i>glPushAttrib</i> and <i>glPopAttrib</i>.  In addition
+to object attributes like the current color, the attribute stack can store global
+attributes like the global ambient color and the enabled state of the depth test.
+Since there are so many possible attributes, <i>glPushAttrib</i> does not simply
+save the value of every attribute.  Instead, it saves a subset of the
+possible attributes.  The subset that is to be saved is specified as a parameter to
+the function.  For example, the command</p>
+
+<pre>glPushAttrib(GL_ENABLED_BIT);</pre>
+
+<np>will save a copy of each of the OpenGL state variables that can be enabled or
+disabled.  This includes the current state of <i>GL_DEPTH_TEST</i>, <i>GL_LIGHTING</i>,
+<i>GL_NORMALIZE</i>, and others.  Similarly,</np>
+
+<pre>glPushAttrib(GL_CURRENT_BIT);</pre>
+
+<np>saves a copy of the current color, normal vector, and texture coordinates.  And</np>
+
+<pre>glPushAttrib(GL_LIGHTING_BIT);</pre>
+
+<np>saves attributes relevant to lighting such as the values of material properties and light properties,
+the global ambient color, color material settings, and the enabled state for lighting and each of
+the individual lights.  Other constants can be used to save other sets of attributes; see the
+OpenGL documentation for details.  It is possible to OR together several constants to combine
+sets of attributes.  For example,</np>
+
+<pre>glPushAttrib(GL_LIGHTING_BIT | GL_ENABLED_BIT)</pre>
+
+<np>will save the attributes in both the <i>GL_LIGHTING_BIT</i> set and in the
+<i>GL_ENABLED_BIT</i> set.</np>
+
+<p>Calling <i>glPopAttrib</i>() will restore all the values that were saved by the
+corresponding call to <i>glPushAttrib</i>.  There is no need for a parameter to
+<i>glPopAttrib</i>, since the set of attributes that are restored is determined
+by the parameter that was passed to <i>glPushAttrib</i>.</p>
+
+<p>It should be easy to see how <i>glPushAttrib</i> and <i>glPopAttrib</i> can be used
+while traversing a scene graph:  When processing a node, before changing attribute values,
+call <i>glPushAttrib</i> to save a copy of the relevant set or sets of attributes.
+Render the node and its descendants. Then call <i>glPopAttrib</i> to restore the
+saved values.  This limits the effect of the changes so that they apply only to the node and
+its descendants.</p>
+
+<break/>
+
+<p>There is an alternative way to save and restore values.  OpenGL has a variety of "get" functions
+for reading the values of various state variables.  I will discuss just some of them here.
+For example,</p>
+
+<pre>glGetFloatv( GL_CURRENT_COLOR, floatArray );</pre>
+
+<np>retrieves the current color value, as set by <i>glColor*</i>.  The <i>floatArray</i> parameter
+should be an array of <ptype>float</ptype>, whose length is at least four.  The RGBA color components
+of the current color will be stored in the array.  Note that, later, you can simply call
+<i>glColor4fv</i>(<i>colorArray</i>) to restore the color.  The same function can be used
+with different first parameters to read the values of different floating-point state variables.
+To find the current value of the <word>viewport</word>, use</np>
+
+<pre>glGetIntegerv( GL_VIEWPORT, intArray );</pre>
+
+<np>This will set <i>intArray</i>[0] and <i>intArray</i>[1] to be the <i>x</i> and <i>y</i> coordinates
+of the lower left corner of the current viewport, <i>intArray</i>[2] to be its width, and <i>intArray</i>[3]
+to be its height. To read the current values of material properties, use</np>
+
+<pre>glGetMaterialfv( face, property, floatArray );</pre>
+
+<np>The <i>face</i> must be <i>GL_FRONT</i> or <i>GL_BACK</i>.  The property must be
+<i>GL_AMBIENT</i>, <i>GL_DIFFUSE</i>, <i>GL_SPECULAR</i>, <i>GL_EMISSION</i>, or <i>GL_SHININESS</i>.
+The current value of the property will be stored in <i>floatArray</i>, which must be of length at least
+four for the color properties, or length at least one for <i>GL_SHININESS</i>.  There is
+a similar command, <i>glGetLightfv</i>, for reading properties of lights.</np>
+
+<p>Finally, I will mention <i>glIsEnabled</i>(<i>name</i>), which can be used to check the
+enabled/disabled status of state variables such as <i>GL_LIGHTING</i> and <i>GL_DEPTH_TEST</i>.
+The parameter should be the constant that identifies the state variable.  The function returns 0 if the state
+variable is disabled and 1 if it is enabled.  For example, <i>glIsEnabled</i>(<i>GL_LIGHTING</i>)
+tests whether lighting is enabled.  Suppose that a node in a scene graph has an attribute
+<i>lit</i> to tell whether that node (and its descendants) should be rendered with lighting
+enabled.  Then the code for rendering a node might include something like this:</p>
+
+<pre>int saveLit = glIsEnabled(GL_LIGHTING);
+if (lit)
+    glEnable(GL_LIGHTING);
+else
+    glDisable(GL_LIGHTING);
+   .
+   .  // Render the node and its descendants
+   .
+if (saveLit)
+   glEnable(GL_LIGHTING);
+else
+   glDisable(GL_LIGHTING);</pre>
+   
+<p>Since <i>glPushAttrib</i> can be used to push large
+groups of attribute values, you might think that it would
+be more efficient to use <i>glIsEnabled</i> and the <i>glGet*</i> family of commands
+to read the values of just those state variables that you are 
+planning to modify.  However, recall that OpenGL can queue a number
+of commands into a batch to be sent to the graphics card, and those commands
+can be executed by the <word>GPU</word> at the same time that your program
+continues to run.  A <i>glGet</i> command can require your 
+program to communicate with the graphics card and wait for the response.
+This means that any pending OpenGL commands will have to be sent to the
+graphics card and executed before the <i>glGet</i> command can complete.
+This is the kind of thing that can hurt performance.  
+In contrast, calls to <i>glPushAttrib</i> and <i>glPopAttrib</i> can
+be queued with other OpenGL commands and sent to the graphics
+card in batches, where they can be executed efficiently by
+the graphics hardware.  In fact, you should generally prefer
+using <i>glPushAttrib</i>/<i>glPopAttrib</i> instead of a
+<i>glGet</i> command when possible.</p>
+
+
+</subsection>
+
+
+
+<subsection title="Moving Camera" id="gl1light.4.2">
+
+<p>Let's turn to another aspect of modeling.  Suppose that we want to implement a
+viewer that can be moved around in the world like other objects.  Sometimes, such
+a viewer is thought of as a moving camera.  The camera is used to take pictures of
+the scene.  We want to be able to apply transformations
+to a camera just as we apply transformations to other objects.  The position
+and orientation of the camera determine what should be visible when the scene is 
+rendered.  And the "size" of the camera, which can be affected by a scaling transformation,
+determines how large a field of view it has.   But a camera is not
+just another object.  A camera really represents the viewing transformation that
+we want to use.  Recall that modeling and viewing transformations have opposite effects:
+Moving objects to the right with a modeling transform is equivalent to moving the
+viewer to the left with a viewing transformation.  (See <localref href="gl1geom.3.4"/>.)
+To apply a modeling transformation to the camera, we
+really want to apply a viewing transformation to the scene as a whole, and that viewing transformation
+is the <word term="inverse transform">inverse</word> of the camera's modeling transformation.</p>
+
+<p>The following illustration shows a scene viewed from a moving camera.  The camera starts
+in the default viewing position, at the origin, looking in the direction of the negative <i>z</i>-axis.
+This corresponds to using the identity as the viewing transform.  For the second image,
+the camera has moved forward by ten units.  This would correspond to applying the modeling
+transformation <i>glTranslatef</i>(0,0,&minus;10) to the camera (since it is moving in the negative
+<i>z</i>-direction).  But to implement this movement as a change of view, 
+we want to apply the inverse operation as a viewing transformation.  So, the viewing
+transform that we actually apply is <i>glTranslatef</i>(0,0,10).  This can be seen, 
+if you like, as a modeling transformation
+that is applied to all the <b>other</b> objects in the scene:  Moving the camera ten units in
+one direction is equivalent to moving all the other objects 10 units in the opposite direction.</p>
+
+<img src="walkthrough.png" width="629" height="220" tex="walkthrough.eps" texscale="0.75"/>
+
+<np>For the third image, the camera has rotated in place by 21 degrees to the right&mdash;a 21-degree
+clockwise rotation about the <i>y</i>-axis&mdash;<b>after</b> it has been translated.  This can be 
+implemented by the transformation <i>glRotatef</i>(21,0,1,0)&mdash;a 21-degree counterclockwise
+rotation about the <i>y</i>-axis&mdash;applied <b>before</b> the translation. Remember that the
+inverse of a composition of transformations is the composition of their inverses, in the opposite
+order.  Mathematically, using <i>T<sup>&minus;1</sup></i> to represent the inverse of a
+transformation <i>T</i>, we have that 
+<i>(RS)<sup>&minus;1</sup>&nbsp;=&nbsp;S<sup>&minus;1</sup>R<sup>&minus;1</sup></i> for
+two transformations <i>R</i> and <i>S</i>.</np>
+
+
+<demo src="c4/walkthrough.html" width="800" height="440">
+<p>The images in the illustration are from <web>the following demo.</web><tex>the demo <demoref href="c4/walkthrough.html"/>, which you
+can try on-line.</tex>  The demo lets you move around in a scene.  More accurately, of course, it 
+lets you change the viewing transformation to see the scene from different viewpoints.</p>
+</demo>
+
+<break/>
+
+<p>When using scene graphs, it can be useful to include a camera object in the graph.  That is,
+we want to be able to include a node in the graph that represents the camera, and we want to
+be able to use the camera to view the scene.  It can even be useful to have several cameras
+in the scene, providing alternative points of view.  To implement this, we need to be able
+to render a scene from the point of view of a given camera.  From the previous discussion,
+we know that in order to do that, we need to use a viewing transformation that is the
+inverse of the modeling transformation that is applied to the camera object.
+The viewing transform must be applied before any of the objects in the scene are rendered.</p>
+
+<p>When a scene graph is traversed, a modeling transformation can be applied at any node.
+The modeling transform that is in effect when a given node is encountered is the composition
+of all the transforms that were applied at nodes along the path that led to given node.
+However, if the node is a camera node, we don't want to apply that modeling transform;
+we want to apply its inverse as a viewing transform.  To get the inverse, we can
+start at the camera node and follow the path backwards, applying the inverse of
+the modeling transform at each node.</p>
+
+<img src="camera-transform.png" width="445" height="225" bordered="true" tex="camera-transform.eps" texscale="0.75"/>
+
+<np>To easily implement this, we can add "parent pointers" to the scene graph data structure.  
+A parent pointer for a node is a link to the parent of that node in the graph. Note that this only works
+if the graph is a tree; in a tree, each node has a unique parent, but that is not true in a general
+directed acyclic graph.  It is possible to move up the tree by following parent pointers.</np>
+
+<p>We this in mind, the algorithm for rendering the scene from the point of view of a camera
+goes as follows: Set the modelview transform to be the identity, by calling <i>glLoadIdentity</i>().
+Start at the camera node, and follow parent pointers until you reach the root of the tree.
+At each node, apply the <i>inverse</i> of any modeling transformation in that node.
+(For example, if the modeling transform is translation by (a,b,c), call
+<i>glTranslatef</i>(<i>&minus;a,&minus;b,&minus;c</i>).)  Upon reaching the root, the viewing
+transform corresponding to the camera has been established.  Now, traverse the scene graph
+to render the scene as usual.  During this traversal, camera nodes should be ignored.</p>
+
+<p>Note that a camera can be attached to an object, in the sense that the camera and the object
+are both subject to the same modeling transformation and so move together as a unit.
+In modeling terms, the camera and the object
+are sub-objects in a complex object.  For example, a camera might be attached
+to a car to show the view through the windshield of that car.  If the car moves, because its
+modeling transformation changes, the camera will move along with it.  </p>
+
+</subsection>
+
+
+
+<subsection title="Moving Light" id="gl1light.4.3">
+
+<p>It can also be useful to think of lights as objects, even as part of a complex object.
+Suppose that a scene includes a model
+of a lamp.  The lamp model would include some geometry to make it visible, but if it
+is going to cast light on other objects in the scene, it also has
+to include a source of light.  This means that the lamp is a complex
+object made up of an OpenGL light source plus some geometric objects.
+Any modeling transformation that is applied to the lamp should
+affect the light source as well as the geometry.  In terms of the
+scene graph, the light is represented by a node in the graph,
+and it is affected by modeling transformations in the same
+way as other objects in the scene graph.  You can even have
+animated lights&mdash;or animated objects that include lights
+as sub-objects, such as the headlights on a car.</p>
+
+<p>Recall from <localref href="gllight.2.3"/> that a light source is subject to the
+modelview transform that is in effect at the time the position of the
+light source is set by <i>glLightfv</i>.  If the light is represented as a node in
+a scene graph, then the modelview transform that we need is the one that
+is in effect when that node is encountered during a traversal of the scene
+graph.  So, it seems like we should just traverse the graph and set the position
+of the light when we encounter it during the traversal.</p>
+
+<p>But there is a problem:  Before any geometry is rendered,
+all the light sources that might affect that geometry must already be
+configured and enabled.  In particular, the lights' positions must be set
+before rendering any geometry.  This means that you can't simply set the
+position of light sources in the scene graph as you traverse the graph in the
+usual way.  If you do that, objects that are drawn before the
+light is encountered won't be properly illuminated by the
+light.  Similarly,
+if the light node contains values for any other properties of
+the light, including the enabled/disabled state of the light,
+those properties must be set before rendering any geometry.</p>
+
+<p>One solution is to do two traversals of the scene graph, the first
+to set up the lights and the second to draw the geometry.  Since
+lights are affected by the modelview transformation, you have to
+set up the modeling transform during the first traversal
+in exactly the same way that you do in the second traversal.
+When you encounter the lights during the first traversal,
+you need to set the position of the light, since setting the
+position is what triggers the application of the current modelview
+transformation to the light.  You also need to set any other
+properties of the light.  During the first traversal, geometric
+objects in the scene graph are ignored.  During the second traversal, when
+geometry is being rendered, light nodes can be ignored.</p>
+
+
+
+</subsection>
+
+</section>

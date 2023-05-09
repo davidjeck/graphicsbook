@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Polyhedron Viewer Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/polyhedra.js"></script>
+<script>
+
+var currentModel;
+var camera;
+
+function display() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (!currentModel.maxLength) {
+        currentModel.maxLength = findMaxLength(currentModel);
+    }
+    if (!currentModel.faceColors) {
+        currentModel.faceColors = randomColorArray(currentModel.faces.length);
+    }
+    var drawFaces = document.getElementById("drawfaces").checked ||
+                         document.getElementById("drawboth").checked;
+    var drawEdges = document.getElementById("drawedges").checked ||
+                         document.getElementById("drawboth").checked;
+    var colored = document.getElementById("colored").checked;
+    
+    camera.setOrthographic(document.getElementById("orthographic").checked);
+    camera.apply();
+    glPushMatrix();
+    var scale = 1/currentModel.maxLength;
+    glScalef(scale,scale,scale);
+    var i,j;
+    if (drawFaces) {
+        if (drawEdges) {
+            glEnable(GL_POLYGON_OFFSET_FILL);
+        }
+        glColor3f(1,1,1); // in case colored is false
+        for (i = 0; i < currentModel.faces.length; i++) {
+            if (colored) {
+                glColor3fv( currentModel.faceColors[i] );
+            }
+            glBegin(GL_TRIANGLE_FAN);
+            for (j = 0; j < currentModel.faces[i].length; j++) {
+                var vertexNum = currentModel.faces[i][j];
+                glVertex3fv( currentModel.vertices[vertexNum] );
+            }
+            glEnd();
+        }
+        glDisable(GL_POLYGON_OFFSET_FILL);
+    }
+    if (drawEdges) {
+        if (drawFaces) {
+            glColor3f(0,0,0);
+        }
+        else {
+            glColor3f(1,1,1);
+        }
+        for (i = 0; i < currentModel.faces.length; i++) {
+            glBegin(GL_LINE_LOOP);
+            for (j = 0; j < currentModel.faces[i].length; j++) {
+                var vertexNum = currentModel.faces[i][j];
+                glVertex3fv( currentModel.vertices[vertexNum] );
+            }
+            glEnd();
+        }
+    }
+    glPopMatrix();
+}
+
+function findMaxCoord(model) {
+    var verts = model.vertices;
+    var max = 0;
+    for (var i = 0; i < verts.length; i++) {
+        var v = verts[i];
+        max = Math.max( Math.max(max,v[0]), Math.max(v[1],v[2]) );
+    }
+    return max;
+}
+
+function findMaxLength(model) {
+    var verts = model.vertices;
+    var max = 0;
+    for (var i = 0; i < verts.length; i++) {
+        var v = verts[i];
+        var len2 = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+        max = Math.max( max, len2 );
+    }
+    return Math.sqrt(max);
+}
+
+function randomColorArray(length) {
+    var colors = new Array(length);
+    for (var i = 0; i < length; i++) {
+        colors[i] = [ Math.random(), Math.random(), Math.random() ];
+    }
+    return colors;
+}
+
+function getModel(num) {
+    switch(num) {
+        case 0: return houseIFS;
+        case 1: return cubeIFS;
+        case 2: return dodecahedronIFS;
+        case 3: return icosahedronIFS;
+        case 4: return octahedronIFS;
+        case 5: return rhombicDodecahedronIFS;
+        case 6: return socerBallIFS;
+        case 7: return stellatedDodecahedronIFS;
+        case 8: return stellatedIcosahedronIFS;
+        case 9: return stellatedOctahedronIFS;
+        case 10: return tetrahedronIFS;
+        case 11: return truncatedIcosahedronIFS;
+        default: return truncatedRhombicDodecahedronIFS;
+    }
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+    }
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(0,0,0,1);
+    glLineWidth(2);
+    glPolygonOffset(1,2);
+    camera = new Camera();
+    camera.lookAt(2,2,6);
+    camera.setScale(1.2);
+    camera.installTrackball(display);
+    currentModel = stellatedDodecahedronIFS;
+    document.getElementById("modelSelect").value = "7";
+    document.getElementById("modelSelect").onchange = function() {
+        var modelNum = Number(document.getElementById("modelSelect").value);
+        currentModel = getModel(modelNum);
+        display();
+    };
+    document.getElementById("reset").onclick = function() {
+        camera.lookAt(2,2,6);
+        display();
+    };
+    document.getElementById("perspective").checked = true;
+    document.getElementById("colored").checked = true;
+    document.getElementById("drawboth").checked = true;
+    document.getElementById("colored").onchange = display;
+    document.getElementById("white").onchange = display;
+    document.getElementById("drawfaces").onchange = display;
+    document.getElementById("drawedges").onchange = display;
+    document.getElementById("drawboth").onchange = display;
+    document.getElementById("perspective").onchange = display;
+    document.getElementById("orthographic").onchange = display;
+    display();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">IFS Polyhedron Viewer</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools">
+<p style="margin-top:0pt"><label>Select Polyhedron:<br>
+    <select id="modelSelect" style="margin-top:3px">
+        <option value="0">House</option>
+        <option value="1">Cube</option>
+        <option value="2">Dodecahedron</option>
+        <option value="3">Icosahedron</option>
+        <option value="4">Octahedron</option>
+        <option value="5">Rhombic Dodecahedron</option>
+        <option value="6">Socer Ball</option>
+        <option value="7">Stellated Dodecahedron</option>
+        <option value="8">Stellated Icosahedron</option>
+        <option value="9">Stellated Octahedron</option>
+        <option value="10">Tetrahedron</option>
+        <option value="11">Truncated Icosahedron</option>
+        <option value="12">Truncated Rhombic Dodecahedron</option>
+    </select>
+</label></p>
+
+<p>
+<label><input type=radio id="colored" name="facecolors">Colored Faces</label><br>
+<label><input type=radio id="white" name="facecolors">White Faces</label>
+</p>
+
+<p>
+<label><input type=radio id="drawfaces" name="draw">Draw Faces</label><br>
+<label><input type=radio id="drawedges" name="draw">Draw Edges</label><br>
+<label><input type=radio id="drawboth" name="draw">Draw Both</label>
+</p>
+
+<p>
+<label><input type=radio id="perspective" name="proj">Perspective Projection</label><br>
+<label><input type=radio id="orthographic" name="proj">Orthographic Projection</label>
+</p>
+
+<p style="margin-bottom:0">
+<button id="reset">Reset Rotation</button>
+</p>
+
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo displays polyhedral models that are defined as
+indexed face sets.  A few of the models have assigned colors
+for the faces (just the house, cube, tetrahedron, and octohedron).
+The others get random colors which will be different each time
+the demo runs.</p>
+<p>You can drag on the polyhedron to rotate it.</p>
+<p>This demo does not use lighting, which means that it is
+lacking one of the major components of realistic 3D graphics.
+The edges and differently colored faces give some hint of 3D.
+Try selecting "White&nbsp;Faces" and "Draw&nbsp;Faces";
+you will see a flat white blob with no hint of 3D at all.</p>
+<p>Try switching between Perspective and Orthographic projection.
+The difference is not huge in this case, but note that with a
+perspective projection, things look bigger when they are closer to
+the viewer.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>The term "computer graphics" refers to anything involved in the creation or
+manipulation of images on a computer, including animated images.  It is a very
+broad field, and one in which changes and advances seem to come at a dizzying pace.
+It can be difficult for a beginner to know where to start.  However, there is
+a core of fundamental ideas that are part of the foundation of most applications
+of computer graphics.  This book attempts to cover those foundational ideas, or
+at least as many of them as will fit into a one-semester college-level course.
+While it is not possible to cover the entire field in a first course&mdash;or even a large
+part of it&mdash;this should be a good place to start.</p1>
+
+<p>This short chapter provides an overview and introduction to the material
+that will be covered in the rest of the book, without going into a lot of detail.</p>
+
+</intro>

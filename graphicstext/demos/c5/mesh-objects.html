@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Mesh Objects</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+   select, input { margin-left: 30px; }
+   p#detailPar { display: none; }
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/three.min.js"></script>
+<script src="../script/threejs/OrbitControls.js"></script>
+<script>
+
+var canvas, scene, renderer, camera;
+
+var currentObject;  // Currently installed object;
+
+var materialSelect, objectSelect, detailSelect;  // Controls
+var smoothShadingRadio, flatShadingRadio;
+
+var currentMaterialNum = 5, currentObjectNum = 2, currentDetailNum = 0;  // Values of controls
+var smoothShading = true;
+
+function render() {
+    renderer.render(scene,camera);
+}
+
+function createWorld() {
+    scene = new THREE.Scene();
+    renderer.setClearColor(0);
+    camera = new THREE.PerspectiveCamera(40,canvas.width/canvas.height,1,30);
+    camera.position.z = 15;
+    light = new THREE.DirectionalLight(0xffffff,0.8);
+    camera.add(light);
+    scene.add(camera);
+    scene.add(new THREE.AmbientLight(0x202020));
+    currentObject = getCurrentObject();
+    scene.add(currentObject);
+}
+
+/* Create an object, according to all the current settings.
+ */
+function getCurrentObject() {
+    var mat;
+    var obj;
+    switch (currentMaterialNum) {
+        case 0:
+            mat  = new THREE.MeshBasicMaterial({
+               color: "white",
+               wireframe: true
+            });
+            break;
+        case 1:
+        case 2:
+            mat  = new THREE.MeshBasicMaterial({
+                polygonOffset: true,  
+                polygonOffsetUnits: 1,
+                polygonOffsetFactor: 1,
+                color: "yellow",
+                side: THREE.DoubleSide
+            });
+            break;
+        case 3:
+        case 4:
+            mat = new THREE.MeshLambertMaterial({
+                polygonOffset: true,  
+                polygonOffsetUnits: 1,
+                polygonOffsetFactor: 1,
+                color: "yellow",
+                side: THREE.DoubleSide
+            });
+            break;
+        default:
+            mat = new THREE.MeshPhongMaterial({
+                polygonOffset: true,  
+                polygonOffsetUnits: 1,
+                polygonOffsetFactor: 1,
+                color: "yellow",
+                specular: 0x101010,
+                shininess: 32,
+                side: THREE.DoubleSide
+            });
+    }
+    switch (currentObjectNum) {
+        case 0:
+            obj = new THREE.Mesh(
+                new THREE.CylinderGeometry(2,2,6,32,3),
+                mat
+            );
+            obj.rotation.x = -Math.PI;
+            break;
+        case 1:
+            obj = new THREE.Mesh(
+                new THREE.CylinderGeometry(3,0,6,32,3),
+                mat
+            );
+            obj.rotation.x = -Math.PI;
+            break;
+        case 2:
+            obj = new THREE.Mesh(
+                new THREE.TorusGeometry(2.5,1.5,16,64),
+                mat
+            );
+            break;
+        case 3:
+            obj = new THREE.Mesh(
+                new THREE.SphereGeometry(4,32,16),
+                mat
+            );
+            break;
+        case 4:
+            obj = new THREE.Mesh(
+                new THREE.BoxGeometry(5,5,5,3,3,3),
+                mat
+            );
+            break;
+        case 5:
+            obj = new THREE.Mesh(
+                new THREE.CylinderGeometry(2,2,6,32,3,false,0,Math.PI),
+                mat
+            );
+            obj.rotation.x = -Math.PI;
+            break;
+        case 6:
+            obj = new THREE.Mesh(
+                new THREE.TorusGeometry(2.5,1.5,16,16,Math.PI/2),
+                mat
+            );
+            break;
+        case 7:
+            obj = new THREE.Mesh(
+                new THREE.CylinderGeometry(2,3.5,6,6,1),
+                mat
+            );
+            break;
+        case 8:
+            obj = new THREE.Mesh(
+                new THREE.TetrahedronGeometry(4,currentDetailNum),
+                mat
+            );
+            break;
+        case 9:
+            obj = new THREE.Mesh(
+                new THREE.OctahedronGeometry(4,currentDetailNum),
+                mat
+            );
+            break;
+        case 10:
+            obj = new THREE.Mesh(
+                new THREE.DodecahedronGeometry(4,currentDetailNum),
+                mat
+            );
+            break;
+        case 11:
+            obj = new THREE.Mesh(
+                new THREE.IcosahedronGeometry(4,currentDetailNum),
+                mat
+            );
+    }
+    mat.flatShading = !smoothShading;
+    if (currentMaterialNum == 2 || currentMaterialNum == 4 || currentMaterialNum == 6) { // combined shaded plus wireframe
+        var w = new THREE.Mesh(
+            obj.geometry,
+            new THREE.MeshBasicMaterial({
+                color: "black",
+                wireframe: true
+            })
+        );
+        obj.add(w);  // Wireframe will rotate with the solid.
+    }
+    return obj;
+}
+
+function changeMaterial() {
+    var newMat = Number(materialSelect.value);
+    if (newMat != currentMaterialNum) {
+        currentMaterialNum = newMat;
+        scene.remove(currentObject);
+        currentObject = getCurrentObject();
+        scene.add(currentObject);
+        if (currentMaterialNum > 4) {
+            document.getElementById("shadingPar").style.display = "block";
+        }
+        else {
+            document.getElementById("shadingPar").style.display = "none";
+        }
+        render();
+    }
+}
+
+function changeObject() {
+    var newObj = Number(objectSelect.value);
+    if (newObj != currentObjectNum) {
+        currentObjectNum = newObj;
+        if (currentObjectNum > 7) {
+            document.getElementById("detailPar").style.display = "block";
+            detailSelect.value = "0";
+            currentDetailNum = 0;
+        }
+        else {
+            document.getElementById("detailPar").style.display = "none";
+        }
+        if (currentObjectNum > 6) {
+            flatShadingRadio.checked = true;
+            smoothShading = false;
+        }
+        else {
+            smoothShadingRadio.checked = true;
+            smoothShading = true;
+        }
+        scene.remove(currentObject);
+        currentObject = getCurrentObject();
+        scene.add(currentObject);
+        render();
+    }
+}
+
+function changeDetail() {
+    var newDetail = Number(detailSelect.value);
+    if (currentObjectNum > 7 && newDetail != currentDetailNum) {
+        currentDetailNum = newDetail;
+        scene.remove(currentObject);
+        currentObject = getCurrentObject();
+        scene.add(currentObject);
+        render();
+    }
+}
+
+function changeShading() {
+    var newShade = smoothShadingRadio.checked;
+    if (newShade != smoothShading) {
+        smoothShading = newShade;
+        scene.remove(currentObject);
+        currentObject = getCurrentObject();
+        scene.add(currentObject);
+        render();
+    }
+}
+
+ function installOrbitControls() {
+       //(I would prefer to use TrackballControls, but there seems to be
+       // no way to get TrackballControls to work without an animation.)
+    var controls = new THREE.OrbitControls(camera,canvas);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.addEventListener("change", render);
+}
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true
+        });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    materialSelect = document.getElementById("material");
+    objectSelect = document.getElementById("object");
+    detailSelect = document.getElementById("detail");
+    materialSelect.value = "" + currentMaterialNum;
+    objectSelect.value = "" + currentObjectNum;
+    detailSelect.value = "" + currentDetailNum;
+    materialSelect.addEventListener("change", changeMaterial, false);
+    objectSelect.addEventListener("change", changeObject, false);
+    detailSelect.addEventListener("change", changeDetail, false);
+    smoothShadingRadio = document.getElementById("shadingSmooth");
+    smoothShadingRadio.checked = true;
+    smoothShadingRadio.addEventListener("change", changeShading, false);
+    flatShadingRadio = document.getElementById("shadingFlat");
+    flatShadingRadio.addEventListener("change", changeShading, false);
+    createWorld();
+    render();
+    installOrbitControls();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Three.js Mesh Object Viewer</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools">
+<p><b>Select Material:</b><br>
+    <select id="material">
+    <option value="0">Wireframe Only</option>
+    <option value="1">Basic</option>
+    <option value="2">Basic Plus Wireframe</option>
+    <option value="3">Lambert</option>
+    <option value="4">Lambert Plus Wireframe</option>
+    <option value="5">Phong</option>
+    <option value="6">Phong Plus Wireframe</option>
+    </select>
+</p>
+<p><b>Select Object:</b><br>
+    <select id="object">
+    <option value="0">Cylinder</option>
+    <option value="1">Cone</option>
+    <option value="2">Torus</option>
+    <option value="3">Sphere</option>
+    <option value="4">Cube</option>
+    <option value="5">Half Cylinder</option>
+    <option value="6">Quarter Torus</option>
+    <option value="7">Hexogonal Frustum</option>
+    <option value="8">Tetrahedron</option>
+    <option value="9">Octahedron</option>
+    <option value="10">Dodecahedron</option>
+    <option value="11">Icosacahedron</option>
+    </select>
+</p>
+<p id="shadingPar"><b>Shading:</b><br>
+    <label><input type="radio" name="shading" id="shadingFlat">Flat</label>
+    <label><input type="radio" name="shading" id="shadingSmooth">Smooth</label>
+</p>
+<p id="detailPar"><b>Select Detail Level:</b><br>
+    <select id="detail">
+    <option>0</option>
+    <option>1</option>
+    <option>2</option>
+    <option>3</option>
+    <option>4</option>
+    <option>5</option>
+    </select>
+</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>You can use this demo to see a variety of <i>three.js</i> mesh objects.
+A mesh object is made up of a geometry and a material.  Twelve different
+geometries are available under "Select Object."  These are created using
+standard classes such as THREE.SphereGeometry and THREE.Icosahedron geometry.
+The cylinder, cone, hexagonal frustum, and half-cylinder are all made using
+the class THREE.CylinderGeometry.</p>
+<p>The mesh materials used in this demo belong to the classes
+THREE.MeshBasicMaterial, THREE.MeshLambertMaterial, and THREE.MeshPhongMaterial.
+Wireframes use THREE.MeshBasicMaterial.  When a wireframe is shown in combination
+with a surface, there are actually two objects, one to represent the wireframe
+and one to represent the surface.  The two objects use the same geometry
+but different material.</p>
+<p>The shading radio buttons, which can be set to Flat or to Smooth, control a
+property of Phong materials.  This option appears only when a Phong material
+is selected.
+For Flat shading, a normal vector is computed for each triangular face and is
+used for all vertices of that face.  This makes the face appear flat.  For
+Smooth shading, a normal vector is computed for each vertex of the solid,
+using an average of the face normals for faces that share that vertex.  The
+result is a smooth-looking surface.</p>
+<p>For the regular polyhedra (tetrahedron, octahedron, dodecahedron,
+and icosahedron), there is an additional control for specifying the "level of
+detail."  When the level of detail is greater than zero, you no longer get
+a regular polyhedron.  Instead, you get an approximation for the
+sphere that circumscribes the regular polyhedron.  As the level of detail increases,
+the number of faces increases, and you get a better approximation for the sphere.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

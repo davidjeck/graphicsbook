@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<!--
+   This page is a simple demo of WebGL.  It draws a triangle
+   where each vertex has a different color.  This is the standard
+   OpenGL "RGB Triangle" example.  In this program, color
+   is a varying variable, and there is a vertexColor attribute
+   to specify the colors for the three vertices.
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>RGB Triangle in WebGL</title>
+
+<script>
+
+"use strict";
+
+const  vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "attribute vec3 a_color;\n" +
+       "varying vec3 v_color;\n" +
+       "void main() {\n" +
+       "   gl_Position = vec4(a_coords, 0.0, 1.0);\n" +
+       "   v_color = a_color;\n" +
+       "}\n";
+
+const  fragmentShaderSource =
+       "precision mediump float;\n" +
+       "varying vec3 v_color;\n" +
+       "void main() {\n" +
+       "   gl_FragColor = vec4(v_color, 1.0);\n" +
+       "}\n";
+
+let  gl;  // The WebGL graphics context.
+
+let  attributeCoords;  // Location of the attribute named "a_coords".
+let  bufferCoords;     // A vertex buffer object to hold the values for coords.
+
+let  attributeColor;   // Location of the attribute named "a_color".
+let  bufferColor;     // A vertex buffer object to hold the values for color.
+
+/**
+ *  Draws the content of the canvas, in this case, the RGB color triangle.
+ */
+function draw() { 
+
+    gl.clearColor(0,0,0,1);  // specify the color to be used for clearing
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas (to black)
+
+    /* Set up values for the "coords" attribute */
+
+    let  coords = new Float32Array( [ -0.9,-0.8, 0.9,-0.8, 0,0.9 ] );
+   
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attributeCoords); 
+   
+    /* Set up values for the "color" attribute */
+   
+    let  color = new Float32Array( [ 0,0,1, 0,1,0, 1,0,0 ] );
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferColor);
+    gl.bufferData(gl.ARRAY_BUFFER, color, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(attributeColor, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attributeColor); 
+    
+    /* Draw the triangle. */
+   
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    let  prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    attributeCoords = gl.getAttribLocation(prog, "a_coords");
+    bufferCoords = gl.createBuffer();
+    attributeColor = gl.getAttribLocation(prog, "a_color");
+    bufferColor = gl.createBuffer();
+}
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        let  canvas = document.getElementById("webglcanvas");
+        let  options = {  // no need for alpha channel or depth buffer in this program
+            alpha: false,
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options);
+              // (Note that this page could use "webgl2" with no further modification.)
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    draw();    // draw the image
+}
+
+window.onload = init;  // Arrange for init() to be called when the page has been loaded.
+
+</script>
+</head>
+<body>
+
+<h2>The RGB Triangle in WebGL</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="500" height="500"></canvas>
+</div>
+
+</body>
+</html>

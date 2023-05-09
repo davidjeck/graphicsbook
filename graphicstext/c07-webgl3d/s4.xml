@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Framebuffers" id="webgl3d.4">
+
+<p1>The term "frame buffer" traditionally refers to the region of memory that holds
+the color data for the image displayed on a computer screen.  In WebGL, a
+<newword>framebuffer</newword> is a data structure that organizes the 
+memory resources that are needed to render an image.  A&nbsp;WebGL graphics
+context has a default framebuffer, which is used for the image that 
+appears on the screen.  The default framebuffer is created by the call to
+<i>canvas.getContext</i>() that creates the graphics context. Its properties
+depend on the options that are passed to that function and cannot be changed after it is created.
+However, additional framebuffers can be created, with properties controlled 
+by the WebGL program.  They can be used for off-screen rendering, and they
+are required for certain advanced rendering algorithms.</p1>
+
+<p>A framebuffer can use a <word>color buffer</word> to hold the color data 
+for an image, a <word>depth buffer</word> to hold a depth value for each
+pixel, and something called a stencil buffer (which is not covered in this
+textbook).  The buffers are said to be "attached" to the framebuffer.
+For a non-default framebuffer, buffers can be attached and detached by the
+WebGL program at any time.  A framebuffer doesn't need a full set of three buffers, 
+but you need a color buffer, a depth buffer, or both to be able to use the framebuffer for rendering.
+If the depth test is not enabled when rendering to the framebuffer, then no depth buffer is needed.
+And some rendering algorithms, such as <word>shadow mapping</word> (<localref href="threejs.3.3"/>)
+use a framebuffer with a depth buffer but no color buffer.  In WebGL&nbsp;2.0, it is also
+possible to attach several color buffers to the same framebuffer, 
+which can be useful for certain advanced algorithms
+and computational applications.  (Also, see <localref href="webgl3d.5.3"/>.)</p>
+
+<p>The rendering functions <i>gl.drawArrays</i>() and <i>gl.drawElements</i>() affect the
+current framebuffer, which is initially the default framebuffer.  The current framebuffer
+can be changed by calling</p>
+
+<pre>gl.bindFramebuffer( gl.FRAMEBUFFER, frameBufferObject );</pre>
+
+<np>The first parameter to this function is always <i>gl.FRAMEBUFFER</i>.  The second parameter
+can be <i>null</i> to select the default framebuffer for drawing, or it can
+be a non-default framebuffer created by the function <i>gl.createFramebuffer</i>(),
+which will be discussed below.</np>
+
+
+<subsection title="Framebuffer Operations" id="webgl3d.4.1">
+
+<p>Before we get to examples of using non-default framebuffers, we look at some
+WebGL settings that affect rendering into whichever framebuffer is current.  Examples that
+we have already seen include the clear color, which is used to fill the color buffer
+when <i>gl.clear</i>() is called, and the enabled state of the depth test.</p>
+
+<p>Another example that affects the use of the depth buffer is the <newword>depth mask</newword>,
+a boolean value that controls whether values are written to the depth buffer during rendering.
+(The enabled state of the depth test determines whether values from the depth buffer are <b>used</b>
+during rendering; the depth mask determines whether new values are <b>written</b> to the depth
+buffer.)  Writing to the depth buffer can be turned off with the command</p>
+
+<pre>gl.depthMask( false );</pre>
+
+<np>and can be turned back on by calling <i>gl.depthMask</i>(<i>true</i>).  The default
+value is <i>true</i>.</np>
+
+<p>One example of using the depth mask is for rendering translucent geometry.  When some of the
+objects in a scene are translucent, then all of the opaque objects should be rendered first,
+followed by the translucent objects.  Suppose that you rendered a translucent object, and
+then rendered an opaque object that lies behind the translucent object.  The depth test
+would cause the opaque object to be hidden by the translucent object.  But "translucent" means
+that the opaque object should be visible through the translucent object.  So it's important
+to render all the opaque objects first.  And it's important to turn off writing
+to the depth buffer, by calling <i>gl.depthMask</i>(<i>false</i>),
+while rendering the translucent objects.  The reason is that a
+translucent object that is drawn behind another translucent object should be visible
+through the front object. Note, however, that the depth test must still be enabled
+while the translucent objects are being rendered, since a translucent object can be hidden
+by an opaque object.  Also, <word>alpha blending</word> must be on while rendering the
+translucent objects.</p>
+
+<p>For fully correct rendering of translucent objects, the translucent
+<word term="geometric primitive">primitives</word> should be
+sorted into back-to-front order before rendering, as in the <word>painter's algorithm</word>
+(<localref href="gl1geom.1.4"/>).  However, that can be difficult to implement, and acceptable
+results can sometimes be obtained by rendering the translucent primitives in arbitrary
+order (but still after the opaque primitives).
+In fact that was done in the demos <demoref href="c3/rotation-axis.html"/> from
+<localref href="gl1geom.2.2"/> and <demoref href="c3/transform-equivalence-3d.html"/> from
+<localref href="gl1geom.3.4"/>.</p>
+
+<break/>
+
+<p>It is also possible to control writing to the color buffer, using the <newword>color mask</newword>.
+The color buffer has four "channels" corresponding to the red, green, blue, and alpha components
+of the color.  Each channel can be controlled separately.  You could, for example, allow writing
+to the red and alpha color channels, while blocking writing to the green and blue channels.
+That would be done with the command</p>
+
+<pre>gl.colorMask( true, false, false, true );</pre>
+
+<np>The <i>colorMask</i> function takes four parameters, one for each color channel.  A <i>true</i>
+value allows writing to the channel; a <i>false</i> value blocks writing.  When writing is blocked
+for a channel during rendering, the value of the corresponding color component is simply ignored.</np>
+
+<p>One use of the color mask is for <word>anaglyph stereo</word> rendering (<localref href="threejs.3.1"/>).  
+An anaglyph stereo image contains two images of the scene, one intended for the left eye and one
+for the right eye.  One image is drawn using only shades of red, while the other uses
+only combinations of green and blue.  The two images are drawn from slightly different
+viewpoints, corresponding to the views from the left and the right eye.  So the algorithm for
+anaglyph stereo has the form</p>
+
+<pre>gl.clearColor(0,0,0,1);
+gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
+gl.colorMask( true, false, false, false ); // write to red channel only
+... // set up view from left eye
+... // render the scene
+gl.clear( gl.DEPTH_BUFFER_BIT ); // clear only the depth buffer
+gl.colorMask( false, true, true, false );  // write to green and blue channels
+... // set up view from right eye
+... // render the scene</pre>
+
+<np>One way to set up the views from the left and right eyes is simply to rotate the
+view by a few degrees about the <i>y</i>-axis.  Note that the depth buffer, but not
+the color buffer, must be cleared before drawing the second image, since otherwise
+the depth test would prevent some parts of the second image from being written.</np>
+
+<break/>
+
+<p>Finally, I would like to look at blending in more detail.  Blending refers to
+how the fragment color from the fragment shader is combined with the current color
+of the fragment in the color buffer.  The default, assuming that the fragment passes
+the depth test, is to replace the current color with the fragment color.  When blending
+is enabled, the current color can be replaced with some combination of the current
+color and the fragment color.  Previously, I have only
+discussed turning on alpha blending for transparency with the commands</p>
+
+<pre>gl.enable( gl.BLEND );
+gl.blendFunc( gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA );</pre>
+
+<np>The function <i>gl.blendFunc</i>() determines how the new color is computed
+from the current color and the fragment color.  With the parameters shown here,
+the formula for the new color, using GLSL syntax, is</np>
+
+<pre>(src * src.a) + (dest * (1-src.a))</pre>
+
+<np>where <i>src</i> is the "source" color (that is, the color that is being written,
+the fragment color) and <i>dest</i> is the "destination" color (that is, the color
+currently in the color buffer, which is the destination of the rendering operation).
+And <i>src.a</i> is the alpha component of the source color.  The parameters to
+<i>gl.blendFunc</i>() determine the coefficients&mdash; <i>src.a</i> and (1&minus;<i>src.a</i>)&mdash;in
+the formula.  The default coefficients for the blend function are given by</np>
+
+<pre>gl.blendFunc( gl.ONE, gl.ZERO );</pre>
+
+<np>which specifies the formula</np>
+
+<pre>(src * 1) + (dest * 0)</pre>
+
+<np>That is, the new color is equal to the source color; there is no blending.</np>
+
+<p>Note that blending applies to the alpha component as well as the RGB components of the
+color, which is probably not what you want.  When drawing with a translucent color, it means
+that the color that is written to the color buffer will have an alpha component less than&nbsp;1.
+When rendering to a canvas on a web page, this will make the canvas itself translucent, allowing
+the background of the canvas to show through.  (This assumes that the WebGL context was
+created with an alpha channel, which is the default.)  To avoid that, you can set the blend function
+with the alternative command</p>
+
+<pre>gl.blendFuncSeparate( gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, 
+                                                    gl.ZERO, gl.ONE );</pre>
+
+<np>The two extra parameters specify separate coefficients to be used for the
+alpha component in the formula, while the first two parameters are used only for the RGB components.  
+That is, the new color for the color buffer is computed using the formula</np>
+
+<pre>vec4( (src.rgb*src.a) + (dest.rgb*(1-src.a)), src.a*0 + dest.a*1  );</pre>
+
+<np>With this formula, the alpha component in the destination (the color buffer) remains
+the same as its original value.</np>
+
+<p>The blend function set by <i>gl.blendFunc</i>(<i>gl.ONE,gl.ONE</i>) can sometimes be
+used in multi-pass algorithms.  In a <newword>multi-pass algorithm</newword>, a scene is
+rendered several times, and the results are combined somehow to produce the final
+image.  (Anaglyph stereo rendering is an example.)  If you simply want to add up the
+results of the various passes, then you can fill the color buffer with zeros, enable
+blending, and set the blend function to (<i>gl.ONE,gl.ONE</i>) during rendering.</p>
+
+<p>As a simple example, the sample program <sourceref href="webgl/image-blur.html"/>
+uses a multi-pass algorithm to implement blurring.  The scene in the example is just a 
+texture image applied to a rectangle, so the effect is to blur the texture image.
+The technique involves drawing the scene nine times.  In the fragment shader,
+the color is divided by nine.  Blending is used to add the fragment colors from the
+nine passes, so that the final color in the color buffer is the average of the colors
+from the nine passes.  For eight of the nine passes, the scene is offset slightly
+from its original position, so that the color of a pixel in the final image is
+the average of the colors of that pixel and the surrounding pixels from the original
+scene.</p>
+
+
+</subsection>
+
+
+
+<subsection title="Render To Texture" id="webgl3d.4.2">
+
+<p>The previous subsection applies to any framebuffer.  But we haven't
+yet used a non-default framebuffer.  We turn to that topic now.</p>
+
+<p>One use for a non-default framebuffer is to render directly into a texture.
+That is, the memory occupied by a texture image can be attached to the framebuffer
+as its color buffer, so that rendering operations will send their output to
+the texture image.  This technique, which is called <newword>render-to-texture</newword>,
+is used in the sample program <sourceref href="webgl/render-to-texture.html"/>.</p>
+
+<p>Texture memory is normally allocated when an image is loaded into the texture
+using the function <i>gl.texImage2D</i> or <i>gl.copyTexImage2D</i>.  (See <localref href="webgl.4"/>.)
+However, there is a version of <i>gl.texImage2D</i> that can be used to allocate memory 
+without loading an image into that memory.  Here is an example, from the sample program:</p>
+
+<pre>texture = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, texture);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 512, 
+                             0, gl.RGBA, gl.UNSIGNED_BYTE, null);</pre>
+ 
+<np>It is the <i>null</i> parameter at the end of the last line that tells
+<i>gl.texImage2D</i> to allocate new memory without loading existing image data to fill that memory.
+Instead, the new memory is filled with zeros. The first parameter to <i>gl.texImage2D</i> is
+the texture target.  The target is <i>gl.TEXTURE_2D</i> for normal textures,
+but other values are used for working with cubemap textures.  The fourth and
+fifth parameters specify the height and width of the image; they should be powers of two. 
+The other parameters
+usually have the values shown here; their meanings are the same as for the
+version of <i>gl.texImage2D</i> discussed in <localref href="webgl.4.3"/>.
+Note that the texture object must first be created and bound; <i>gl.texImage2D</i> applies
+to the texture that is currently bound to the active <word>texture unit</word>.
+(In WebGL&nbsp;2.0, the same thing can also be accomplished using the
+<i>gl.texStorage2D()</i> function discussed in <localref href="webgl.4.6"/>.)
+</np>
+
+<p>To attach the texture to a framebuffer, you need to create a framebuffer object
+and make that object the current framebuffer by binding it.  For example,</p>
+
+<pre>framebuffer = gl.createFramebuffer();
+gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);</pre>
+
+<np>Then the function <i>gl.framebufferTexture2D</i> can be used to attach the
+texture to the framebuffer:</np>
+
+<pre>gl.framebufferTexture2D( gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, 
+                                                gl.TEXTURE_2D, texture, 0 );</pre>
+
+<np>The first parameter is always <i>gl.FRAMEBUFFER</i>.  The second parameter
+says a color buffer is being attached. The last character in <i>gl.COLOR_ATTACHMENT0</i>
+is a zero, which allows the possibility of having more than one color
+buffer attached to a framebuffer (although in standard WebGL&nbsp;1.0, only one color buffer
+is allowed).
+The third parameter is the same texture target that was used in
+<i>gl.texImage2D</i>, and the fourth is the texture object.  The last parameter
+is the <word>mipmap</word> level; it will usually be zero, which means rendering
+to the texture image itself rather than to one of its mipmap images.</np>
+
+<p>With this setup, you are ready to bind the framebuffer and
+draw to the texture.  After drawing the texture, call</p>
+
+<pre>gl.bindFramebuffer( gl.FRAMEBUFFER, null );</pre>
+
+<np>to start drawing again to the default framebuffer.  At that point, the texture is ready for use
+in subsequent rendering operations.  The texture object
+can be bound to a texture unit, and a <i>sampler2D</i> variable can be used
+in the shader program to read from the texture.</np>
+
+<p>You are very likely to use
+different shader programs for drawing to the texture and drawing to the screen.
+Recall that the function <i>gl.useProgram</i>() is used to specify the shader program.</p>
+
+<p>In the <sourceref href="webgl/render-to-texture.html">sample program</sourceref>, 
+the texture can be animated.  During the animation, a new image is drawn to the texture
+for each frame of the animation.  The texture image is 2D, so the depth test is disabled
+while rendering it.  This means that the framebuffer doesn't need a depth buffer.
+In outline form, the rendering function in the sample program has the form</p>
+
+<pre>function draw() {
+
+    /* Draw the 2D image into a texture attached to a framebuffer. */
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);
+    gl.useProgram(prog_texture);  // shader program for the texture
+    
+    gl.clearColor(1,1,1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the texture to white
+
+    gl.enable(gl.BLEND);  // Use transparency while drawing 2D image.    
+    gl.disable(gl.DEPTH_TEST); // framebuffer doesn't even have a depth buffer!
+    gl.viewport(0,0,512,512);  // Viewport is not set automatically!
+    
+      .
+      .  // draw the texture image, which changes in each frame
+      .
+      
+    gl.disable(gl.BLEND);
+
+    /*  Now draw the main scene, which is 3D, using the texture. */
+    
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null); // Draw to default framebuffer.
+    gl.useProgram(prog);  // shader program for the on-screen image
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.viewport(0,0,canvas.width,canvas.height);  // Reset the viewport!
+    
+    .
+    .   // draw the scene
+    .
+    
+}</pre>
+
+<np>Note that the <word>viewport</word> has to be set by hand when drawing
+to a non-default frame buffer.  It then has to be reset when drawing the
+on-screen image to match the size of the <word term="HTML canvas">canvas</word>
+where the on-screen image is rendered.  I should also note that only one texture
+object is used in this program, so it can be bound once and for all
+during initialization.  In this case, it is not necessary to call 
+<i>gl.bindTexture</i>() in the <i>draw</i>() function.</np>
+
+<p>This example could be implemented without using a framebuffer, as was done
+for the example in <localref href="gl1light.3.6"/>.  In that example, the
+texture image was drawn to the default framebuffer, then copied to the
+texture object.  However,
+the version in this section is more efficient because it does not need to
+copy the image after rendering it.</p>
+
+</subsection>
+
+<subsection title="Renderbuffers" id="webgl3d.4.3">
+
+<p>It is often convenient to use memory from a texture object as the color buffer
+for a framebuffer.  However, sometimes its more appropriate to create separate memory
+for the buffer, not associated with any texture.  For the depth buffer, that is the
+typical case.  For such cases, the memory can be created as a <newword>renderbuffer</newword>.
+A renderbuffer represents memory that can be attached to a framebuffer for use as
+a color buffer, depth buffer, or stencil buffer.  To use one, you need to create the 
+renderbuffer and allocate memory for it.  Memory is allocated using the function
+<i>gl.renderbufferStorage</i>().  The renderbuffer must be bound by calling
+<i>gl.bindRenderbuffer</i>() before allocating the memory.  Here is an example
+that creates a renderbuffer for use as a depth buffer:</p>
+
+<pre>let depthBuffer = gl.createRenderbuffer();
+gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, 512, 512);</pre>
+
+<np>The first parameter to both <i>gl.bindRenderbuffer</i> and <i>gl.renderbufferStorage</i>
+must be <i>gl.RENDERBUFFER</i>.  The second parameter to <i>gl.renderbufferStorage</i>
+specifies how the renderbuffer will be used.  The value <i>gl.DEPTH_COMPONENT16</i>
+is for a depth buffer with 16 bits for each pixel.  (Sixteen bits is the only option in WebGL&nbsp;1.0.)
+For a color buffer holding RGBA colors with four eight-bit values per pixel, the second parameter would be <i>gl.RGBA8</i>.
+Other values are possible, such as <i>gl.RGB565</i>, which uses 16 bits per pixel with
+5 bits for the red color channel, 6 bits for green, and 5 bits for blue.  For a
+stencil buffer, the value would be <i>gl.STENCIL_INDEX8</i>.
+The last two parameters to <i>gl.renderbufferStorage</i> are the width and height
+of the buffer.</np>
+
+<p>The function <i>gl.framebufferRenderbuffer</i>() is used to attach a renderbufffer
+to be used as one of the buffers in a framebuffer.  It takes the form</p>
+
+<pre>gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, 
+                                          gl.RENDERBUFFER, renderbuffer);</pre>
+
+<np>The framebuffer must be bound by calling <i>gl.bindFramebuffer</i> before
+this function is called.  The first and third parameters to <i>gl.framebufferRenderbuffer</i>
+must be as shown.  The last parameter is the renderbuffer.  The second paramter
+specifies how the renderbuffer will be used.  It can be, for example,
+<i>gl.COLOR_ATTACHMENT0</i>, <i>gl.DEPTH_ATTACHMENT</i>, or
+<i>gl.STENCIL_ATTACHMENT</i>.</np>
+
+</subsection>
+
+<subsection title="Dynamic Cubemap Textures" id="webgl3d.4.4">
+
+<p>To render a 3D scene to a framebuffer, we need both a color buffer and
+a depth buffer.  An example can be found in the sample
+program <sourceref href="webgl/cube-camera.html"/>.  This example uses
+render-to-texture for a <word>cubemap texture</word>.  The cubemap texture 
+is then used as an <word term="environment mapping">environment map</word>
+on a reflective surface.  In addition to the environment map, the program
+uses another cubemap texture for a <word>skybox</word>.  (See
+<localref href="webgl.3.5"/>.)  Here's an image from the program:</p>
+
+<img src="dynamic-cubemap.png" width="350" height="324" tex="dynamic-cubemap.eps" texscale="0.7"/>
+
+<np>The environment in this case includes the background skybox, but also includes
+several colored cubes that are not part of the skybox texture.  The reflective
+sphere in the center of the image reflects the cubes as well as the skybox, which
+means that the environment map texture can't be the same as the skybox texture&mdash;it
+has to include the cubes.  Furthermore, the scene can be animated and the cubes can move.  
+The reflection in the sphere has to change as the cubes move.  This means that
+the environment map texture has to be recreated in each frame.  For that, we can
+use a framebuffer to render to the cubemap texture.</np>
+
+<p>A cubemap texture consists of six images, one each for the positive and negative
+direction of the <i>x</i>, <i>y</i>, and <i>z</i> axes.  Each image is associated
+with a different texture target (similar to <i>gl.TEXTURE_2D</i>).  To render 
+a cubemap, we need to allocate storage for all six sides.  Here's the code from the
+sample program:</p>
+
+<pre>cubemapTargets = [  
+         // store texture targets in an array for convenience 
+   gl.TEXTURE_CUBE_MAP_POSITIVE_X, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 
+   gl.TEXTURE_CUBE_MAP_POSITIVE_Y, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 
+   gl.TEXTURE_CUBE_MAP_POSITIVE_Z, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z 
+];
+
+dynamicCubemap = gl.createTexture(); // Create the texture object.
+gl.bindTexture(gl.TEXTURE_CUBE_MAP, dynamicCubemap);  // bind it as a cubemap
+for (i = 0; i &lt; 6; i++) {
+   gl.texImage2D(cubemapTargets[i], 0, gl.RGBA, 512, 512, 
+                                    0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+}</pre>
+
+<p>We also need to create a framebuffer, as well as a renderbuffer for use as a depth buffer,
+and we need to attach the depth buffer to the framebuffer.  The same framebuffer
+can be used to render all six images for the texture, changing the color buffer
+attachment of the framebuffer as needed.  To attach one of the six cubemap images
+as the color buffer, we just specify the corresponding cubemap texture target
+in the call to <i>gl.framebufferTexture2D</i>().  For example, the command</p>
+
+<pre>gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, 
+                          gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, dynamicCubemap, 0);</pre>
+
+<np>attaches the negative z image from the texture object <i>dynamicCubemap</i> to be used
+as the color buffer in the currently bound framebuffer.</np>
+
+<p>After the six texture images have been rendered, the cubemap texture is
+ready to be used.  Aside from the fact that six 3D images are rendered instead of
+one 2D image, this is all very similar to the render-to-texture example from
+earlier in this section.</p>
+
+<break/>
+
+<p>The question remains of how to render the six images of the scene that are needed for the cubemap texture.
+To make an environment map for a reflective object, we want images of the environment that
+surrounds that object.  The images can be made with a camera placed at the center
+of the object.  The basic idea is to point the camera in the six directions of the
+positive and negative coordinate axes and snap a picture in each direction,
+but it's tricky to get the details correct.  (And note that when we apply the result 
+to a point on the surface, we will only have an approximation of the correct
+reflection.  For a geometrically correct reflection at the point, we would need the
+view from that very point, not the view from the center of the
+object, but we can't realistically make a different environment map for each
+point on the surface.  The approximation will look OK as long as other objects
+in the scene are not too close to the reflective surface.)</p>
+
+<p>A "camera" really means a <word>projection transformation</word> and a
+<word>viewing transformation</word>.  The projection needs a ninety-degree
+field of view, to cover one side of the cube, and its <word>aspect ratio</word> 
+will be&nbsp;1, since the sides of the cube are squares.  We can make the projection
+matrix with a <i>glMatrix</i> command such as</p>
+
+<pre>mat4.projection( projection, Math.PI/2, 1, 1, 100 );</pre>
+
+<np>where the last two parameters, the near and far clipping distances, should be chosen to
+include all the objects in the scene.  If we apply no viewing transformation, the camera
+will be at the origin, pointing in the direction of the negative <i>z</i>-axis.  If the
+reflective object is at the origin, as it is in the sample program, we can use the
+camera with no viewing transformation to take the negative-z image for the cubemap texture.</np>
+
+<p>But, because of the
+details of how the images must be stored for cubemap textures, it turns out that we
+need to apply one transformation.  Let's look at the layout of images for
+a cubemap texture:</p>
+
+<img src="cubemap-layout.png" width="273" height="206" tex="cubemap-layout.eps" texscale="0.7"/>
+
+<np>The six sides of the cube are shown in black, as if the sides of the cube have
+been opened up and laid out flat.  Each side is marked with the corresponding coordinate
+axis direction.  Duplicate copies of the plus and minus y sides are shown in gray,
+to show how those sides attach to the negative z side.  The images that we make for
+the cubemap must fit together in the same way as the sides in this layout.  However,
+the sides in the layout are viewed from the <b>outside</b> of the cube, while
+the camera will be taking a picture from the <b>inside</b> of the cube.  To get the
+correct view, we need to filp the picture from the camera horizontally.  After some
+experimentation, I found that I also need to flip it vertically, perhaps because
+web images are stored upside down with respect to the OpenGL convention.  We can
+do both flips with a <word>scaling</word> transformation by (&minus;1,&minus;1,1).
+Putting this together, the code for making the cubemap's negative z image is</np>
+
+<pre>gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer); // Draw to offscreen buffer.
+gl.viewport(0,0,512,512);  // Match size of the texture images.
+
+/* Set up projection and modelview matrices for the virtual camera
+
+mat4.perspective(projection, Math.PI/2, 1, 1, 100);
+mat4.identity(modelview);
+mat4.scale(modelview,modelview,[-1,-1,1]);
+
+/* Attach the cubemap negative z image as the color buffer in the framebuffer,
+   and "take the picture" by rendering the image. */
+
+gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, 
+                          gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, dynamicCubemap, 0);
+renderSkyboxAndCubes();</pre>
+
+<np>The function in the last line renders the scene, except for the central reflective
+object itself, and is responsible for sending the projection and modelview matrices
+to the shader programs.</np>
+
+<p>For the other five images, we need to aim the camera in a different direction
+before taking the picture.  That can be done by adding an appropriate rotation
+to the viewing transformation.  For example, for the positive x image, we need to
+rotate the camera by &minus;90 degrees about the y-axis. As a viewing transform,
+we need the command</p>
+
+<pre>mat4.rotateY(modelview, modelview, Math.PI/2);</pre>
+
+<np>It might be easier to think of this as a modeling transformation that
+rotates the positive x side of the cube into view in front of the camera.</np>
+
+<p>In the <sourceref href="webgl/cube-camera.html">sample program</sourceref>,
+the six cubemap images are created in the function <i>createDynamicCubemap</i>().
+Read the source code of that function for the full details.</p>
+
+<demo src="c7/cube-camera-demo.html" width="550" height="565"><p>This dynamic cubemap
+program is a nice example, since it makes use of so many of the concepts and
+techniques that we have covered.  <web>Take a minute to think about everything that is
+going on in this demo version of the sample program, and how it was all implemented.
+(You might also notice that the teapot does not reflect any part of <b>itself</b>.)</web><tex>You
+should run the program and think about everything that is
+going on, and how it was all implemented.</tex></p></demo>
+
+</subsection>
+
+
+</section>

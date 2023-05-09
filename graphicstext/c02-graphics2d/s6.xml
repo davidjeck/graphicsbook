@@ -1,0 +1,763 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="HTML Canvas Graphics" id="graphics2d.6">
+
+<p1>Most modern web browsers support a 2D graphics <word>API</word> that can be used
+to create images on a web page.  The API is implemented using <word>JavaScript</word>, the client-side programming 
+language for the web.  I won't cover the JavaScript language in this section.  To understand the 
+material presented here, you don't need to know much about it.  Even if you
+know nothing about it at all, you can learn something about its 2D graphics API and
+see how it is similar to, and how it differs from, the Java API presented in the
+<localref href="graphics2d.5">previous section</localref>.  (For a short introduction
+to JavaScript, see <localref href="proglang.3"/> in <localref href="proglang"/>.)</p1>
+
+<subsection title="The 2D Graphics Context" id="graphics2d.6.1">
+
+<p>The visible content of a web page is made up of "elements" such
+as headlines and paragraphs.  The content is specified using the <word>HTML</word> language.
+A "canvas" is an HTML element. It appears on the page as a blank rectangular area which can
+be used as a drawing surface by what I am calling the "<word>HTML canvas</word>" graphics API.
+In the source code of a web page, a canvas element is created with code of the form</p>
+
+<pre>&lt;canvas width="800" height="600" id="theCanvas"&gt;&lt;/canvas&gt;</pre>
+
+<np>The <i>width</i> and <i>height</i> give the size of the drawing area, in pixels.  The
+<i>id</i> is an identifier that can be used to refer to the canvas in JavaScript.</np>
+
+<p>To draw on a canvas, you need a graphics context.  A graphics context is an object that
+contains functions for drawing shapes.  It also contains variables that record the current graphics 
+state, including  things like the current drawing color, transform, and font.  Here, I will 
+generally use <i>graphics</i> as the name of the variable that refers to the graphics context, 
+but the variable name is, of course, up to the programmer.  This graphics context plays the same role in 
+the canvas API that a variable of type <classname>Graphics2D</classname> plays in Java.
+A typical starting point is
+</p>
+
+<pre>canvas = document.getElementById("theCanvas");
+graphics = canvas.getContext("2d");
+</pre>
+
+<np>The first line gets a reference to the canvas element on the web page, using its <i>id</i>.
+The second line creates the graphics context for that canvas element.  (This code will
+produce an error in a web browser that doesn't support canvas, so you might add some error
+checking such as putting these commands inside a <code>try..catch</code> statement.)</np>
+
+<p>Typically, you will store the canvas graphics context in a global variable
+and use the same graphics context throughout your program.  This is in contrast
+to Java, where you typically get a new <classname>Graphics2D</classname> context
+each time the <i>paintComponent</i>() method is called, and that new context
+is in its initial state with default color and stroke
+properties and with no applied transform.  When a graphics 
+context is global, changes made to the state in one function
+call will carry over to subsequent function calls, unless you do something to limit
+their effect.  This can actually lead to a fairly common type of bug: For example, 
+if you apply a 30-degree rotation in a function, those rotations will <b>accumulate</b>
+each time the function is called, unless you do something to undo the previous rotation
+before the function is called again.</p>
+
+<p>The rest of this section will be mostly concerned with describing what you can do with
+a canvas graphics context.  But here, for the record, is the complete source code for
+a very minimal web page that uses canvas graphics:
+</p>
+
+<pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Canvas Graphics&lt;/title&gt;
+&lt;script&gt;
+    let canvas;    // DOM object corresponding to the canvas
+    let graphics;  // 2D graphics context for drawing on the canvas
+    
+    function draw() {
+           // draw on the canvas, using the graphics context
+        graphics.fillText("Hello World", 10, 20);
+    }
+
+    function init() {
+        canvas = document.getElementById("theCanvas");
+        graphics = canvas.getContext("2d");
+        draw();  // draw something on the canvas
+    }
+    
+    window.onload = init;
+    
+&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;canvas id="theCanvas" width="640" height="480"&gt;&lt;/canvas&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<np>For a more complete, though still minimal, example, you can look at the sample page
+<sourceref href="canvas2d/GraphicsStarter.html"/>.  (You should look at the page
+in a browser, but you should also read the source code.)  This example shows
+how to draw some basic shapes using canvas graphics, and you can use it as
+a basis for your own experimentation.  There are also three more advanced
+"starter" examples:  <sourceref href="canvas2d/GraphicsPlusStarter.html"/> adds
+some utility functions for drawing shapes and setting up a coordinate system;
+<sourceref href="canvas2d/AnimationStarter.html"/> adds animation and includes
+a simple <word>hierarchical modeling</word> example; and
+<sourceref href="canvas2d/EventsStarter.html"/> shows how to respond to keyboard
+and mouse events.</np>
+
+
+</subsection>
+
+
+<subsection title="Shapes" id="graphics2d.6.2">
+
+<p>The default coordinate system on a canvas is the usual: The unit of measure is one pixel;
+(0,0) is at the upper left corner; the <i>x</i>-coordinate increases to the right;
+and the <i>y</i>-coordinate increases downward.   The range of <i>x</i> and <i>y</i>
+values is given by the <i>width</i> and <i>height</i> properties of the <tag>canvas</tag>
+element.  The term "pixel" here for the unit of measure is not really correct.  
+Probably, I should say something like "one nominal pixel."
+The unit of measure is one pixel at typical desktop resolution with no magnification.
+If you apply a magnification to a browser window, the unit of measure gets stretched.
+And on a high-resolution screen, one unit in the default coordinate system might 
+correspond to several actual pixels on the display device.</p>
+
+<p>The canvas API supports only a very limited set of basic shapes. In fact, the
+only basic shapes are rectangles and text.  Other shapes must be created as paths.
+Shapes can be <word term="stroking a shape">stroked</word> and 
+<word term="filling a shape">filled</word>.  That includes text: When you stroke a string of
+text, a pen is dragged along the outlines of the characters; when you fill a string,
+the insides of the characters are filled.  It only really makes sense to stroke text
+when the characters are rather large.  Here are the functions for drawing
+rectangles and text, where <i>graphics</i> refers to the object that represents
+the graphics context:</p>
+
+<ul>
+<li><codedef>graphics.fillRect(x,y,w,h)</codedef> &mdash; draws a filled rectangle with corner
+at (<i>x,y</i>), with width <i>w</i> and with height&nbsp;<i>h</i>. If the width or
+the height is less than or equal to zero, nothing is drawn.</li>
+<li><codedef>graphics.strokeRect(x,y,w,h)</codedef> &mdash; strokes the outline of the same
+rectangle.</li>
+<li><codedef>graphics.clearRect(x,y,w,h)</codedef> &mdash; clears the rectangle by filling
+it with fully transparent pixels, allowing the background of the canvas to show.
+The background is determined by the properties of the web page on which the canvas appears.
+It might be a background color, an image, or even another canvas.</li>
+<li><codedef>graphics.fillText(str,x,y)</codedef> &mdash; fills the characters in the string <i>str</i>.
+The left end of the baseline of the string is positioned at the point (<i>x,y</i>).</li>
+<li><codedef>graphics.strokeText(str,x,y)</codedef> &mdash; strokes the outlines of the characters 
+in the string.</li>
+</ul>
+
+<p>A path can be created using functions in the graphics context.  The context keeps track of
+a "current path."  In the current version of the API, paths are not represented by objects,
+and there is no way to work with more than one path at a time or to keep a copy of a path
+for later reuse.  Paths can contain lines, <word term="Bezier curve">Bezier curves</word>, and circular arcs.
+Here are the most common functions for working with paths:</p>
+
+<ul>
+<li><codedef>graphics.beginPath()</codedef> &mdash; start a new path.  Any previous path is discarded,
+and the current path in the graphics context is now empty.  Note that the graphics context
+also keeps track of the current point, the last point in the current path.  After calling
+<i>graphics.beginPath</i>(), the current point is undefined.</li>
+<li><codedef>graphics.moveTo(x,y)</codedef> &mdash; move the current point to (<i>x,y</i>), without
+adding anything to the path.  This can be used for the starting point of the path or to
+start a new, disconnected segment of the path.</li>
+<li><codedef>graphics.lineTo(x,y)</codedef> &mdash; add the line segment
+starting at current point and ending at (<i>x,y</i>) to
+the path, and move the current point to (<i>x,y</i>).</li>
+<li><codedef>graphics.bezierCurveTo(cx1,cy1,c2x,cy2,x,y)</codedef> &mdash; add a cubic Bezier curve to the
+path.  The curve starts at
+the current point and ends at (<i>x,y</i>).  The points (<i>cx1,cy1</i>) and (<i>cx2,cy2</i>) are 
+the two <word term="control point">control points</word> for
+the curve.   (Bezier curves and their control points were discussed in 
+<localref href="graphics2d.2.3"/>.)</li>
+<li><codedef>graphics.quadraticCurveTo(cx,cy,x,y)</codedef> &mdash; adds a quadratic Bezier curve
+from the current point to (<i>x,y</i>), with control point (<i>cx,cy</i>).</li>
+<li><codedef>graphics.arc(x,y,r,startAngle,endAngle)</codedef> &mdash; adds an arc of the
+circle with center (<i>x,y</i>) and radius&nbsp;<i>r</i>.  The next two parameters give the
+starting and ending angle of the arc.  They are measured in radians.  The arc extends in the
+positive direction from the start angle to the end angle.  (The positive rotation direction is
+from the positive x-axis towards the positive y-axis; this is clockwise in the default coordinate
+system.)  An optional fifth parameter can be set to <i>true</i> to get an arc that extends in the
+negative direction.  After drawing the arc, the current point is at the end of the arc.  If there is a current point before
+<i>graphics.arc</i> is called, then before the arc is drawn, a line is added to the path that extends from the
+current point to the starting point of the arc.  (Recall that immediately after <i>graphics.beginPath</i>(),
+there is no current point.)</li>
+<li><codedef>graphics.closePath()</codedef> &mdash; adds to the path a line from the current point
+back to the starting point of the current segment of the curve.  (Recall that you start
+a new segment of the curve every time you use <i>moveTo</i>.)</li>
+</ul>
+
+<np>Creating a curve with these commands does not draw anything.  To get something visible
+to appear in the image, you must fill or stroke the path.</np>
+
+<p>The commands <i>graphics.fill</i>() and <i>graphics.stroke</i>() are used to fill
+and to stroke the current path.  If you fill a path that has not been closed, the fill
+algorithm acts as though a final line segment had been added to close the path.
+When you stroke a shape, it's the center of the virtual pen that moves along the path.
+So, for high-precision canvas drawing, it's common to
+use paths that pass through the centers of pixels rather than through their corners.
+For example, to draw a line that extends from the pixel with coordinates (100,200) to
+the pixel with coordinates (300,200), you would actually stroke the geometric line
+with endpoints (100.5,200.5) and (100.5,300.5).  We should look at some examples.
+It takes four steps to draw a line:</p>
+
+<pre>graphics.beginPath();          // start a new path
+graphics.moveTo(100.5,200.5);  // starting point of the new path
+graphics.lineTo(300.5,200.5);  // add a line to the point (300.5,200.5)
+graphics.stroke();             // draw the line</pre>
+
+<np>Remember that the line remains as part of the current path until the
+next time you call <i>graphics.beginPath</i>().  Here's how to draw a filled,
+regular octagon centered at (200,400) and with radius 100:</np>
+
+<pre>graphics.beginPath();
+graphics.moveTo(300,400);
+for (let i = 1; i &lt; 8; i++) {
+    let angle = (2*Math.PI)/8 * i;
+    let x = 200 + 100*Math.cos(angle);
+    let y = 400 + 100*Math.sin(angle);
+    graphics.lineTo(x,y);
+}
+graphics.closePath();
+graphics.fill();</pre>
+
+
+<p>The function <i>graphics.arc</i>() can be used to draw a circle, with a start 
+angle of 0 and an end angle of <i>2*Math.PI</i>.  Here's a filled circle with radius 
+100, centered at 200,300:</p>
+
+<pre>graphics.beginPath();
+graphics.arc( 200, 300, 100, 0, 2*Math.PI );
+graphics.fill();</pre>
+
+<p>To draw just the outline of the circle, use <i>graphics.stroke</i>()
+in place of <i>graphics.fill</i>().  You can apply both operations to the same path.
+If you look at the details of <i>graphics.arc</i>(),
+you can see how to draw a wedge of a circle:</p>
+
+<pre>graphics.beginPath();
+graphics.moveTo(200,300);   // Move current point to center of the circle.
+graphics.arc(200,300,100,0,Math.PI/4);  // Arc, plus line from current point.
+graphics.lineTo(200,300);  // Line from end of arc back to center of circle.
+graphics.fill();  // Fill the wedge.</pre>
+
+<np>There is no way to draw an oval that is not a circle, except by using 
+transforms.  We will cover that later in this section.  But JavaScript has
+the interesting property that it is possible to add new functions and 
+properties to an existing object.  The sample program
+<sourceref href="canvas2d/GraphicsPlusStarter.html"/> shows how to
+add functions to a graphics context for drawing lines, ovals, and
+other shapes that are not built into the API.</np>
+
+</subsection>
+
+
+<subsection title="Stroke and Fill" id="graphics2d.6.3">
+
+<p>Attributes such as line width that affect the visual appearance of
+strokes and fills are stored as properties of the graphics context.
+For example, the value of <i>graphics.lineWidth</i> is a number that
+represents the width that will be used for strokes.  (The width is 
+given in pixels for the default coordinate system, but it is subject 
+to transforms.)  You can change the line width by assigning a value
+to this property:</p>
+
+<pre>graphics.lineWidth = 2.5;  // Change the current width.</pre>
+
+<np>The change affects subsequent strokes.  You can also read the current
+value:</np>
+
+<pre>saveWidth = graphics.lineWidth;  // Save current width.</pre>
+
+<np>The property <i>graphics.lineCap</i> controls the appearance of
+the endpoints of a stroke.  It can be set to
+"round", "square", or "butt".  The quotation marks are part of the value.  For example,</np>
+
+<pre>graphics.lineCap = "round";</pre>
+
+<np>Similarly, <i>graphics.lineJoin</i> controls
+the appearance of the point where one segment of a stroke joins another
+segment; its possible values are "round", "bevel", or "miter".  (Line
+endpoints and joins were discussed in <localref href="graphics2d.2.1"/>.)</np>
+
+<p>Note that the values for <i>graphics.lineCap</i> and <i>graphics.lineJoin</i>
+are strings.  This is a somewhat unusual aspect of the API.  Several other properties
+of the graphics context take values that are strings, including the properties that
+control the colors used for drawing and the font that is used for drawing
+text.</p>
+
+<p>Color is controlled by the values of the properties <i>graphics.fillStyle</i>
+and <i>graphics.strokeStyle</i>.  The graphics context maintains separate styles
+for filling and for stroking.  A&nbsp;solid color for stroking or filling is specified
+as a string.  Valid color strings are ones that can be used in <word>CSS</word>, the language
+that is used to specify colors and other style properties of elements on web pages.
+Many solid colors can be specified by their names, such as "red", "black", and
+"beige".  An <word>RGB color</word> can be specified as a string of the
+form "rgb(r,g,b)", where the parentheses contain three numbers in the range
+0 to 255 giving the red, green, and blue components of the color.  Hexadecimal color
+codes are also supported, in the form "#XXYYZZ" where XX, YY, and ZZ are two-digit
+hexadecimal numbers giving the RGB color components.  For example,</p>
+
+<pre>graphics.fillStyle = "rgb(200,200,255)"; // light blue
+graphics.strokeStyle = "#0070A0"; // a darker, greenish blue</pre>
+
+<np>The style can actually be more complicated
+than a simple solid color:  <word term="gradient">Gradients</word> and 
+<word term="pattern fill">patterns</word> are also supported.  As an 
+example, a gradient can be created with a series of steps such as</np>
+
+<pre>let lineargradient = graphics.createLinearGradient(420,420,550,200);
+lineargradient.addColorStop(0,"red");
+lineargradient.addColorStop(0.5,"yellow");
+lineargradient.addColorStop(1,"green");
+graphics.fillStyle = lineargradient;  // Use a gradient fill!</pre>
+
+<np>The first line creates a linear gradient that will vary in color along
+the line segment from the point (420,420) to the point (550,200).
+Colors for the gradient are specified by the <i>addColorStop</i> function:
+the first parameter gives the fraction of the distance from the initial
+point to the final point where that color is applied, and the second is a string
+that specifies the color itself.  A color stop at 0 specifies
+the color at the initial point; a color stop at 1 specifies the color
+at the final point.  Once a gradient has been created, it can be used both
+as a fill style and as a stroke style in the graphics context.</np>
+
+<p>Finally, I note that the font that is used for drawing text is the
+value of the property <i>graphics.font</i>.  The value is a string
+that could be used to specify a font in <word>CSS</word>.
+As such, it can be fairly complicated, but the simplest versions
+include a font-size (such as <i>20px</i> or <i>150%</i>) and a font-family
+(such as <i>serif</i>, <i>sans-serif</i>, <i>monospace</i>, or the name of any font
+that is accessible to the web page).
+You can add <i>italic</i> or <i>bold</i> or both to the front of the string.
+Some examples:
+</p>
+
+<pre>graphics.font = "2cm monospace";  // the size is in centimeters
+graphics.font = "bold 18px sans-serif";
+graphics.font = "italic 150% serif";   // size is 150% of the usual size</pre>
+
+<np>The default is "10px sans-serif," which is usually too small.  Note that text, like all drawing, is
+subject to coordinate transforms.  Applying a scaling operation changes the
+size of the text, and a negative scaling factor can produce mirror-image text.</np>
+
+
+</subsection>
+
+
+<subsection title="Transforms" id="graphics2d.6.4">
+
+<p>A graphics context has three basic functions for modifying the current transform
+by scaling, rotation, and translation.  There are also functions that will compose
+the current transform with an arbitrary transform and for completely
+replacing the current transform:</p>
+
+<ul>
+<li><codedef>graphics.scale(sx,sy)</codedef> &mdash; scale by <i>sx</i> in the <i>x</i>-direction
+and <i>sy</i> in the <i>y</i>-direction.</li>
+<li><codedef>graphics.rotate(angle)</codedef> &mdash; rotate by <i>angle</i> radians about the
+origin.  A positive rotation is clockwise in the default coordinate system.</li>
+<li><codedef>graphics.translate(tx,ty)</codedef> &mdash; translate by <i>tx</i> in the <i>x</i>-direction
+and <i>ty</i> in the <i>y</i>-direction.</li>
+<li><codedef>graphics.transform(a,b,c,d,e,f)</codedef> &mdash; apply the <word>affine transform</word>
+<code>x1 = a*x + c*y + e</code>, and <code>y1 = b*x + d*y + f</code>.</li>
+<li><codedef>graphics.setTransform(a,b,c,d,e,f)</codedef> &mdash; discard the current transformation,
+and set the current transformation to be <code>x1 = a*x + c*y + e</code>, and
+<code>y1 = b*x + d*y + f</code>.</li>
+</ul>
+
+<np>Note that there is no <word>shear transform</word>, but you can apply a shear as
+a general transform.  For example, for a horizontal shear with shear factor&nbsp;0.5, use</np>
+
+<pre>graphics.transform(1, 0, 0.5, 1, 0, 0)</pre>
+
+<p>To implement hierarchical modeling, as discussed in <localref href="graphics2d.4"/>, 
+you need to be able to save
+the current transformation so that you can restore it later.  Unfortunately,
+no way is provided to read the current transformation from a canvas graphics
+context.  However, the graphics context itself keeps a stack of transformations
+and provides methods for pushing and popping the current transformation.  In fact,
+these methods do more than save and restore the current transformation.  They actually
+save and restore almost the entire state of the graphics context, including properties
+such as current colors, line width, and font (but not the current path):</p>
+
+
+<ul>
+<li><codedef>graphics.save()</codedef> &mdash; push a copy of the current state of the graphics
+context, including the current transformation, onto the stack.</li>
+<li><codedef>graphics.restore()</codedef> &mdash; remove the top item from the stack, containing
+a saved state of the graphics context, and restore the graphics context to that state.</li>
+</ul>
+
+<p>Using these methods, the basic setup for drawing an object with a modeling
+transform becomes:</p>
+
+<pre>graphics.save();          // save a copy of the current state
+graphics.translate(a,b);  // apply modeling transformations
+graphics.rotate(r);     
+graphics.scale(sx,sy);
+   .
+   .  // Draw the object!
+   .
+graphics.restore();       // restore the saved state</pre>
+
+<np>Note that if drawing the object includes any changes to attributes
+such as drawing color, those changes will be also undone by the call to <i>graphics.restore</i>().
+In hierarchical graphics, this is usually what you want, and it eliminates the
+need to have extra statements for saving and restoring things like color.</np>
+
+<p>To draw a hierarchical model, you need to traverse a <word>scene graph</word>, either
+procedurally or as a data structure.  It's pretty much the same as in Java.
+In fact, you should see that the basic concepts that you learned about
+transformations and modeling carry over to the canvas graphics API.  Those
+concepts apply very widely and even carry over to 3D graphics APIs, with
+just a little added complexity.  The sample web page
+<sourceref href="canvas2d/HierarchicalModel2D.html"/>
+implements hierarchical modeling using the 2D canvas API.</p>
+
+<break/>
+
+<p>Now that we know how to do transformations, we can see how to draw an oval
+using the canvas API.  Suppose that we want an oval with center at (<i>x,y</i>),
+with horizontal radius <i>r1</i> and with vertical radius <i>r2</i>.
+The idea is to draw a circle of radius 1 with center at (0,0), then transform
+it.  The circle needs to be scaled by a factor of <i>r1</i> horizontally and
+<i>r2</i> vertically.  It should then be translated to move its center from
+(0,0) to (<i>x,y</i>).  We can use <i>graphics.save</i>() and <i>graphics.restore</i>()
+to make sure that the transformations only affect the circle.  Recalling that
+the order of transforms in the code is the opposite of the order in which they
+are applied to objects, this becomes:</p>
+
+<pre>graphics.save();
+graphics.translate( x, y );
+graphics.scale( r1, r2 );
+graphics.beginPath();
+graphics.arc( 0, 0, 1, 0, Math.PI );  // a circle of radius 1
+graphics.restore();
+graphics.stroke();</pre>
+
+<np>Note that the current path is <b>not</b> affected by the
+calls to <i>graphics.save</i>() and <i>graphics.restore</i>().  So,
+in the example, the oval-shaped path is not discarded when
+<i>graphics.restore</i>() is called. When <i>graphics.stroke</i>() is
+called at the end, it is the oval-shaped path that is stroked.  On the
+other hand, the line width that is used for the stroke is not affected
+by the scale transform that was applied to the oval.  Note that if
+the order of the last two commands were reversed, then the line width
+would be subject to the scaling.</np>
+
+<p>There is an interesting point here about transforms and paths.  In the HTML canvas
+API, the points that are used to create a path are transformed by the
+current transformation before they are saved.  That is, they are saved
+in pixel coordinates.  Later, when the path is stroked or filled, the current
+transform has no effect on the path (although it can affect,
+for example, the line width when the path is stroked).  In particular,
+you can't make a path and then apply different transformations.  For example,
+you can't make an oval-shaped path, and then use it to draw several ovals
+in different positions.  Every time you draw the oval, it will be in the
+same place, even if different translation transforms are applied to
+the graphics context.</p>
+
+<p>The situation is different in Java, where the coordinates that are stored
+in the path are the actual numbers that are used to specify the path,
+that is, the <word>object coordinates</word>.  When the path is stroked or
+filled, the transformation that is in effect at that time is applied
+to the path.  The path can be reused many times
+to draw copies with different transformations.  This comment is offered as an
+example of how APIs that look very similar can have subtle differences.</p>
+
+</subsection>
+
+
+<subsection title="Auxiliary Canvases" id="graphics2d.6.5">
+
+<p>In <localref href="graphics2d.5.5"/>, we looked at the sample program
+<sourceref href="java2d/JavaPixelManipulation.java"/>, which uses a
+<classname>BufferedImage</classname> both to implement an
+<word>off-screen canvas</word> and to allow direct manipulation of
+the colors of individual pixels.  The same ideas can be applied
+in HTML canvas graphics, although the way it's done is a little different.
+The sample web application <sourceref href="canvas2d/SimplePaintProgram.html"/>
+does pretty much the same thing as the Java program (except for the
+image filters).</p>
+
+<demo src="c2/SimplePaintDemo.html" width="600" height="425"><p><web>Here
+is</web><tex>The on-line version of this section has</tex> a live demo 
+version of the program that has the same functionality.
+You can try it out to see how the various drawing tools work.  Don't
+forget to try the "Smudge" tool! (It has to be applied to shapes that
+you have already drawn.)</p></demo>
+
+
+<p>For JavaScript, a web page is represented as a data structure, defined
+by a standard called the <word>DOM</word>, or Document Object model.
+For an off-screen canvas, we can use a <tag>canvas</tag> that is not part of
+that data structure and therefore is not part of the page.
+In JavaScript, a <tag>canvas</tag>
+can be created with the function call <i>document.createElement</i>("canvas").
+There is a way to add this kind of dynamically created canvas to the
+DOM for the web page, but it can be used as an off-screen canvas without doing so.
+To use it, you have to set its width and height properties, and you
+need a graphics context for drawing on it.  Here, for example, is
+some code that creates a 640-by-480 canvas, gets a graphics
+context for the canvas, and fills the whole canvas with white:</p>
+
+
+<pre>OSC = document.createElement("canvas");  // off-screen canvas
+
+OSC.width = 640;    // Size of OSC must be set explicitly.
+OSC.height = 480;
+
+OSG = OSC.getContext("2d");  // Graphics context for drawing on OSC.
+
+OSG.fillStyle = "white";  // Use the context to fill OSC with white.
+OSG.fillRect(0,0,OSC.width,OSC.height);</pre>
+
+<np>The sample program lets the user drag the mouse on the canvas to
+draw some shapes. The off-screen canvas holds the official copy of
+the picture, but it is not seen by the user.  There is also an
+on-screen canvas that the user sees.  The off-screen canvas is copied 
+to the on-screen canvas whenever the picture is modified.  
+While the user is dragging the mouse to
+draw a line, oval, or rectangle, the new shape is actually
+drawn on-screen, over the contents of the off-screen canvas. It is
+only added to the off-screen canvas when the user finishes the
+drag operation. For the other tools, changes are made directly
+to the off-screen canvas, and the result is then copied to the
+screen.  This is an exact imitation of the Java program.</np>
+
+<p>(The demo version <web>shown</web><tex>mentioned</tex> above 
+actually uses a somewhat different technique to accomplish the
+same thing.  It uses two on-screen canvases, one located exactly
+on top of the other.  The lower canvas holds the actual image.
+The upper canvas is completely transparent, except when the
+user is drawing a line, oval, or rectangle.  While the user
+is dragging the mouse to draw such a shape, the new shape
+is drawn on the upper canvas, where it hides the part of
+the lower canvas that is beneath the shape.  When the user
+releases the mouse, the shape is added to the lower canvas
+and the upper canvas is cleared to make it completely transparent
+again.  Again, the other tools operate directly on the lower
+canvas.)</p>
+
+
+</subsection>
+
+
+<subsection title="Pixel Manipulation" id="graphics2d.6.6">
+
+<p>The "Smudge" tool in the <sourceref href="canvas2d/SimplePaintProgram.html">sample program</sourceref> 
+and demo is implemented by computing with the color component values of pixels in the image.
+The implementation requires some way to read the colors of pixels in a canvas.  That can be 
+done with the function <i>graphics.getPixelData</i>(<i>x,y,w,h</i>), where <i>graphics</i> is a 2D graphics
+context for the canvas.  The function reads the colors of a rectangle of pixels, where (<i>x,y</i>) is
+the upper left corner of the rectangle, <i>w</i> is its width, and <i>h</i> is its height.  The
+parameters are always expressed in pixel coordinates.  Consider, for example</p>
+
+<pre>colors = graphics.getImageData(0,0,20,10)</pre>
+
+<np>This returns the color data for a 20-by-10 rectangle in the upper left corner of the canvas.
+The return value, <i>colors</i>, is an object with properties <i>colors.width</i>,
+<i>colors.height</i>, and <i>colors.data</i>.  The <i>width</i> and <i>height</i> give the number of
+rows and columns of pixels in the returned data.  (According to the documentation, on a high-resolution 
+screen, they might not be the same as the width and height in the function call.  The data can be 
+for real, physical pixels on the display device, not the "nominal" pixels that are used in the pixel 
+coordinate system on the canvas. There might be several device pixels for each nominal pixel.
+I'm not sure whether this can really happen in practice.)</np>
+
+<p>The value of <i>colors.data</i> is an array, with four array elements for each pixel.  The four
+elements contain the red, blue, green, and alpha color components of the pixel, given as integers
+in the range 0 to 255.  For a pixel that lies outside the canvas, the four component values will
+all be zero.  The array is a value of type <i>Uint8ClampedArray</i> whose elements are
+8-bit unsigned integers limited to the range 0 to 255.  This is one of JavaScript's
+<newword>typed array</newword> datatypes, which can only hold values of a specific numerical type.
+As an example, suppose that you just want to read the RGB color of one pixel, at coordinates (<i>x,y</i>).
+You can set</p>
+
+<pre>pixel = graphics.getImageData(x,y,1,1);</pre>
+
+<np>Then the RGB color components for the pixel are R = <i>pixel.data</i>[0],
+G = <i>pixel.data</i>[1], and B = <i>pixel.data</i>[2].</np>
+
+<p>The function <i>graphics.putImageData</i>(<i>imageData</i>,<i>x</i>,<i>y</i>) is
+used to copy the colors from an image data object into a canvas, placing it into
+a rectangle in the canvas with upper left corner at (<i>x,y</i>).  The <i>imageData</i>
+object can be one that was returned by a call to <i>graphics.getImageData</i>, possibly
+with its color data modified.  Or you can create a blank image data object by
+calling <i>graphics.createImageData</i>(<i>w,h</i>) and fill it with data.</p>
+
+<p>Let's consider the "Smudge" tool in the sample program. When the user clicks the
+mouse with this tool, I use <i>OSG.getImageData</i> to get the color data from a 
+9-by-9 square of pixels surrounding the mouse location.  <i>OSG</i> is the graphics
+context for the canvas that contains the image.  Since I want to do real-number
+arithmetic with color values, I copy the color components into another typed array,
+one of type <i>Float32Array</i>, which can hold 32-bit floating point numbers.
+Here is the function that I call to do this:</p>
+
+<pre>function grabSmudgeData(x, y) {  // (x,y) gives mouse location
+    let colors = OSG.getImageData(x-5,y-5,9,9);
+    if (smudgeColorArray == null) {
+          // Make image data &amp; array the first time this function is called.
+        smudgeImageData = OSG.createImageData(9,9);
+        smudgeColorArray = new Float32Array(colors.data.length);
+     }
+     for (let i = 0; i &lt; colors.data.length; i++) {
+           // Copy the color component data into the Float32Array.
+        smudgeColorArray[i] = colors.data[i];
+    }
+}</pre>
+
+<np>The floating point array, <i>smudgeColorArray</i>, will be used for computing new
+color values for the image as the mouse moves.  The color values
+from this array will be copied into the image data object, <i>smudgeImageData</i>, 
+which will then be used to put the color values into the image.  This is done in
+another function, which is called for each point that is visited as the user
+drags the Smudge tool over the canvas:</np>
+
+<pre>function swapSmudgeData(x, y) { // (x,y) is new mouse location
+    let colors = OSG.getImageData(x-5,y-5,9,9);  // get color data from image
+    for (let i = 0; i &lt; smudgeColorArray.length; i += 4) {
+        // The color data for one pixel is in the next four array locations.
+        if (smudgeColorArray[i+3] &amp;&amp; colors.data[i+3]) {
+              // alpha-components are non-zero; both pixels are in the canvas;
+              // (getImageData() gets 0 for the alpha value at pixel coordinates
+              // that are not actually part of the canvas).
+            for (let j = i; j &lt; i+3; j++) { // compute new RGB values
+                let newSmudge = smudgeColorArray[j]*0.8 + colors.data[j]*0.2;
+                let newImage  = smudgeColorArray[j]*0.2 + colors.data[j]*0.8;
+                smudgeImageData.data[j] = newImage;
+                smudgeColorArray[j] = newSmudge;
+            }
+            smudgeImageData.data[i+3] = 255;  // alpha component
+        }
+        else {
+              // one of the alpha components is zero; set the output
+              // color to all zeros, "transparent black", which will have
+              // no effect on the color of the pixel in the canvas.
+            for (let j = i; j &lt;= i+3; j++) {
+                smudgeImageData.data[j] = 0; 
+            }
+        }
+    }
+    OSG.putImageData(smudgeImageData,x-5,y-5); // copy new colors into canvas
+}</pre>
+
+<np>In this function, a new color is computed for each pixel in a 9-by-9 square of
+pixels around the mouse location.  The color is replaced by a weighted average
+of the current color of the pixel and the color of the corresponding pixel in the
+<i>smudgeColorArray</i>.  At the same time, the color in <i>smudgeColorArray</i>
+is replaced by a similar weighted average.</np>
+
+<p>It would be worthwhile to try to understand this example to see how pixel-by-pixel
+processing of color data can be done.  See the 
+<sourceref href="canvas2d/SimplePaintProgram.html">source code</sourceref>
+of the example for more details.</p>
+
+</subsection>
+
+
+
+<subsection title="Images" id="graphics2d.6.7">
+
+<p>For another example of pixel manipulation, we can look at 
+image filters that modify an image by replacing the color of each pixel with
+a weighted average of the color of that pixel and the 8 pixels that
+surround it. Depending on the weighting factors that are used, the
+result can be as simple as a slightly blurred version of the image, or
+it can be something more interesting.</p>
+
+<demo src="c2/image-filters.html" width="600" height="310"><p><web>Here is 
+an</web><tex>The on-line version of this section includes</tex> an
+interactive demo that lets you apply several different image filters to
+a variety of images<tex>.</tex><web>:</web></p></demo>
+
+<p>The filtering operation in the demo uses the image data functions
+<i>getImageData</i>, <i>createImageData</i>, and <i>putImageData</i>
+that were discussed above.  Color data from the entire image is obtained
+with a call to <i>getImageData</i>.  The results of the averaging 
+computation are placed in a new image data object, and the resulting
+image data is copied back to the image using <i>putImageData</i>.</p>
+
+<p>The remaining question is, where do the original images come
+from, and how do they get onto the canvas in the first place?
+An image on a web page is specified by an element in the web page
+source such as</p>
+
+<pre>&lt;img src="pic.jpg" width="400" height="300" id="mypic"&gt;</pre>
+ 
+ <np>The <i>src</i> attribute specifies the URL from which the image is
+loaded.  The optional <i>id</i> can be used to reference the image
+in JavaScript.  In the script,</np>
+
+<pre>image = document.getElementById("mypic");</pre>
+
+<np>gets a reference to the object that represents the image in the
+document structure.  Once you have such an object, you can use it to
+draw the image on a canvas.  If <i>graphics</i> is a graphics context
+for the canvas, then</np>
+
+<pre>graphics.drawImage(image, x, y);</pre>
+
+<np>draws the image with its upper left corner at (<i>x,y</i>).  Both
+the point (<i>x,y</i>) and the image itself are transformed by any
+transformation in effect in the graphics context.  This will draw
+the image using its natural width and height (scaled by the transformation,
+if any).  You can also specify the width and height of the rectangle
+in which the image is drawn:</np>
+
+<pre>graphics.drawImage(image, x, y, width, height);</pre>
+
+<np>With this version of <i>drawImage</i>, the image is scaled to fit
+the specified rectangle.</np>
+
+<p>Now, suppose that the image you want to draw onto the canvas is not
+part of the web page?  In that case, it is possible to load the image dynamically.
+This is much like making an off-screen canvas, but you are making
+an "off-screen image."  Use the <i>document</i> object to create an
+<i>img</i> element:</p>
+
+<pre>newImage = document.createElement("img");</pre>
+
+<np>An <i>img</i> element needs a <i>src</i> attribute that
+specifies the URL from which it is to be loaded.  For example,</np>
+
+<pre>newImage.src = "pic2.jpg";</pre>
+
+<np>As soon as you assign a value to the <i>src</i> attribute, the browser
+starts loading the image.  The loading is done asynchronously; that is,
+the computer continues to execute the script without waiting for the
+load to complete.  This means that you can't simply draw the image on
+the line after the above assignment statement:  The image is very likely
+not done loading at that time.  You want to draw the image after it has
+finished loading.  For that to happen, you need to assign a function to the image's <i>onload</i>
+property before setting the <i>src</i>. That function will
+be called when the image has been fully loaded.  Putting this together, here is a simple 
+JavaScript function for loading an image from a specified URL and drawing it on a canvas
+after it has loaded:</np>
+
+<pre>function loadAndDraw( imageURL, x, y ) {
+    let image = document.createElement("img");
+    image.onload = doneLoading;
+    image.src = imageURL;
+    function doneLoading() {
+        graphics.drawImage(image, x, y);
+    }
+}</pre>
+
+<np>A similar technique is used to load the images in the filter demo.</np>
+
+<p>There is one last mystery to clear up.  When discussing the use of an off-screen
+canvas in the <i>SimplePaintProgram</i> example earlier in this section, I noted that
+the contents of the off-screen canvas have to be copied to the main canvas,
+but I didn't say how that can be done.  In fact, it is done using <i>drawImage</i>.
+In addition to drawing an image onto a canvas, <i>drawImage</i> can be used to draw the contents of
+one canvas into another canvas.  In the sample program, the command</p>
+
+<pre>graphics.drawImage( OSC, 0, 0 );</pre>
+
+<np>is used to draw the off-screen canvas to the main canvas.  Here, <i>graphics</i>
+is a graphics context for drawing on the main canvas, and <i>OSC</i> is the object
+that represents the off-screen canvas.</np>
+
+</subsection>
+
+
+
+</section>

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" 
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" 
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="200px" height="200px" 
+     viewBox="-100 -100 200 200"
+     preserveAspectRatio="xMidYMid">
+     
+<!--  A simple example of grouping using the <g> element.  This
+      draws a face, centered at (0,0), with radius 98.  The attributes
+      on the <g> element set up default values for the group for the
+      fill, stroke, and stroke-width attributes.  The default 
+      stroke-width is overridden with a different value for the
+      <path> element.  The transform on the <g> element flips the
+      picture vertically, just because I am more comfortable with
+      a flipped coordinate system. -->
+     
+<g fill="none" stroke="black" stroke-width="2" transform="scale(1,-1)">
+     <circle r="98"/>
+     <ellipse cx="40" cy="40" rx="20" ry="7"/>
+     <ellipse cx="-40" cy="40" rx="20" ry="7"/>
+     <line y1="20" y2="-10"/>
+     <path d="M -40,-40 C -30,-50 30,-50 40,-40" stroke-width="4"/>
+</g>
+    
+</svg>

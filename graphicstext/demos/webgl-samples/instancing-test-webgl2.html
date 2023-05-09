@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+
+<!--
+   This pages uses gl.drawArraysInstanced() to draw a large number
+   of disks with a single function call, as an example of WebGL 2.0
+   "instancing".  Instancing is not part of core WebGL 1.0, but is
+   often available as an extension in WebGL 1.0.
+-->
+
+<head>
+<title>WebGL2 Instancing Test</title>
+<style>
+    body {
+        background-color: #DDDDDD;
+    }
+    canvas {
+        display: block;
+        border: 2px solid black;
+    }
+</style>
+
+
+<!--
+   Shader programs, written using GLSL ES 3.00.  The very first line in the
+   shader source must be "#version 300 es".  WebGL 2.0 can use GLSL ES 3.00,
+   but note that it could also use GLSL ES 1.00, and the shaders for this
+   program could have been written in that language.
+-->
+
+<script type="x-shader/x-vertex" id="vshader-texture">#version 300 es
+    in vec2 a_coords;        // "in" variables would be "attribute" in GLSL ES 1.00
+    in vec2 a_translation;
+    in vec4 a_color;
+    out vec4 color;          // "out" variable would be "varying" in GLSL ES 1.00
+    void main() {
+        gl_Position = vec4(a_coords + a_translation, 0, 1);
+        color = a_color;
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-texture">#version 300 es
+    precision mediump float;
+    in vec4 color;           // "in" variable would be "varying" in GLSL ES 1.00
+    out vec4 color_out;      // no "out" variables in GLSL ES 1.00 fragment shader
+    void main() {
+        color_out = color;    // would be "gl_FragColor = color" in GLSL ES 1.00
+    }
+</script>
+
+
+
+<script>
+
+"use strict";
+
+let gl;      // The webgl 2.0 context.
+
+let prog; // The shader program.
+
+let a_coords_loc;  // Location of the a_coords attribute in prog
+let a_coords_buffer;        // A buffer to hold the coordinates for a_coords_loc
+let a_color_loc;       // Location of the color uniform in prog.
+let a_color_buffer;
+let a_translation_loc; // Location of the translation uniform in prog
+let a_translation_buffer;
+
+const DISK_COUNT = 30;  // The scene in the texture shows moving disks.  This is the number of disks.
+let diskCenters;  // An array giving the positions of the disks, used as values of the u_translation uniform.
+let diskVelocities;  // For animating the disk positions.
+
+let animating = true;
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    
+    prog = createProgram(gl, "vshader-texture", "fshader-texture");
+    gl.useProgram(prog);
+    
+    // Set some properties of the WebGL constant that won't change per frame.
+    
+    gl.clearColor(1,1,1,1);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    // Make the coordinate data for the vertices of disk, approximated with 64 sides.
+    
+    let diskCoords = new Float32Array(2*64);
+    for (let i = 0; i < 64; i++) {
+        let angle = i/64 * 2*Math.PI;
+        diskCoords[2*i] = 0.25 * Math.cos(angle);
+        diskCoords[2*i+1] = 0.25 * Math.sin(angle);
+    }
+    
+    // Get the shader program location for the attribute that represents the
+    // vertex coordinates.  Create a buffer to hold the data.  Load the
+    // coordinate data into the buffer.  Since this data won't ever change,
+    // the usage hint in gl.bufferData is gl.STATIC_DRAW.
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_coords_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.vertexAttribPointer(a_coords_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords_loc);
+    gl.bufferData(gl.ARRAY_BUFFER, diskCoords, gl.STATIC_DRAW);
+    
+    // Create an array holding random color coordinates for each disk,
+    // with an alpha value of 0.5 to make the disk translucent.
+    
+    let diskColors = new Float32Array(4*DISK_COUNT);
+    for (let i = 0; i < DISK_COUNT; i++) {
+        diskColors[4*i] = Math.random();
+        diskColors[4*i+1] = Math.random();
+        diskColors[4*i+2] = Math.random();
+        diskColors[4*i+3] = 0.5;
+    }
+    
+    // Get the shader program location for the attribute that represents the
+    // colors for the disks.  Create and configure a buffer to hold the data.
+    // Set the vertexAttribDivisor to 1, indicating that each instance will
+    // get its own value for the color when gl.drawArraysInstanced() is
+    // called to draw the disks.  
+    
+    a_color_loc =  gl.getAttribLocation(prog, "a_color");
+    a_color_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_color_buffer);
+    gl.vertexAttribPointer(a_color_loc, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_color_loc);
+    gl.vertexAttribDivisor(a_color_loc,1);
+    gl.bufferData(gl.ARRAY_BUFFER, diskColors, gl.STATIC_DRAW);
+    
+    // Get the shader program location for the attribute that represents the
+    // positions of the disks.  Create and configure a buffer to hold the data,
+    // but don't load the data here.  This data changes in each frame, as the
+    // disks move.  The data will be used by gl.drawArraysInstanced(), and
+    // each instance gets its own value, so set vertexAttribDivisor to 1.
+    
+    a_translation_loc =  gl.getAttribLocation(prog, "a_translation");
+    a_translation_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_translation_buffer);
+    gl.vertexAttribPointer(a_translation_loc, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_translation_loc);
+    gl.vertexAttribDivisor(a_translation_loc,1);
+    
+}
+
+
+/* Draw the scene.  This is called once for each frame. Between frames,
+ * updateDiskPositions() is called to make the disks move by changing
+ * the disk positions that are stored in diskCenters. */
+function draw() {
+    
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    
+    /* Draw a set of DISK_COUNT disks using instancing.  Each
+       instance is a gl.TRIANGLE_FAN, using the same vertex
+       coordinates, but each instance gets its own color and
+       translation amount.*/
+
+    // The translation data changes in each frame as the disks
+    // move.  New data from diskCenters needs to be loaded into
+    // the buffer that holds the translation amounts.  Since
+    // the data is only used once, the usage in gl.bufferData()
+    // is set to gl.STREAM_DRAW.
+    
+    let translationBufferData = new Float32Array( 2*DISK_COUNT );
+    for (let i = 0; i < DISK_COUNT; i++) {
+        translationBufferData[2*i] = diskCenters[i][0];
+        translationBufferData[2*i+1] = diskCenters[i][1];
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_translation_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, translationBufferData, gl.STREAM_DRAW);
+    
+    // Draw the disks!
+    
+    gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 64, DISK_COUNT);
+    
+}
+
+
+/* Create random initial positions and random velocities to the disks.
+   This is called once, in init(), before drawing the first frame. */
+function createDiskPositionsAndVelocities() {
+    diskCenters = new Array(DISK_COUNT);
+    diskVelocities = new Array(DISK_COUNT);
+    for (let i = 0; i < DISK_COUNT; i++) {
+        diskCenters[i] = [ 2*Math.random() - 1, 2*Math.random() - 1 ];
+        let angle = Math.random()*2*Math.PI;
+        let speed = 0.003 + 0.01*Math.random();
+        diskVelocities[i] = [ speed*Math.cos(angle), speed*Math.sin(angle) ];
+    }
+}
+
+
+/* Advance disk positions by disk velocities, wrapping around when disks move completely
+ * outside the coordinate range from -1 to 1 (that is when the center coordinates move
+ * outside the range -1.25 to 1.25, since the disk radius is 0.25).
+ * For more visual interest, change to a new random velocity occasionally.
+ * This method is called before each new frame is drawn.
+ */
+function updateDiskPositions() {
+    for (let i = 0; i < DISK_COUNT; i++) {
+        diskCenters[i][0] += diskVelocities[i][0];
+        if (diskCenters[i][0] < -1.25) {
+            diskCenters[i][0] = 1.25;
+        }
+        else if (diskCenters[i][0] > 1.25) {
+            diskCenters[i][0] = -1.25;
+        }
+        diskCenters[i][1] += diskVelocities[i][1];
+        if (diskCenters[i][1] < -1.25) {
+            diskCenters[i][1] = 1.25;
+        }
+        else if (diskCenters[i][1] > 1.25) {
+            diskCenters[i][1] = -1.25;
+        }
+        if (Math.random() < 0.01) {
+            let angle = Math.random()*2*Math.PI;
+            let speed = 0.003 + 0.01*Math.random();
+            diskVelocities[i] = [ speed*Math.cos(angle), speed*Math.sin(angle) ];
+        }
+    }
+}
+
+
+//-------------- WebGL shader program creation -----------------------------
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are the id attributes for <script>
+ * elements that contain the source code for the vertex and fragment
+ * shaders.  A ReferenceError will be thrown if a <script> element does
+ * not exist.
+ */
+function createProgram(gl, vertexShaderID, fragmentShaderID) {
+    function getTextContent( elementID ) {
+            // This nested function retrieves the text content of an
+            // element on the web page.  It is used here to get the shader
+            // source code from the script elements that contain it.
+        let element = document.getElementById(elementID);
+        let node = element.firstChild;
+        let str = "";
+        while (node) {
+            if (node.nodeType === 3) // this is a text node
+                str += node.textContent;
+            node = node.nextSibling;
+        }
+        return str;
+    }
+    let vertexShaderSource, fragmentShaderSource;
+    try {
+        vertexShaderSource = getTextContent( vertexShaderID );
+        fragmentShaderSource = getTextContent( fragmentShaderID );
+    }
+    catch (e) {
+        throw new Error("Could not get shader source code from script elements.");
+    }
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vertexShaderSource);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error( "Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+//------------------------- Animation -------------------------------
+
+function frame() {
+    if (animating) { 
+        updateDiskPositions();
+        draw();
+        requestAnimationFrame(frame);
+    }
+}
+
+function doAnimationCheckbox() {
+    let run = document.getElementById("animCheckbox").checked;
+    if (run != animating) {
+        animating = run;
+        if (animating)
+            requestAnimationFrame(frame);
+    }
+}
+
+//-------------------------- Initialization -------------------------------
+
+function init() {
+    try {
+        let canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext( "webgl2", { alpha: false, depth: false } );
+             // No need for alpha channel, since image is not meant to have transparency.
+             // No need for depth buffer since depth test is not used.
+        if ( ! gl ) {
+            throw new Error();
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL2 graphics context.  This page requires WebGL 2.0.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        console.error(e);
+        return;
+    }
+    document.getElementById("animCheckbox").checked = animating;
+    document.getElementById("animCheckbox").onchange = doAnimationCheckbox;
+    createDiskPositionsAndVelocities();
+    draw();
+    if (animating) {
+        requestAnimationFrame(frame);  // Get animation started
+    }
+}
+
+window.onload = init;  // Arrange for init to be called when page has loaded.
+
+</script>
+</head>
+<body>
+
+<h2>WebGL 2.0 Instancing Test</h2>
+
+<p id=message>&nbsp;</p>
+
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p><label><input type="checkbox" id="animCheckbox"> <b>Animate</b></label>
+</p>
+
+<canvas width=600 height=600 id="webglcanvas"></canvas>
+
+
+</body>
+</html>
+
+

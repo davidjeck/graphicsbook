@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section id="introduction.3" title="Hardware and Software">
+
+<p1>We will be using OpenGL as the primary basis for 3D graphics programming.
+The original version of OpenGL was released in 1992 by a company named
+Silicon Graphics, which was known for its graphics workstations&mdash;powerful,
+expensive computers designed for intensive graphical applications.  (Today,
+you probably have more graphics computing power on your smart phone.)  OpenGL
+is supported by the graphics hardware in most modern computing devices, including
+desktop computers, laptops, and many mobile devices.  This section will give
+you a bit of background about the history of OpenGL and about the graphics 
+hardware that supports it.</p1>
+
+<p>In the first desktop computers, the contents of the screen were managed
+directly by the <word>CPU</word>.  For example, to draw a line segment on the screen, the CPU
+would run a loop to set the color of each pixel that lies along the line.
+Needless to say, graphics could take up a lot of the CPU's time.  And graphics
+performance was very slow, compared to what we expect today.  So what has changed?
+Computers are much faster in general, of course, but the big change is that
+in modern computers, graphics processing is done by a specialized component
+called a <newword>GPU</newword>, or Graphics Processing Unit.  A GPU includes processors
+for doing graphics computations; in fact, it can include a large number of such
+processors that work in parallel to greatly speed up graphical operations.  
+It also includes its own dedicated memory for storing things like images and 
+lists of coordinates.  GPU processors have very fast
+access to data that is stored in GPU memory&mdash;much faster than their access to data
+stored in the computer's main memory.</p>
+
+<p>To draw a line or perform some other graphical operation, the CPU simply has to
+send commands, along with any necessary data, to the GPU, which is responsible
+for actually carrying out those commands.  The CPU offloads most of the graphical
+work to the GPU, which is optimized to carry out that work very quickly.
+The set of commands that the GPU understands make up the <word>API</word>
+of the GPU.  OpenGL is an example of a graphics API, and most GPUs support
+OpenGL in the sense that they can understand OpenGL commands, or at least
+that OpenGL commands can efficiently be translated into commands that the
+GPU can understand.</p>
+
+<p>OpenGL is not the only graphics API.  The best-known alternatives are probably
+the proprietary APIs used by Apple and Microsoft.  Apple's MacOS uses an API known
+as Metal, while Microsoft Windows uses Direct3D.  Nevertheless, OpenGL
+can currently still be used on MacOS and Windows.  Furthermore, a newer open API named
+Vulkan has been defined as a replacement for OpenGL itself.
+Vulkan is a complex, low-level
+API designed more for speed and efficiency rather than ease-of-use, and it will likely
+not completely replace OpenGL for some time, if ever.  Metal, Direct3D, and Vulkan
+are not covered in this textbook.  We are using OpenGL since it provides an easier
+introduction to 3D graphics and because it is still the basis for 3D graphics in
+Web browsers. </p>
+
+<break/>
+
+<p>I have said that OpenGL is an API, but in fact it is a series of APIs that have
+been subject to repeated extension and revision.  The current version, in 2021,
+is 4.6, which was first released in 2017.  It is very different from the 1.0 version from 1992.
+Furthermore,
+there is a specialized version called OpengGL&nbsp;ES for "embedded systems" such
+as mobile phones and tablets.  And there is also WebGL, for use in Web browsers,
+which is basically a port of OpenGL ES.  It will be useful to know something
+about how and why OpenGL has changed.</p>
+
+<p>First of all, you should know that OpenGL was designed as a "client/server"
+system.  The server, which is responsible for controlling the computer's
+display and performing graphics computations, carries out commands issued by the
+client.  Typically, the server is a GPU, including its graphics processors and memory.
+The server executes OpenGL commands.  The client is the CPU in the same computer, along 
+with the application program that it is running. OpenGL commands come from the
+program that is running on the CPU.  However,
+it is actually possible to run OpenGL programs remotely over a network.  That
+is, you can execute an application program on a remote computer (the OpenGL client), while
+the graphics computations and display are done on the computer that you are
+actually using (the OpenGL server).</p>
+
+<p>The key idea is that the client and the server are separate components, and there
+is a communication channel between those components.  OpenGL commands and the
+data that they need are communicated from the client (the CPU) to the server (the GPU)
+over that channel.  The capacity of the channel can be a limiting factor in graphics
+performance.  Think of drawing an image onto the screen.  If the GPU can draw the
+image in microseconds, but it takes milliseconds to send the data for the image
+from the CPU to the GPU, then the great speed of the GPU is irrelevant&mdash;most of
+the time that it takes to draw the image is communication time.</p>
+
+<p>For this reason, one of the driving factors in the evolution of OpenGL has been
+the desire to limit the amount of communication that is needed between the CPU and
+the GPU.  One approach is to store information in the GPU's memory.  If some data
+is going to be used several times, it can be transmitted to the GPU once and
+stored in memory there, where it will be immediately accessible to the GPU.
+Another approach is to try to decrease the number of OpenGL commands that must
+be transmitted to the GPU to draw a given image.</p>
+
+<p>OpenGL draws <word term="geometric primitive">primitives</word> such as triangles.
+Specifying a primitive means specifying <word term="coordinate system">coordinates</word>
+and <word term="attribute">attributes</word> for each of its <word term="vertex">vertices</word>.  In the
+original OpenGL&nbsp;1.0, a separate command was used to specify the coordinates of each vertex,
+and a command was needed each time the value of an attribute changed.  To draw a single 
+triangle would require three or more commands.  Drawing a complex object made up of
+thousands of triangles would take many thousands of commands.  Even in OpenGL&nbsp;1.1,
+it became possible to draw such an object with a single command instead of thousands.  All the data
+for the object would be loaded into arrays, which could then be sent in a single
+step to the GPU.  Unfortunately, if the object was going to be drawn more than
+once, then the data would have to be retransmitted each time the object was drawn.
+This was fixed in OpenGL&nbsp;1.5 with <newword term="VBO">Vertex Buffer Objects</newword>.
+A VBO is a block of memory in the GPU that can store the coordinates or attribute values for
+a set of vertices.  This makes it possible to reuse the data without having to retransmit it
+from the CPU to the GPU every time it is used.</p>
+
+<p>Similarly, OpenGL 1.1 introduced <newword term="texture object">texture objects</newword>
+to make it possible to store several images on the GPU for use as <word term="texture">textures</word>.
+This means that texture images that are going to be reused several times can be loaded once
+into the GPU, so that the GPU can easily switch between images without having to reload them.</p>
+
+<break/>
+
+<p>As new capabilities were added to OpenGL, the API grew in size.  But the growth was still
+outpaced by the invention of new, more sophisticated techniques for doing graphics.  Some
+of these new techniques were added to OpenGL, but
+the problem is that no matter how many features you add, there will always be demands for 
+new features&mdash;as well as complaints that all the new features are making things too 
+complicated! OpenGL was a giant machine, with new pieces always being tacked onto it, 
+but still not pleasing everyone. The real solution was to make the machine <b>programmable</b>.
+With OpenGL 2.0, it became possible to write programs to be executed as part of the
+graphical computation in the GPU.  The programs are run on the GPU at GPU speed.
+A programmer who wants to use a new graphics technique can write a program to 
+implement the feature and just hand it to the GPU.  The OpenGL API doesn't have to
+be changed.  The only thing that the API has to support is the ability to send programs
+to the GPU for execution.</p>
+
+<p>The programs are called <newword term="shader">shaders</newword> (although the term doesn't
+really describe what most of them actually do).  The first shaders to be introduced were
+<newword term="vertex shader">vertex shaders</newword> and <newword term="fragment shader">fragment shaders</newword>.
+When a <word term="geometric primitive">primitive</word> is drawn, some work has to be done at each vertex of the primitive,
+such as applying a <word>geometric transform</word> to the vertex coodinates or
+using the <word term="attribute">attributes</word> and global <word>lighting</word> environment
+to compute the color of that vertex.  A vertex shader is a program that can take over the
+job of doing such "per-vertex" computations.  Similarly, some work has to be done for each
+pixel inside the primitive.  A fragment shader can take over the job of performing such
+"per-pixel" computations.  (Fragment shaders are also called pixel shaders.)</p>
+
+<p>The idea of programmable graphics hardware was very successful&mdash;so successful that
+in OpenGL&nbsp;3.0, the usual per-vertex and per-fragment processing
+was deprecated (meaning that its use was discouraged). 
+And in OpenGL&nbsp;3.1, it was removed from
+the OpenGL standard, although it is still present as an optional extension.  In practice,
+all the original features of OpenGL are still supported in desktop versions of OpenGL and will
+probably continue to be available in the future.  On the embedded system side, however,
+with OpenGL&nbsp;ES&nbsp;2.0 and later, the use of shaders is mandatory, and a large part
+of the OpenGL&nbsp;1.1 API has been completely removed.
+WebGL, the version of OpenGL for use in web browsers, 
+is based on OpenGL&nbsp;ES, and it also requires shaders to get anything at all done.
+Nevertheless, we will begin our study of OpenGL with version 1.1.  Most of the concepts and
+many of the details from that version are still relevant, and it offers an easier entry point
+for someone new to 3D graphics programming.</p>
+
+<p>OpenGL shaders are written in <newword>GLSL</newword> (OpenGL Shading Language).  Like
+OpenGL itself, GLSL has gone through several versions. We will spend some time later in the
+course studying GLSL&nbsp;ES, the version used with WebGL and
+OpenGL&nbsp;ES.  GLSL uses a syntax similar to the C programming language.</p>
+
+<break/>
+
+<p>As a final remark on GPU hardware, I should note that the computations that are done for
+different vertices are pretty much independent, and so can potentially be done in parallel.
+The same is true of the computations for different fragments.  In fact, GPUs can
+have hundreds or thousands of processors that can operate in parallel.  Admittedly, the
+individual processors are much less powerful than a CPU, but then typical per-vertex
+and per-fragment computations are not very complicated.  The large number of processors,
+and the large amount of parallelism that is possible in graphics computations, makes
+for impressive graphics performance even on fairly inexpensive GPUs.</p>
+
+</section>
+

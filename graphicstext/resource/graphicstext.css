@@ -1,0 +1,206 @@
+
+html, body {
+	margin: 0;
+	padding: 0;
+}
+body {
+   background-color:gray;
+}
+div.page {
+   background-color: #EEEEEE;
+   color: black;
+   max-width: 9.5in;
+   margin: 0 auto;
+   padding: 8px;
+   border: thin solid black;
+}
+
+a:link {
+   color: #0000AA;
+   text-decoration: underline;
+}
+a:visited {
+   color: #553377;
+   text-decoration: underline;
+}
+a:active {
+   color: #CC2222;
+   text-decoration: underline;
+}
+a:hover {
+   color: #6666FF;
+   text-decoration: underline;
+   cursor: pointer;
+}
+
+div.content {
+   margin-left: 25px;
+   margin-right: 25px;
+}
+
+iframe {
+   border: 2px solid #740b0b; 
+   box-shadow: 0px 0px 8px #500000;
+   margin-top:17px;
+   margin-bottom:17px;
+}
+
+pre.exercisecode {
+   margin-left: 25px;
+}
+
+pre {
+   margin-left: 60px;
+}
+
+.chapter_title {
+   text-align: center;
+}
+
+.quiz_title {
+   text-align: center;
+}
+
+.section_title {
+   text-align: center;
+}
+
+.subsection_title {
+}
+
+hr.break {
+   align:center;
+   width: 33%;
+}
+
+ul.contents {
+   margin-left: 20px;
+}
+
+img.bordered {
+   border: solid black 1px;
+   background-color: white;
+   padding: 10px;
+}
+
+table.subsections {
+  background: white;
+  float: right;
+  margin: 0px 0px 8px 8px;
+}
+
+h3.exercise {
+   color: #CC0000;
+}
+
+div.exercisesubtitle {
+   color: #CC0000;
+}
+
+p.firstpar:first-line {
+    font-variant: small-caps;
+}
+
+p.firstpar:first-letter, div.subsection p:first-of-type:first-letter {
+    font-size: 150%;
+}
+
+p.noindent, p.firstpar, p[align=center], div.subsection p:first-of-type {
+    text-indent: 0px;
+}
+
+p {
+    text-indent: 30px;
+}
+
+span.newword {
+    color: #AA0000;
+    font-weight: bold;
+    white-space: pre;
+    cursor: help;
+    border-bottom: 1px dotted #AA0000;
+}
+
+span.word {
+    border-bottom: 2px dotted #AA0000;
+    white-space: pre;
+    cursor: help;
+}
+
+span.word:hover, span.newword:hover {
+    border-bottom: 1px solid #DD0000;
+}
+
+span.codedef {
+    color: #AA0000;
+    font-family: monospace;
+}
+
+span.ptype {
+    color: #004090;
+}
+
+
+span.classname {
+    color: #004090;
+    font-style: oblique;
+}
+
+span.atype {
+    color: #004090;
+    font-family: monospace;
+}
+
+span.tag {
+	font-family: monospace;
+}
+
+
+span.code {
+	font-family: monospace;
+}
+
+span.newcode {
+	font-family: monospace;
+	color: #CC0000;
+}
+
+span.bnf {
+	font-weight: bold;
+	color: #009900;
+}
+
+span.question {
+    font-weight: bold;
+    color: #990000;
+}
+
+tr.question {
+    background: #FFFFE8;
+}
+
+span.answer {
+    font-weight: bold;
+    color: #000080;
+}
+
+tr.answer {
+    background: #E8E8FF
+}
+
+span.sourceref {
+    font-style: italic;
+}
+
+p.glossary_item {
+    text-indent: -30px;
+    padding-left: 30px;
+}
+
+span.glossary_term {
+    font-weight: bold;
+    color: #AA2200;
+}
+
+span.glossary_definition {
+}

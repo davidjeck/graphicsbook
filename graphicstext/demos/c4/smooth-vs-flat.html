@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Smooth or Faceted</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var camera;
+var smooth = true;
+
+function smoothShpere(radius, slices, stacks) {
+    var i,j;
+    for (j = 0; j < stacks; j++) {
+        var latitude1 = (Math.PI/stacks) * j - Math.PI/2;
+        var latitude2 = (Math.PI/stacks) * (j+1) - Math.PI/2;
+        var sinLat1 = Math.sin(latitude1);
+        var cosLat1 = Math.cos(latitude1);
+        var sinLat2 = Math.sin(latitude2);
+        var cosLat2 = Math.cos(latitude2);
+        glBegin(GL_QUAD_STRIP);
+        for (i = 0; i <= slices; i++) {
+            var longitude = (2*Math.PI/slices) * i;
+            var sinLong = Math.sin(longitude);
+            var cosLong = Math.cos(longitude);
+            var x1 = cosLong * cosLat1;
+            var y1 = sinLong * cosLat1;
+            var z1 = sinLat1;
+            var x2 = cosLong * cosLat2;
+            var y2 = sinLong * cosLat2;
+            var z2 = sinLat2;
+            glNormal3d(x2,y2,z2);
+            glVertex3d(radius*x2,radius*y2,radius*z2);
+            glNormal3d(x1,y1,z1);
+            glVertex3d(radius*x1,radius*y1,radius*z1);
+        }
+        glEnd();
+    }
+}
+
+function facetedShpere(radius, slices, stacks) {
+    var i,j;
+    glBegin(GL_QUADS);
+    for (j = 0; j < stacks; j++) {
+        var latitude1 = (Math.PI/stacks) * j - Math.PI/2;
+        var sinLat1 = Math.sin(latitude1);
+        var cosLat1 = Math.cos(latitude1);
+        var latitude2 = (Math.PI/stacks) * (j+1) - Math.PI/2;
+        var sinLat2 = Math.sin(latitude2);
+        var cosLat2 = Math.cos(latitude2);
+        for (i = 0; i <= slices; i++) {
+            var longitude1 = (2*Math.PI/slices) * i;
+            var longitude2 = (2*Math.PI/slices) * (i+1);
+            var sinLong1 = Math.sin(longitude1);
+            var cosLong1 = Math.cos(longitude1);
+            var sinLong2 = Math.sin(longitude2);
+            var cosLong2 = Math.cos(longitude2);
+            var x1 = cosLong1 * cosLat1;
+            var y1 = sinLong1 * cosLat1;
+            var z1 = sinLat1;
+            var x2 = cosLong1 * cosLat2;
+            var y2 = sinLong1 * cosLat2;
+            var z2 = sinLat2;
+            var x3 = cosLong2 * cosLat1;
+            var y3 = sinLong2 * cosLat1;
+            var z3 = sinLat1;
+            var x4 = cosLong2 * cosLat2;
+            var y4 = sinLong2 * cosLat2;
+            var z4 = sinLat2;
+            glNormal3d( (x1+x2+x3+x4/4), (y1+y2+y3+y4/4), (z1+z2+z3+z4/4) );
+            glVertex3d(radius*x1,radius*y1,radius*z1);
+            glVertex3d(radius*x2,radius*y2,radius*z2);
+            glVertex3d(radius*x4,radius*y4,radius*z4);
+            glVertex3d(radius*x3,radius*y3,radius*z3);
+        }
+    }
+    glEnd();
+}
+
+function cross(v,w) {
+    var x = v[1]*w[2] - v[2]*w[1];
+    var y = v[2]*w[0] - v[0]*w[2];
+    var z = v[0]*w[1] - v[1]*w[0];
+    return [x,y,z];
+}
+
+function wireSphere(radius, slices, stacks) {
+    var i,j;
+    for (j = 1; j < stacks; j++) {
+        var latitude = (Math.PI/stacks) * j - Math.PI/2;
+        var sinLat = Math.sin(latitude);
+        var cosLat = Math.cos(latitude);
+        glBegin(GL_LINE_LOOP);
+        for (i = 0; i < slices; i++) {
+            var longitude = (2*Math.PI/slices) * i;
+            var sinLong = Math.sin(longitude);
+            var cosLong = Math.cos(longitude);
+            var x = radius * cosLong * cosLat;
+            var y = radius * sinLong * cosLat;
+            var z = radius * sinLat;
+            glVertex3f(x,y,z)
+        }
+        glEnd();
+    }
+    for (i = 0; i < slices; i++) {
+        var longitude = (2*Math.PI/slices) * i;
+        var sinLong = Math.sin(longitude);
+        var cosLong = Math.cos(longitude);
+        glBegin(GL_LINE_LOOP);
+        for (j = 0; j <= stacks; j++) {
+            var latitude = (Math.PI/stacks) * j - Math.PI/2;
+            var sinLat = Math.sin(latitude);
+            var cosLat = Math.cos(latitude);
+            var x = radius * cosLong * cosLat;
+            var y = radius * sinLong * cosLat;
+            var z = radius * sinLat;
+            glVertex3f(x,y,z)
+        }
+        glEnd();
+    }
+}
+
+function draw() {
+    var faceted = document.getElementById("faceted").checked;
+    var edges = document.getElementById("edges").checked;
+    var slices = sliders.value(0);
+    var stacks = sliders.value(1);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    camera.apply();
+    glRotatef(-90,1,0,0);
+
+    if (edges) {
+        glEnable(GL_POLYGON_OFFSET_FILL);
+    }
+    
+    if (faceted) {
+        facetedShpere(4,slices,stacks);
+    }
+    else {
+        smoothShpere(4,slices,stacks);
+    }
+    
+    if (edges) {
+        glDisable(GL_LIGHTING);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        wireSphere(4,slices,stacks);
+        glEnable(GL_LIGHTING);
+    }
+    
+}
+
+function initGL() {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(0,0,0,1);
+    glColor3f(0,0,0);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [0.7, 0.7, 0.7, 1]);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.2, 0.2, 0.2, 1]);
+    glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 16);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [1,1,1,1]);
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [0.2,0.2,0.2,1]);
+    glPolygonOffset(1,1);
+    //glLineWidth(2);    
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    document.getElementById("edges").checked = false;
+    document.getElementById("smooth").checked = true;
+    document.getElementById("edges").onchange = draw;
+    document.getElementById("smooth").onchange = draw;
+    document.getElementById("faceted").onchange = draw;
+    sliders = new SliderCanvas(document.getElementById("sliders"));
+    sliders.addSlider({label:"Slices", min: 3, max:64, value:8});
+    sliders.addSlider({label:"Stacks", min: 2, max:32, value:4});
+    sliders.onChange = draw;
+    sliders.draw();
+    initGL();
+    camera = new Camera();
+    camera.installTrackball(draw);
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Smooth Versus Flat Shading</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools">
+
+<p style="margin-top:0"><label><input type="radio" id="smooth" name="style">Smooth (Normal Per Vertex)</label><br>
+   <label><input type="radio" id="faceted" name="style">Flat (Normal Per Face)</label></p>
+   
+<p><label><input type="checkbox" id="edges">Show Edges</label></p>
+
+<p><canvas id="sliders" width="250" height="120"></canvas></p>
+
+<p style="margin-bottom:0">(Note: Drag your mouse on<br>the sphere to rotate it.)</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>The choice of normal vectors can affect the appearance
+of a surface.  The demo shows a sphere approximated as a
+polyhedron, divided by lines of longitude into "slices" and
+by lines of latitude into "stacks."  (The approximation is
+pretty bad when the number of slices or stacks is small.)
+The sphere can be displayed with "Smooth" shading or
+with "Flat" shading.  When you switch between "Smooth"
+and "Flat", the only thing that changes is the normal
+vectors.  The underlying geometry changes only when you
+change the number of slices or stacks.  Watch the outline
+of the shape as you change from Smooth to Flat to see that the
+geometry doesn't change.</p>
+<p>For Flat shading, all the normal vectors for a face
+are perpendicular to that face, making it look flat and
+giving the sphere a faceted appearance, with abrupt changes
+in lighting along each edge.  For Smooth
+shading, the normal vectors are not perpendicular to the
+face; instead, the are chosen to be perpendicular
+to the smooth surface of the sphere that is being approximated.
+This makes the normal vectors on the two sides of an edge
+agree, so there is no abrupt change along the edge.</p>
+<p>Smooth shading only works well when the polyhedron
+is a good approximation for the sphere.  To see the
+best approximation, increase the number of slices and
+stacks to maximum.  Try using both smooth and flat shading.
+Even with the maximum values, flat shading makes the
+sphere look like it is made of flat facets.</p>
+<p>You should also try setting the number of slices
+and stacks to be very small.  In that case, smooth
+shading will make the object look <i>wrong</i>, though
+you might have trouble putting your finger on exactly
+what is wrong.  The problem is that the normal
+vectors are trying to make a geometrically sharp
+edge look smooth.</p>
+<p>Note that this demo uses some specular color, so that
+you can see the light glinting off the facets!  Set the shading
+to be Flat, and watch how
+the highlights change as you use your mouse to rotate the sphere.</p>
+<p>By the way, you can get some interesting looking objects
+if you set the number of slices to be very small and the number
+of stacks to be very large, or vice versa.  Try it!</p>
+
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

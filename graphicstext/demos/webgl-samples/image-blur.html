@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<!--
+     Uses WebGL to apply bluring to an image.
+     This is a demonstration of using gl.blendFunc()
+     for something other than transparency.  It is a
+     simple multi-pass algorithm.  (Actually, it would be
+     much better to apply the blur filer in the fragement
+     shader -- that method would support more general
+     image filters.)
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Image Filtering in WebGL</title>
+
+
+<script>
+
+"use strict";
+
+const vertexShaderSource = `
+    attribute vec2 a_coords;
+    uniform vec2 offset;
+    varying vec2 v_coords;
+    void main() {
+        vec2 coords;  // coords translated from default range -1 to 1 to the range 0 to 1.
+        coords = vec2( (a_coords.x + 1.0)*0.5, (a_coords.y + 1.0)* 0.5 );
+        v_coords = coords + offset;
+        gl_Position = vec4(a_coords,0.0,1.0);
+    }`;
+
+const fragmentShaderSource = `
+    precision mediump float;
+    uniform sampler2D image;
+    uniform float multiplier;
+    varying vec2 v_coords;
+    void main() {
+        vec4 color = texture2D( image, v_coords );
+        gl_FragColor = vec4( multiplier*color.rgb, 1.0 );
+    }`;
+
+
+let gl;  // The WebGL graphics context.
+
+let a_coords_location;      // location of the "a_coords" attribute variable in the shader program
+let a_coords_buffer;        // a VBO to hold the vertex coordinates
+
+let u_image ;               // Locations of uniform variables in the shader program
+let u_offset;
+let u_multiplier;
+
+let textureObject;          // A texture object to hold the texture image.
+let textureLoaded;          // Set to true when a texture has been successfully loaded.
+
+const imageURLs = [
+    "images-for-blur/house.jpg",
+    "images-for-blur/space-station.jpg",
+    "images-for-blur/bluejay.jpg",
+    "images-for-blur/earth.jpg"
+];
+
+/**
+ *  Draws the current image, with no blur applied.  This is used when the image is just loaded.
+ *  When the "apply blur" button is clicked, the image is drawn using the blur() function.
+ */
+function draw() {
+
+    gl.clearColor(1,1,1,1);  
+    gl.clear(gl.COLOR_BUFFER_BIT);  
+    
+    if ( ! textureLoaded ) {
+        return;
+    }
+    
+    gl.uniform2f(u_offset, 0, 0);
+    gl.uniform1f(u_multiplier, 1);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);  // Attribute values were set up in initGL()
+
+}
+
+/**
+ * Applies a blur filter to the current image by drawing the texture image 9 times,
+ * with different offsets and with color values multiplied by 9.  An additive blend
+ * function is used, so that the values from the 9 passes are just added up.
+ * At the end, the final image is copied back into the texture, so that another
+ * blur can be applied to further blur the image.
+ */
+function blur() {
+    function drawWithOffset(a,b) { // helper function
+        gl.uniform2f(u_offset, a, b);
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    }
+    if ( ! textureLoaded ) {
+        return;
+    }
+    gl.clearColor(0,0,0,0);  // fill color buffer with zeros
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);  // turn on blending
+    gl.blendFunc(gl.ONE, gl.ONE);  // just add the source and destination values, with no dependence on alpha
+    gl.uniform1f(u_multiplier, 1/9);  // (the only value we need in this program; could be different for other blur functions)
+    let dx = 1/512;  // width of one pixel in the texture image, which is 512x256
+    let dy = 1/256;  // height of one pixel in the texture image
+    drawWithOffset(-dx,-dy);  // Draw the texture 9 times, with different offsets
+    drawWithOffset(-dx,0);
+    drawWithOffset(-dx,dy);
+    drawWithOffset(0,dy);
+    drawWithOffset(0,0);
+    drawWithOffset(0,-dy);
+    drawWithOffset(dx,-dy);
+    drawWithOffset(dx,0);
+    drawWithOffset(dx,dy);
+    gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGB, 0,0,512,256, 0);  // copy current image to texture
+    gl.disable(gl.BLEND); // turn blending off, so it won't apply in draw()
+}
+
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+    }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/**
+ *  Loads a texture image asynchronously.  The first paramter is the url
+ *  from which the image is to be loaded.  The second parameter is the
+ *  texture object into which the image is to be loaded.  When the image
+ *  has finished loading, the draw() function will be called
+ *      If an error occurs during loading, an error message is displayed.
+ * on the page.
+ */
+function loadTexture( ) {
+    let imageNum = Number( document.getElementById("image").value );
+    textureLoaded = false;  // signal to draw() that there is currently no texture
+    draw();  // will draw a black rectangle, while texture is loading
+    let img = new Image(); 
+    img.onload = function() { 
+        gl.bindTexture(gl.TEXTURE_2D, textureObject);
+        try {
+            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+        } catch(e) {
+            document.getElementById("headline").innerHTML =
+                        "<p>Sorry, could not load image into WebGL texture.</p>";
+            return;
+        }
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+        textureLoaded = true;
+        draw();  // Draw the canvas, with the texture.  
+    };
+    img.onerror = function(e,f) { 
+        document.getElementById("headline").innerHTML =
+                        "<p>Sorry, texture image could not be loaded.</p>";
+        draw(); 
+    };
+    img.src = imageURLs[imageNum];  // Start loading of the image.
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1 );    
+    
+    a_coords_location = gl.getAttribLocation(prog, "a_coords");
+    a_coords_buffer = gl.createBuffer();
+    
+    let coords = new Float32Array( [ -1,-1, 1,-1, 1,1, -1,1 ] );
+   
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(a_coords_location, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords_location);
+    
+    u_image = gl.getUniformLocation(prog, "image");
+    u_offset = gl.getUniformLocation(prog, "offset");
+    u_multiplier = gl.getUniformLocation(prog, "multiplier");
+    
+    gl.uniform1i(u_image, 0);  // We will only use texture object zero
+    textureObject = gl.createTexture();
+}
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        let options = {  // no need for depth buffer in this program
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("image").value = "0";
+    document.getElementById("image").onchange = loadTexture;
+    document.getElementById("apply").onclick = blur;
+    loadTexture();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body style="background-color: lightGray">
+
+<h2 id="headline">Image Bluring with WebGL</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<p><label><b>Image:</b>
+    <select id="image">
+    <option value="0">House</option>
+    <option value="1">Space Station</option>
+    <option value="2">Bluejay</option>
+    <option value="3">Earth</option>
+    </select>
+</label>
+<button id="apply" style="margin-left:50px">APPLY BLUR</button> (Click repeatedly)
+</p>
+
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="512" height="256"></canvas>
+</div>
+
+</body>
+</html>

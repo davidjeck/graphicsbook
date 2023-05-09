@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Model Loader Demo</title>
+<script src="three.min.js"></script>
+<script src="GLTFLoader.js"></script>
+<script src="OBJLoader.js"></script>
+<script src="ColladaLoader.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="models/teapot-model-IFS.js"></script>
+<script>
+
+/* Uses various model loaders to load objects that have been saved
+ * in various formats.  Requires the folder named "models"
+ * that contains the sample models.  Because of web browser security
+ * policies, the models need to be loaded from a web site, not from
+ * local disk.  (This does not apply to the teapot model, which is
+ * actually part of the program, not loaded from a file.)
+ */
+
+let canvas, renderer, scene, camera; // Standard three.js requirements.
+
+let controls;  // An OrbitControls object that is used to implement
+               // rotation of the scene using the mouse. 
+
+let model = null; // The three.js object that represents the current model.
+
+
+/**
+ *  The render function draws the scene.
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+/*  This function is called by the init() method to create the world.  In this program,
+ *  it just creates a light and a camera.  The model will be added in modelLoaded,
+ *  after the model has been loaded.
+ */
+function createWorld() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(50, canvas.width/canvas.height, 0.1, 100);
+    camera.position.z = 35;
+    let light= new THREE.DirectionalLight("white",0.8); 
+    light.position.set(0,0,1);
+    camera.add(light);
+    scene.add(camera);
+    scene.add(new THREE.AmbientLight(0x404040));
+    renderer.setClearColor(0x9999DD); 
+}
+
+
+/**
+ * This function will be called when a model has been loaded. The model
+ * mode; is a Mesh object, passed as first parameter.  The function translates the
+ * object so its center is at the origin.  It wraps the object in another object
+ * that is used to scale and rotate the object.  The scale is set
+ * so that the maximum coordinate in its vertices, in absolute
+ * value, is scaled to 12.  If the second parameter is defined, it is applied
+ * to the object as a rotation; its value is an array of length 3 containing
+ * the Euler angles for the rotation.
+ */ 
+function modelLoaded(object, rotation) {
+
+    document.getElementById("status").innerHTML = "";
+    controls.reset();
+
+    /* Determine the ranges of x, y, and z in the vertices of the geometry. */
+
+    let geometry = object.geometry;
+    vertices = geometry.getAttribute("position");
+    let xmin = Infinity;
+    let xmax = -Infinity;
+    let ymin = Infinity;
+    let ymax = -Infinity;
+    let zmin = Infinity;
+    let zmax = -Infinity;
+    for (let i = 0; i < vertices.count; i++) {
+        let x = vertices.getX(i); // get vertex coords from the geometry "position" attribute.
+        let y = vertices.getY(i);
+        let z = vertices.getZ(i);
+        if (x < xmin)
+            xmin = x;
+        else if (x > xmax)
+            xmax = x;
+        if (y < ymin)
+            ymin = y;
+        else if (y > ymax)
+            ymax = y;
+        if (z < zmin)
+            zmin = z;
+        else if (z > zmax)
+            zmax = z;
+    }
+    
+    /* Remove any transformation that has been applied to the object. */
+    object.scale.set(1,1,1);
+    object.position.set(0,0,0);
+    object.rotation.set(0,0,0);
+    
+    /* translate the center of the object to the origin */
+    let centerX = (xmin+xmax)/2;
+    let centerY = (ymin+ymax)/2; 
+    let centerZ = (zmin+zmax)/2;
+    let max = Math.max(centerX - xmin, xmax - centerX);
+    max = Math.max(max, Math.max(centerY - ymin, ymax - centerY) );
+    max = Math.max(max, Math.max(centerZ - zmin, zmax - centerZ) );
+    let scale = 12/max;
+    object.position.set( -centerX, -centerY, -centerZ );
+    console.log("Model loaded, scaling object by " + scale +
+                ".  Center at ( " + centerX + ", " + centerY + ", " + centerZ + " )");
+    
+    /* Create the wrapper, model, to scale and rotate the object. */
+    
+    if (model) {  // remove previous model, if any
+        scene.remove(model);
+    }
+    
+    model = new THREE.Object3D();
+    model.add(object);
+    model.scale.set(scale,scale,scale);
+    if (typeof rotation !== "undefined") {
+        model.rotation.set(rotation[0],rotation[1],rotation[2]);
+    }
+    scene.add(model);
+    render();
+}
+
+
+/*  This function is called when the page first load and when the user
+ *  selects a new model.  It has nested functions for loading models in
+ *  GLTF, OBJ, and Collada format.
+ */
+function installModel(modelNum) {
+
+    // This function is called by the model loaders, if an error occurs.
+    function loaderError(error) {
+        document.getElementById("status").innerHTML =
+           "Could not<br>load model!<br><br>Note: if you are<br>trying to run this<br>" +
+           "<from a local disk,br>read the section on<br>running locally in<br>" +
+           "<a href='https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally'>three.js documentation!</a>";
+        if (error) {
+           console.log("Could not load model.  Loader error: ", error);
+        }
+    }
+    
+    // Load a model in GLTF format, using a THREE.GLTFLoader.  GTLF files
+    // can refer to textures and other resources that have to be loaded
+    // separately.  The LoadingManager is used to make sure that all
+    // resources are loaded before it calls modelLoaded().
+    // (Note that in fact, for the models that are used in this program,
+    // there are no external resources, and the manager is not needed.)
+    function loadGLTF(path, rotation) {
+         let object;
+         let manager = new THREE.LoadingManager(function() {
+            modelLoaded(object,rotation);
+         }, undefined, loaderError);
+         loader = new THREE.GLTFLoader(manager);
+		   loader.load( path, function ( data ) {
+             for (let child of data.scene.children) {
+                    // Search the children of data.scene to find a mesh object.
+                 object = child;
+                 if (child.isMesh) {
+                    return;
+                 }
+             }
+             loaderError("Loaded GLTF file but could not find a mesh object.");
+         });
+    }
+    
+    // Load a model in OBJ format.  An OBJ file describes a
+    // single object, so it should be save to use its first
+    // child as the model.
+    function loadOBJ(path, material, rotation) {
+         loader = new THREE.OBJLoader();
+		   loader.load( path, function ( data ) {
+             let object = data.children[0];
+             if (material) {
+                 object.material = material;
+             }
+             modelLoaded(object,rotation);
+         }, undefined, loaderError);
+    }
+    
+    // Load a model in Collada format, using a THREE.ColladaLoader.  Models
+    // can refer to textures and other resources that have to be loaded
+    // separately.  The LoadingManager is used to make sure that all
+    // resources are loaded before it calls modelLoaded().
+    function loadCollada(path, rotation) {
+        let object;
+        let manager = new THREE.LoadingManager(function() {
+            modelLoaded(object,rotation);
+        }, undefined, loaderError);
+        loader = new THREE.ColladaLoader(manager);
+        loader.load( path, function( data ) { 
+               // Note:  The object that we want might not actually
+               // be the first child of data.scene.  For the general
+               // case, you might have to search for it, or investigate
+               // the structure of the loaded scene.
+            object = data.scene.children[0];
+        });
+    }
+   
+    document.getElementById("status").innerHTML = "Loading Model";
+    switch(modelNum) {
+    case 0:  // teapot
+        // The teapot does not actually have to be loaded, since it is included as a script.
+        let teapotGeom = new THREE.BufferGeometry();
+        teapotGeom.setAttribute("position", new THREE.BufferAttribute( teapotModel.vertexPositions, 3));
+        teapotGeom.setAttribute("normal", new THREE.BufferAttribute( teapotModel.vertexNormals, 3));
+        teapotGeom.setIndex(new THREE.BufferAttribute( teapotModel.indices, 1 ));
+        let teapotMaterial = new THREE.MeshPhongMaterial( {
+                color: new THREE.Color(0.780392, 0.568627, 0.113725),  
+                specular: 0x171615,
+                shininess: 28,
+                side: THREE.DoubleSide  // required since some parts of the inside are visible
+            } );
+        modelLoaded( new THREE.Mesh( teapotGeom, teapotMaterial ), [0.25,0,0] );
+        break;
+    case 1: // horse
+         loadGLTF("models/Horse.glb", [0.2, -0.7, 0]);
+         break;
+    case 2: // stork
+         loadGLTF("models/Stork.glb", [0.25, 1, 0.2]);
+         break;
+    case 3: // tree
+         let treeMaterial = new THREE.MeshPhongMaterial({
+                  color: 0x88DD88,
+                  specular: 0x001000
+              });
+         // treeMaterial will replace the default material from the OBJLoader
+         loadOBJ("models/tree.obj",treeMaterial);
+         break;
+    case 4: // elf
+         loadCollada("models/elf/elf.dae");
+         break;
+    case 5: // WaltHead
+         let waltMaterial = new THREE.MeshLambertMaterial({
+             color: "white",
+             side: THREE.DoubleSide  // required to make the inside surface visable
+         });
+         loadOBJ("models/WaltHead.obj", waltMaterial);
+         break;
+    case 6: // Arrowhead
+         loadGLTF("models/Arrowhead.glb", [Math.PI/2, 0, 0]);
+         break;
+    } // end switch
+}
+
+
+
+/**
+ *  This function is called by the onload event so it will run after the
+ *  page has loaded.  It creates the renderer, canvas, and scene objects,
+ *  calls createWorld() to add objects to the scene, and renders the
+ *  initial view of the scene.  If an error occurs, it is reported.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("glcanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true
+        });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    renderer.setClearColor(0x555555);
+    document.getElementById("r0").checked = true;
+    document.getElementById("r0").onchange = function() { installModel(0); };
+    document.getElementById("r1").onchange = function() { installModel(1); };
+    document.getElementById("r2").onchange = function() { installModel(2); };
+    document.getElementById("r3").onchange = function() { installModel(3); };
+    document.getElementById("r4").onchange = function() { installModel(4); };
+    document.getElementById("r5").onchange = function() { installModel(5); };
+    document.getElementById("r6").onchange = function() { installModel(6); };
+    createWorld();
+    controls = new THREE.OrbitControls(camera,canvas);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.addEventListener("change", render);
+    render();  // Just gives a black backtground
+    installModel(0);
+}
+
+window.onload = init;  //Arrange for init() to be called when page has been loaded.
+
+</script>
+</head>
+<body>
+
+<h2>Three.js Model Loaders Demo</h2>
+
+<noscript>
+<p style="color: #A00; font-weight: bold">Sorry, but this page requires JavaScript!</p>
+</noscript>
+
+<p style="color:#A00; font-weight: bold" id="message"></p>
+
+<p><b>Use the mouse to rotate the model.</b></p>
+
+<div id="canvas-holder" style="float:left">
+   <canvas width=500 height=500 id="glcanvas" style="background-color:black"></canvas>
+</div>
+
+<div style="float:left; margin-left:60px">
+
+<p style="text-indent: -30px"><b>Available models:</b><br><br>
+    <label><input type="radio" name="model" id="r0">Teapot (JavaScript)</label><br>
+    <label><input type="radio" name="model" id="r1">Horse (GLTF)</label><br>
+    <label><input type="radio" name="model" id="r2">Stork (GLTF) </label><br>
+    <label><input type="radio" name="model" id="r4">Elf (Collada)</label><br>
+    <label><input type="radio" name="model" id="r3">Tree (OBJ)</label><br>
+    <label><input type="radio" name="model" id="r5">WaltHead (OBJ)</label><br>
+    <label><input type="radio" name="model" id="r6">Arrowhead (GLTF)</label>    
+</p>
+
+
+<p id="status" style="margin-top:30px; font-weight: bold"></p>
+</div>
+
+
+<div style="clear:both">
+
+
+<br>
+<h3>About the Models:</h3>
+
+<p>The Teapot is the standard <a href="https://en.wikipedia.org/wiki/Utah_teapot">Utah teapot</a>.  The next five models are<br>
+from the examples folder in the <a href="http://threejs.org">three.js</a> download.  The arrowhead was<br>
+created using Blender and is original.</p>
+
+<p>The Teapot is defined by a JavaScript file that is loaded into the<br>
+program along with the other scripts.  It simply defines an object that<br>
+includes all the data necessary to define the teapot model.</p>
+
+<p>The Horse, Stork, and Tree examples are small models, containing a<br>
+fairly small number of polygons.  The Horse and Stork come along with<br>
+colors, so that different parts of the object can have different colors.<br>
+The Elf and WaltHead examples are large, high-quality models.  The Elf<br>
+comes with texture images that are mapped onto the basic model.  For the<br>
+Elf, 2.6 megabytes of data have to be loaded, and 1.1 megabytes for WaltHead.<br>
+The Arrowhead is a fairly small model, with 768 faces in 22 kilobytes.
+</p>
+
+<p>Except for Teapot, objects are loaded using <i>three.js</i> loaders, which are<br>
+provided along with the examples in the <i>three.js</i> download.  Note that<br>
+because of security restrictions in web browsers, the loaders will probably<br>
+fail if this page comes from your local disk instead of from a web server.<br>
+See the documentation about
+<a href="https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally">running three.js examples locally</a>.<br>
+(But note that the problem only applyes to some <i>three.js</i> programs.)
+</p>
+
+</div>
+
+
+
+</body>
+</html>

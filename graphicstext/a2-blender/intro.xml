@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>Blender is a free and open-source graphics program with a large
+community of users.  It can be used to create and animate 3D 
+scenes interactively.  It is a very complex and sophisticated program,
+with advanced modeling and rendering tools, that can be used to
+produce professional graphics and animation. This appendix looks
+at just a small subset of its features.</p1>
+
+<p>Blender can be downloaded from <a href="https://www.blender.org">blender.org</a>.
+The site includes a great deal of information about what it can do
+(<a href="https://www.blender.org/features/">blender.org/features</a>)
+and how to use it (<a href="https://www.blender.org/support/">blender.org/support</a>).</p>
+
+<p>I have included some work with Blender as part of my computer graphics courses since 2001,
+as a supplement to the graphics programming that is the main topic of the course.
+While we use only a small part of Blender's capabilities, I believe that it is useful
+for students to have some experience with interactive 3D modeling.  It helps them develop their
+ability to visualize in three dimensions, and it lets them see
+the role that fundamental concepts such as transformations, lighting and material,
+and textures play in real applications.
+Most people are intimidated, at first, by Blender's complex interface, but it's
+actually not difficult to learn how to use it for some basic tasks that are
+relevant to this textbook. Many of my students have enjoyed using it and have gone on to learn 
+enough about it to use it in a final project.
+</p>
+
+<p>Blender went through some significant changes between versions 2.79 and 2.8.
+This appendix is based on Blender&nbsp;2.93, which is the current version as of
+July, 2021.  However, most of the appendix should apply to any version between 
+2.8 and 2.93.</p>
+
+</intro>

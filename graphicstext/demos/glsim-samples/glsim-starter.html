@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+   A framework for writing simple 3D applications with glsim, with
+   support for animation and for mouse and keyboard events.  Note
+   that you have to uncomment some lines in init() and initGL() to
+   enable support for various features.  Look for lines labeled "TODO".
+   
+   To implement OpenGL 1.1 functions, this page uses glsim.js, which
+   simulates a subset of the OpenGL 1.1 API in JavaScript by translating
+   the OpenGL functions into WebGL.  In particular WebGL support is
+   requried.  The purpose of glsim.js is to make it possible to try
+   out some basic OpenGL 1.1 commands.  It does not attempt to be efficient,
+   and it covers only a limited subset of OpenGL 1.1.  The subset is
+   approximately the one covered in Chapters 2 and 3 of the on-line
+   computer graphics textbook at http://math.hws.edu/graphicsbook
+-->
+
+<head>
+<meta charset="UTF-8">
+<title>OpenGL Program using glsim.js</title>
+
+<script src="glsim.js"></script>  <!-- load the OpenGL 1.1 simulation code -->
+
+<script>
+
+    "use strict";
+
+    // -------------------------- rendering code ----------------------------------
+
+    let frameNumber = 0;     // For use only in an animation.
+
+    /**
+     *  Called when the display needs be redrawn.  Usually, it will completely
+     *  redraw the image.  Note that the projection could be set up in initGL()
+     *  if it is not going to change.
+     */
+    function display() {
+
+        glClearColor(0,0,0,1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  // For 2D, usually leave out the depth buffer.
+        
+        glMatrixMode(GL_PROJECTION);   // Set up a simple orthographic projection, ignoring aspect ratio.
+        glLoadIdentity();              //    TODO:  should almost certainly use a different projection!
+        glOrtho(-1, 1, -1, 1, -2, 2);
+        glMatrixMode(GL_MODELVIEW);
+        
+        glLoadIdentity();             // Start with no modeling transform. 
+            
+        // TODO: INSERT DRAWING CODE HERE!!
+       
+    }
+    
+    // --------------- support for key events ----------------------------------------
+    
+    /**
+     * Set up in init() to be called when the user presses a key on the keyboard.
+     * The value of keyCode will be a number that identifies the key that was pressed.
+     * Notable values include 38, 39, 40, and 41 for the left, up, right, and down
+     * arrow keys.  Keys that represent a character such as 'a' or space generally have
+     * the ASCII code of the character as their keyCode (32 for space, 13 for enter/return,
+     * 96 for 'a', 97 for 'b', and so on).
+     */
+    function doKeyDown(evt) {
+        let keyCode = evt.keyCode;  // code for the key that was pressed
+
+        // TODO:  Add code to respond to the key press.
+        
+        if (keyCode >=34 && keyCode <= 40) {
+            evt.preventDefault(); // Stop page from scrolling for arrow keys, home, end, pageup, pagedown.
+        }
+        display();  // Redraw the picture to account for changes.
+    }
+    
+    
+    // --------------- support for mouse events --------------------------------------
+    
+    /**
+     * This function is called in init() to set up mouse event handling
+     * on the canvas.  You can modify the nested functions doMouseDown,
+     * doMouseDrag, and possibly doMouseUp to change the reponse to
+     * mouse events.  See the lines labeled "TODO".
+     */
+    function installMouseHandler(canvasID) {
+    
+        const canvas = document.getElementById(canvasID);
+
+        let dragging = false;  // set to true when a drag action is in progress.
+        let startX, startY;    // coordinates of mouse at start of drag.
+        let prevX, prevY;      // previous mouse position during a drag.
+        
+        function doMouseDown(evt) {
+                // This function is called when the user presses a button on the mouse.
+                // Only the main mouse button will start a drag.
+            if (dragging) {
+                return;  // if a drag is in progress, don't start another.
+            }
+            if (evt.button != 0) {
+                return;  // don't respond unless the button is the main (left) mouse button.
+            }
+            let r = canvas.getBoundingClientRect();
+            let x = Math.round(evt.clientX - r.left);  // translate mouse position from screen coords to canvas coords.
+            let y = Math.round(evt.clientY - r.top);   // round to integer values; some browsers would give non-integers.
+            dragging = true;  // (TODO: This might not be the case for all mousedowns in all programs.)
+            if (dragging) {
+                startX = prevX = x;
+                startY = prevY = y;
+                document.addEventListener("mousemove", doMouseMove, false);
+                document.addEventListener("mouseup", doMouseUp, false);
+            }
+        }
+        
+        function doMouseMove(evt) {
+                // This function is called when the user moves the mouse during a drag.
+            if (!dragging) {
+                return;  // (shouldn't be possible)
+            }
+            let r = canvas.getBoundingClientRect();
+            let x = Math.round(evt.clientX - r.left);  //mouse position, in canvas coords, with (0,0) at upper left.
+            let y = Math.round(evt.clientY - r.top);
+ 
+            // TODO:  ADD CODE TO REPSOND TO THE MOUSE BEING DRAGGED.
+             
+            prevX = x;  // update prevX,prevY to prepare for next call to doMouseMove
+            prevY = y;
+            display();   // Redraw the image, to reflect the changes.
+        }
+        
+        function doMouseUp(evt) {
+                // This function is called when the user releases a mouse button during a drag.
+            if (!dragging) {
+                return;  // (shouldn't be possible)
+            }
+            dragging = false;
+            document.removeEventListener("mousemove", doMouseMove, false);
+            document.removeEventListener("mouseup", doMouseMove, false);
+            // TODO:  Possibly, respond to mouse up and call repaint().
+         }
+         
+         canvas.addEventListener("mousedown", doMouseDown, false);
+
+    } // end installMouseHandler    
+    
+    // --------------- support for animation ------------------------------------------
+
+    /* You can call startAnimation() to run an animation.  A frame will be drawn every
+     * 30 milliseconds (can be changed in the call to glutTimerFunc.  The global frameNumber
+     * variable will be incremented for each frame.  Call pauseAnimation() to stop animating.
+     */
+    
+    let animating = false;      // indicates whether an animation is in progress;
+                                // do not change directly; call startAnimation() and pauseAnimation()
+    
+    function updateFrame() {
+            // this is called before each frame of the animation.
+       // TODO: INSERT CODE TO UPDATE ANY OTHER DATA USED IN DRAWING A FRAME
+       frameNumber++;
+    }
+    
+    function timerFunction() {
+            // Used for animation; do not call this directly.
+        if (animating) {
+            updateFrame();
+            display();
+            setTimeout(timerFunction, 30);
+        }
+    }
+    
+    function startAnimation() {
+            // call this to start or restart the animation.
+       if ( ! animating ) {
+           animating = true;
+           setTimeout(timerFunction, 30);
+       }
+    }
+    
+    function pauseAnimation() {
+             // call this to pause the animation.
+        animating = 0;
+    }
+    // ------------------------- initialization functions -----------------------------------
+    
+    /**
+     *  initGL() is called just once, by main(), to do initialization of OpenGL state
+     *  and other global state.
+     */
+    function initGL() {
+        glClearColor(0.0, 0.0, 0.0, 1.0); // background color
+    
+        glEnable(GL_DEPTH_TEST);  // Required for 3D drawing, not usually for 2D.
+        
+        // TODO: Uncomment the following 4 lines to do some typical initialization for 
+        // lighting and materials.
+    
+        //glEnable(GL_LIGHTING);        // Enable lighting.
+        //glEnable(GL_LIGHT0);          // Turn on a light.  By default, shines from direction of viewer.
+        //glEnable(GL_NORMALIZE);       // OpenGL will make all normal vectors into unit normals
+        //glEnable(GL_COLOR_MATERIAL);  // Material ambient and diffuse colors can be set by glColor*
+    }
+    
+    function init() {  // Called by <body onload="init()">, when the page has loaded.
+        try {
+            glsimUse("glcanvas"); // OpenGL will draw to the canvas with id="glcanvas".
+                                        // TODO:  If you need to keep the image between calls
+                                        // to display(), use  { preserveDrawingBuffer: true }
+                                        // as the second parameter to this function.
+        }
+        catch (e) {
+            document.getElementById("canvas-holder").innerHTML =
+                "Sorry, an error occured:<br>" + e;
+            return;
+        }
+        initGL();
+        display();  // Call display() when the page is first loaded.
+        
+        /* Uncomment the following line to enable keyboard events. */
+        //document.addEventListener("keydown", doKeyDown, false);
+        
+        /* Uncomment the following line to add mouse handling. */
+        //installMouseHandler("glcanvas");
+        
+        /* Uncomment the following line to start an animation running. */
+        //startAnimation();
+    }
+
+    window.onload = init;
+</script>
+
+</head>
+
+<body>
+
+<h3>A Simulated OpenGL Program</h3>
+
+<noscript>
+<p><b>Sorry, this page requires JavaScript!</b></p>
+</noscript>
+
+<!-- TODO: HTML controls such as buttons and popup menus can be added to the page. -->
+
+<div id="canvas-holder">
+   <!-- TODO: You can set the size of the drawing area in the next line -->
+   <canvas id="glcanvas" width="500" height="500"></canvas>
+</div>
+
+</body>
+</html>

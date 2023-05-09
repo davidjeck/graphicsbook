@@ -1,0 +1,729 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="GLSL" id="webgl.3">
+
+<p1>You have seen a few short, simple examples of <word>shader</word> programs
+written in <word>GLSL</word>.  In fact, shader programs are often fairly short,
+but they are not always so simple.  To understand the more complex shaders
+that we will be using in the rest of this book, you will need to know more
+about GLSL.  This section aims to give a short
+introduction to the major features of the language.  This is a rather
+technical section.  You should read it to get some familiarity with GLSL,
+and then use it as a reference when needed.</p1>
+
+<p>For WebGL 1.0, shaders must be written in version 1.00 of GLSL&nbsp;ES.  WebGL&nbsp;2.0 can
+use either version 1.00 or version 3.00, but some features of WebGL&nbsp;2.0 are only
+available when shaders are written in GLSL ES&nbsp;3.00.  Although the two versions
+of GLSL are very similar, there are major differences and incompatibilities.
+Unless otherwise noted, the discussion here applies to both versions.
+</p>
+
+<p>The vertex shader and the fragment shader in a shader program must be written using the
+same version of GLSL.  A GLSL ES 3.00 shader program must begin with the line</p>
+
+<pre>#version 300 es</pre>
+
+<np>This must be the very first line of the shader source code.  It cannot even be preceded
+by blank lines or comments.  A shader program that does not start with this line
+is a version 1.00 shader.  A version 1.00 shader does not include a declaration of
+the version number.</np>
+
+<subsection title="Basic Types" id="webgl.3.1">
+
+<p>Variables in GLSL must be declared before they are used.  GLSL is a strictly
+typed language, and every variable is given a type when it is declared.</p>
+
+<p>GLSL has built-in types to represent scalars (that is, single values), vectors, and
+matrices.  The scalar types are <ptype>float</ptype>, <ptype>int</ptype>, and <ptype>bool</ptype>.
+Version 3.00 adds an unsigned integer type, <ptype>uint</ptype>.
+A <word>GPU</word> might not support integers or booleans on the hardware level, so
+it is possible that the <ptype>int</ptype> and <ptype>bool</ptype> types are actually
+represented as floating point values.</p>
+
+<p>The types <i>vec2</i>, <i>vec3</i>, and <i>vec4</i> represent vectors of two,
+three, and four <ptype>floats</ptype>.  There are also types to represent vectors
+of <ptype>ints</ptype> (<i>ivec2</i>, <i>ivec3</i>, and <i>ivec4</i>) and
+<ptype>bools</ptype> (<i>bvec2</i>, <i>bvec3</i>, and <i>bvec4</i>) &mdash;
+and, in version 3.00, of unsigned integers (<i>uvec2</i>, <i>uvec3</i>, and <i>uvec4</i>).
+GLSL has very flexible notation for referring to the components of a vector.
+One way to access them is with array notation.  For example, if <i>v</i> is a four-component
+vector, then its components can be accessed as <i>v</i>[0], <i>v</i>[1], <i>v</i>[2], and
+<i>v</i>[3].  But they can also be accessed using the dot notation as
+<i>v.x</i>, <i>v.y</i>, <i>v.z</i>, and<i>v.w</i>.  The component names <i>x</i>,
+<i>y</i>, <i>z</i>, and <i>w</i> are appropriate for a vector that holds coordinates.
+However, vectors can also be used to represent colors, and the components of <i>v</i>
+can alternatively be referred to as <i>v.r</i>, <i>v.g</i>, <i>v.b</i>, and <i>v.a</i>.
+Finally, they can be referred to as <i>v.s</i>, <i>v.t</i>, <i>v.p</i>, and <i>v.q</i> &mdash;
+names appropriate for texture coordinates.</p>
+
+<p>Furthermore, GLSL allows you to use multiple component names after the dot, as in
+<i>v.rgb</i> or <i>v.zx</i> or even <i>v.yyy</i>.  The names can be in any order, and 
+repetition is allowed.  This is called <newword term="swizzler">swizzling</newword>,
+and <i>v.zx</i> is an example of a swizzler.  The notation <i>v.zx</i> can be used in 
+an expression as a two-component vector.  For example, if <i>v</i> is
+<i>vec4</i>(1.0,2.0,3.0,4.0), then <i>v.zx</i> is equivalent to <i>vec2</i>(3.0,1.0),
+and <i>v.yyy</i> is like <i>vec3</i>(2.0,2.0,2.0).  Swizzlers can even be used on
+the left-hand side of an assignment, as long as they don't contain repeated components.
+For example,</p>
+
+<pre>vec4 coords = vec4(1.0, 2.0, 3.0, 4.0);
+vec3 point = vec3(5.0, 6.0, 7.0);
+coords.yzw = coords.wyz;  // Now, coords is (1.0, 4.0, 2.0, 3.0)
+point.xy = coords.xx;     // Now, point is (1.0, 1.0, 7.0)</pre>
+
+<p>A notation such as <i>vec2</i>(1.0,&nbsp;2.0) is referred to as a "constructor," although
+it is not a constructor in the sense of Java or C++, since GLSL is not object-oriented,
+and there is no <i>new</i> operator.  A constructor in GLSL consists of a type name
+followed by a list of expressions in parentheses, and it represents a value of the type
+specified by the type name.  Any type name can be used, including the scalar types.
+The value is constructed from the values of the expressions in parentheses.  An expression
+can contribute more than one value to the constructed value;  we have already seen this
+in examples such as</p>
+
+<pre>vec2 v = vec2( 1.0, 2.0 );
+vec4 w = vec4( v, v );  // w is ( 1.0, 2.0, 1.0, 2.0 )</pre>
+
+<np>Note that the expressions can be swizzlers:</np>
+
+<pre>vec3 v = vec3( 1.0, 2.0, 3.0 );
+vec3 w = vec3( v.zx, 4.0 );  // w is ( 3.0, 1.0, 4.0 )</pre>
+
+<p>Extra values from the last parameter will be dropped.  This makes is possible to
+use a constructor to shorten a vector.  However, it is not legal to have extra 
+parameters that contribute no values at all to the result:</p>
+
+<pre>vec4 rgba = vec4( 0.1, 0.2, 0.3, 0.4 );
+vec3 rgb = vec3( rgba );  // takes 3 items from rgba; rgb is (0.1, 0.2, 0.3)
+float r = float( rgba );  // r is 0.1
+vec2 v = vec2( rgb, rgba );    // ERROR: No values from rgba are used.</pre>
+
+<p>As a special case, when a vector is constructed from a single scalar value,
+all components of the vector will be set equal to that value:</p>
+
+<pre>vec4 black = vec4( 1.0 );  // black is ( 1.0, 1.0, 1.0, 1.0 )</pre>
+
+<p>When constructing one of the built-in types, type conversion will be applied
+if necessary.  For purposes of conversion, the boolean values <i>true/false</i> convert
+to the numeric values zero and one; in the other direction, zero converts to <i>false</i>
+and any other numeric value converts to <i>true</i>.  As far as I know, constructors
+are the <b>only</b> context in which GLSL does automatic type conversion.
+For example, you need to use a constructor to assign an <ptype>int</ptype> value
+to a <ptype>float</ptype> variable, and it is illegal to add an <ptype>int</ptype>
+to a <ptype>float</ptype>:</p>
+
+<pre>int k = 1;
+float x = float(k);  // OK; "x = k" would be a type mismatch error
+x = x + 1.0;         // OK
+x = x + 1;           // ERROR: Can't add values of different types.</pre>
+
+<break/>
+
+<p>The built-in matrix types are <i>mat2</i>, <i>mat3</i>, and <i>mat4</i>.
+They represent, respectively, two-by-two, three-by-three, and four-by-four matrices 
+of floating point numbers.  (There are no matrices of integers or booleans, but there
+are some additional matrix types for representing non-square matrices.)
+The elements of a matrix can be 
+accessed using array notation, such as <i>M</i>[2][1]. If a single index is used, as
+in <i>M</i>[2], the result is a vector.  For example, if <i>M</i> is of type
+<i>mat4</i>, then <i>M</i>[2] is a <i>vec4</i>.  Arrays in GLSL, as in OpenGL,
+use <newword>column-major order</newword>.  This means that <i>M</i>[2] is column
+number 2 in <i>M</i> rather than row number 2 (as it would be in Java), and <i>M</i>[2][1] is
+the element in column 2 and row&nbsp;1.</p>
+
+<p>A matrix can be constructed from the appropriate number of values, which can
+be provided as scalars, vectors or matrices.  For example, a <i>mat3</i> can be
+constructed from nine <ptype>float</ptype> or from three <i>vec3</i> parameters:</p>
+
+<pre>mat3 m1 = mat3( 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0 );
+vec3 v = vec3( 1, 2, 3 );
+mat3 m2 = mat3( v, v, v );</pre>
+
+<np>Keep in mind that the matrix is filled in column-major order; that is, the
+first three numbers go into column&nbsp;0, the next three into column&nbsp;1, and the
+last three into column&nbsp;2.</np>
+
+<p>As a special case, if a matrix <i>M</i> is constructed from a single scalar value, then
+that value is put into all the diagonal elements of <i>M</i> (<i>M</i>[0][0],
+<i>M</i>[1][1], and so on).  The non-diagonal elements are all set equal to zero. 
+For example, <i>mat4</i>(1.0) constructs the four-by-four <word>identity matrix</word>.</p>
+
+<p>The only other built-in types are the so-called "sampler types", which
+are used for accessing <word term="texture">textures</word>. The sampler types can be used only in limited ways.
+They are not numeric types and cannot be converted to or from numeric types.  The will
+be covered in the <localref href="webgl.4">next section</localref>.</p>
+
+
+</subsection>
+
+
+
+<subsection title="Data Structures" id="webgl.3.2">
+
+<p>A GLSL program can define new types using the <i>struct</i> keyword.  The syntax is the
+same as in C, with some limitations.  A struct is made up of a sequence
+of named members, which can be of different types.  The type of a member can be
+any of the built-in types, an array type, or a previously defined struct type.  For example,</p>
+
+<pre>struct LightProperties {
+    vec4 position;
+    vec3 color;
+    float intensity;
+};</pre>
+
+<np>This defines a type named <i>LightProperties</i>.  The type can be used to declare variables:</np>
+
+<pre>LightProperties light;</pre>
+
+<np>The members of the variable <i>light</i> are then referred to as <i>light.position</i>,
+<i>light.color</i>, and <i>light.intensity</i>.  Struct types have constructors, but their
+constructors do not support type conversion:  The constructor must contain a list of
+values whose types exactly match the types of the corresponding members in the struct.
+For example,</np>
+
+<pre>light = LightProperties( vec4(0.0, 0.0, 0.0, 1.0), vec3(1.0), 1.0 );</pre>
+
+<p>GLSL also supports arrays.  Only one-dimensional arrays are allowed.  The base type
+of an array can be any of the basic types or it can be a struct type.  The size of
+the array must be specified in the variable declaration as an integer constant.  For 
+example</p>
+
+<pre>int A[10];
+vec3 palette[8];
+LightProperties lights[3];</pre>
+
+<np>In version 1.00, there are no array constructors, and it is not possible to initialize an array as
+part of its declaration.  Version 3.00 does have array constructors, and it allows type names
+such as "<code>int[10]</code>, representing an array of 10 integers:</np>
+
+<pre>int[4] B; // B is an array of 4 ints; GLSL ES 3.00 only!
+B = int[4] (2, 3, 5, 7);  // Array constructor; GLSL ES 3.00 only!</pre>
+
+
+<p>Array indexing uses the usual syntax, such as <i>A</i>[0]
+or <i>palette</i>[<i>i</i>+1] or <i>lights</i>[3].<i>color</i>.
+In GLSL ES 1.00, there are some strong limitations on the expressions that can be used as array 
+indices.  With one exception, an expression that is used as the index for an array
+can contain only integer constants and <i>for</i> loop variables (that is, variables
+that are used as loop control variables in <i>for</i> loops).  For example,
+the expression <i>palette</i>[<i>i</i>+1] would only be legal inside a <i>for</i> of the form
+<i>for&nbsp;(int&nbsp;i&nbsp;=&nbsp;&dots;</i>.  The single exception is that
+arbitrary index expressions can be used for arrays of <i>uniforms</i> in a
+vertex shader (and then only if the array does not contain samplers).
+Note that these restrictions do not apply in GLSL&nbsp;ES&nbsp;3.00.
+</p>
+
+<p>Just as in C, there is no check for array index out of bounds errors.  It is up to
+the programmer to make sure that array indices are valid.</p>
+
+</subsection>
+
+
+
+<subsection title="Qualifiers" id="webgl.3.3">
+
+<p>Variable declarations can be modified by various qualifiers.  You have seen
+examples of the qualifiers <i>attribute</i>, <i>uniform</i>, and <i>varying</i>.
+These are called <newword term="storage qualifier">storage qualifiers</newword>.
+The qualifiers <i>attribute</i> and <i>varying</i> do not exist in version 3.00;
+instead, an attribute is declared in the vertex shader using the storage qualifier <i>in</i>,
+and a varying variable is declared using <i>out</i> in the vertex shader and
+<i>in</i> in the fragment shader.  The <i>uniform</i> qualifier is used in both
+versions.  Only global variables, not local variables in function definition,
+can be attribute, uniform, or varying variables.</p>
+
+<p>The <i>attribute</i> qualifier can only be used in a GLSL ES 1.00
+vertex shader, and it only applies to the built-in floating point types
+<ptype>float</ptype>, <i>vec2</i>, <i>vec3</i>, <i>vec4</i>, 
+<i>mat2</i>, <i>mat3</i>, and <i>mat4</i>.  (Matrix attributes are not supported directly
+on the JavaScript side.  A matrix attribute has to be treated as a set of vector attributes,
+one for each column.  The attribute locations for the columns are successive integers,
+and the WebGL function <i>gl.getAttribLocation</i> will return the location for the first column.
+Matrix attributes would be rare, though perhaps useful for <word>instanced drawing</word>,
+and I won't go into further detail about them here.)</p>
+
+<p>In GLSL ES 3.00, the <i>in</i> qualifier on a vertex shader variable defines it to be an attribute variable, 
+and it can be applied to integer and unsigned integer scalars and vectors, as
+well as to the floating point types.</p>
+
+<p>Also in GLSL ES 3.00, the <i>out</i> qualifier can be used on integer and floating point
+scalars and vectors in the fragment shader.  In version 1.00, a fragment shader has the
+predefined variable <i>gl_FragColor</i> of type <ptype>vec4</ptype> to specify the color of the pixel.
+In version 3.00, a fragment shader can have multiple outputs, and the outputs
+are not necessarily colors.  Because the output type does not have to be <ptype>vec4</ptype>,
+it is not possible to have a predefined output variable.  For now, we will only use one
+fragment shader output representing a color.  So, a version 3.00 fragment shader will
+have one <i>out</i> variable of type <ptype>vec4</ptype>.  (When we discuss
+<word term="framebuffer">framebuffers</word> in <localref href="webgl3d.4"/>, we will see
+how multiple outputs can be used.)</p>
+
+<p>Both the vertex shader and the fragment shader can use <i>uniform</i> variables.
+The same variable can occur in both shaders, as long as the types in the two shaders are
+the same.  Uniform variables can be of any type, including array and
+structure types. Now,
+JavaScript only has functions for setting uniform values that are scalar variables,
+vectors, or matrices.  There are no functions for setting the values of structs or
+arrays.  The solution to this problem requires treating every component of a
+struct or array as a separate uniform value.  For example, consider the declarations</p>
+
+<pre>struct LightProperties {
+    vec4 position;
+    vec3 color;
+    float intensity;
+};
+uniform LightProperties light[4];</pre>
+
+<np>The variable <i>light</i> contains twelve basic values, which are of type <i>vec4</i>, <i>vec3</i>,
+or <i>float</i>.  To work with the <i>light</i> uniform in JavaScript, we need twelve variables
+to represent the locations of the 12 components of the
+uniform variable.   When using <i>gl.getUniformLocation</i> to get the location of
+one of the 12 components, you need to give the full name of the component in the GLSL
+program.  For example: <i>gl.getUniformLocation</i>(<i>prog</i>, "<i>light[2].color</i>").
+It is natural to store the 12 locations in an array of JavaScript objects that
+parallels the structure of the array of structs on the GLSL side.  Here is
+typical JavaScript code to create the structure and use it to initialize the
+uniform variables:</np>
+
+<pre>lightLocations = new Array(4);
+for (i = 0; i &lt; light.length; i++) {
+    lightLocations[i] = {
+        position: gl.getUniformLocation(prog, "light[" + i + "].position" );
+        color: gl.getUniformLocation(prog, "light[" + i + "].color" );
+        intensity: gl.getUniformLocation(prog, "light[" + i + "].intensity" );
+    };
+}
+
+for (i = 0; i &lt; light.length; i++) {
+    gl.uniform4f( lightLocations[i].position, 0, 0, 0, 1 );
+    gl.uniform3f( lightLocations[i].color, 1, 1, 1 );
+    gl.uniform1f( lightLocations[i].intensity, 0 );    
+}</pre>
+
+<p>For uniform shader variables that are matrices, 
+the JavaScript function that is used to set the value of the uniform
+is <i>gl.uniformMatrix2fv</i> for a <i>mat2</i>,
+<i>gl.uniformMatrix3fv</i> for a <i>mat3</i>, or <i>gl.uniformMatrix4fv</i> for a <i>mat4</i>.
+Even though the matrix is two-dimensional, the values are stored in a one dimensional array.
+The values are loaded into the array in column-major order.  For example, if
+<i>transform</i> is a uniform <i>mat3</i> in the shader, then JavaScript can set
+its value to be the identity matrix with</p>
+
+<pre>transformLoc = gl.getUniformLocation(prog, "transform");
+gl.uniformMatrix3fv( transformLoc, false, [ 1,0,0, 0,1,0, 0,0,1 ] );</pre>
+
+<np>In Version 1.00, the second parameter <b>must</b> be <i>false</i>.  In Version 3.00,
+the second parameter can be <i>true</i> to indicate that the entries of the matrix are
+provided in row-major rather than column-major order.
+Note that the 3 in <i>uniformMatrix3fv</i> refers to the number of rows and columns in
+the matrix, not to the length of the array, which must be&nbsp;9.  (By the way, it is OK
+to use a typed array rather than a normal JavaScript array for the value of a uniform.)</np>
+
+<p>A varying variable should be declared with the same name and type in both the
+vertex shader and fragment shader.  In version 1.00, the storage qualifier for
+declaring varying variables is <i>varying</i>, and it can only be used
+for for the built-in floating
+point types (<i><ptype>float</ptype>, <i>vec2</i>, <i>vec3</i>, <i>vec4</i>, 
+<i>mat2</i>, <i>mat3</i>, and <i>mat4</i></i>) and for arrays of those types.</p>
+
+<p>In version 3.00, a varying variable can also be an integer or unsigned integer 
+scalar or vector.  But there is a complication because it doesn't make
+sense to apply interpolation to integer values.  So, a varying variable of integer
+type must be declared with the additional qualifier <i>flat</i>, which means it
+will not be interpolated.  Instead, the value from the first vertex of a triangle or line segment
+will be used for every pixel.  (Floating point varying variables can
+also, optionally, be declared as <i>flat</i>.)  For example:</p>
+
+<pre>flat in ivec3 A;  // GLSL ES 3.00 fragment shader only!</pre>
+
+
+<p>Another possible storage qualifier is <i>const</i>, which means that the value
+of the variable cannot be changed after it has been initialized.  The declaration
+of a <i>const</i> variable must include initialization.</p>
+
+ 
+<break/>
+
+<p>A variable declaration can also be modified by <newword term="precision qualifier">precision qualifiers</newword>.
+The possible precision qualifiers are <i>highp</i>, <i>mediump</i>, and <i>lowp</i>.
+A precision qualifier sets the minimum range of possible values for an integer variable or the
+minimum range of values and number of decimal places for a floating point variable. 
+GLSL doesn't assign a definite meaning to the precision qualifiers, but mandates some
+minimum requirements.  For example, in version 1.00, <i>lowp</i> integers must be able to represent values
+in at least the range &minus;2<sup>8</sup> to 2<sup>8</sup>; <i>mediump</i> integers, in the
+range &minus;2<sup>10</sup> to 2<sup>10</sup>; and <i>highp</i> integers, in the range
+&minus;2<sup>16</sup> to 2<sup>16</sup>.  For version 3.00, <i>highp</i> variables always
+use 32 bits, and the requirements for <i>mediump</i> and <i>lowp</i> are higher.
+It is even possible that all values are 32-bit values and the precision qualifiers have
+no real effect.  But GPUs in embedded systems can be more limited.</p>
+
+<p>A precision qualifier can be used on any variable declaration, including local variables and function parameters.
+If the variable also has
+a storage qualifier, the storage qualifier comes first.  For example</p>
+
+<pre>lowp int n;
+varying highp float v;
+uniform mediump vec3 colors[3];</pre>
+
+<np>A varying variable can have different precisions in the vertex and in the fragment shader.
+The default precision for integers and floats in the vertex shader is <i>highp</i>.
+Fragment shaders are not required to support <i>highp</i>, although it is likely that
+they do so, except perhaps on older mobile hardware.  In the fragment shader,
+the default precision for integers is <i>mediump</i>, but floats do not have a default
+precision.   This means that every floating point variable in the fragment shader has
+to be explicitly assigned a precision.  Alternatively, it is possible to set a default 
+precision for floats with the statement</np>
+
+<pre>precision mediump float;</pre>
+
+<np>This statement was used at the start of each of the fragment shaders
+in the <localref href="webgl.2">previous section</localref>.  Of course, if the
+fragment shader does support <i>highp</i>, this restricts the precision unnecessarily.
+You can avoid that by using this code at the start of the fragment shader:</np>
+
+<pre>#ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+#else
+    precision mediump float;
+#endif</pre>
+
+<np>This sets the default precision to <i>highp</i> if it is available and
+to <i>mediump</i> if not.  The lines starting with "#" are preprocessor directives&mdash;an aspect
+of GLSL that I don't want to get into.</np>
+
+<break/>
+
+<p>The next qualifier, <newword term="invariant qualifier">invariant</newword>, 
+is even more difficult to explain, and it has only a limited use.  Invariance
+refers to the requirement that when the same expression is used to compute the value of
+the same variable (possibly in different shaders), then the value that is assigned to 
+the variable should be exactly the same in both cases.  This
+is not automatically the case.  For example, the values
+can be different if a compiler uses different optimizations or evaluates the operands
+in a different order in the two expressions.  The <i>invariant</i> qualifier on the
+variable will force the compiler to use exactly the same calculations for the two
+assignment statements.  The qualifier can only be used on declarations of varying variables.
+It must be the first qualifier in the declaration.  For example,
+</p>
+
+<pre>invariant varying mediump vec3 color;</pre>
+
+<np>It can also be used to make the predefined variables such as <i>gl_Position</i> and
+<i>gl_FragCoord</i> invariant, using a statement such as</np>
+
+<pre>invariant gl_Position;</pre>
+
+<p>Invariance can be important in a <newword>multi-pass algorithm</newword> that applies
+two or more shader programs in succession to compute an image.  It is important, for
+example, that both shaders get the same answer when they compute <i>gl_Position</i>
+for the same vertex, using the same expression in both vertex shaders.  Making <i>gl_Position</i> 
+invariant in the shaders will ensure that.</p>
+
+<break/>
+
+<p>The last type of qualifier, a "layout" qualifier, is only available in version 3.00.
+It can be used to specify the integer ID of an attribute variable, as an alternative to
+using the JavaScript function <i>gl.getAttribLocation</i>() to query the ID.  An example
+would be</p>
+
+<pre>layout(location = 0) in vec3 a_coords; // GLSL ES 3.00 vertex shader only!</pre>
+
+
+<np>The same kind of layout qualifier can be used on an <i>out</i> variable in a GLSL ES 3.00
+fragment shader that has multiple outputs.  In that case, it specifies which of several
+output destinations should be used for that variable.</np>
+
+</subsection>
+
+
+
+<subsection title="Expressions" id="webgl.3.4">
+
+<p>Expressions in GLSL can use the arithmetic operators <code>+</code>, <code>&minus;</code>, <code>*</code>, 
+<code>/</code>, <code>++</code> and&nbsp;<code>&minus;&minus;</code> for integer and floating
+point values.  In version 3.00, the remainder operator, <code>%</code>, as well as left and right
+shift and bitwise logical operators, are also available for integer types.
+There is no automatic type conversion in expressions.  If <i>x</i>
+is of type <ptype>float</ptype>, the expression <i>x</i><code>+</code>1 is illegal.
+You have to say <i>x</i><code>+</code>1.0 or <i>x</i><code>+</code><i>float</i>(1).</p>
+
+<p>The arithmetic operators have been extended in various ways to work with vectors and matrices.
+If you use <code>*</code> to multiply a matrix and a vector, in either order, it multiplies
+them in the linear algebra sense, giving a vector as the result.
+The types of the operands must match in the obvious way; for example,
+a <i>vec3</i> can only be multiplied by a <i>mat3</i>, and the result is a <i>vec3</i>.
+When used with two matrices of the same size, <code>*</code> does matrix multiplication.</p>
+
+<p>If <code>+</code>, <code>&minus;</code>, <code>*</code>, or <code>/</code> is used on a
+vector and a scalar of the same basic type, then the operation is performed on each element
+of the vector.  For example, <i>vec2</i>(3.0,3.0)&nbsp;<code>/</code>&nbsp;2.0 is the
+vector <i>vec2</i>(1.5,1.5), and 2<code>*</code>ivec3(1,2,3) is the vector <i>ivec3</i>(2,4,6).
+When one of these operators is applied to two vectors of the
+same type, the operation is applied to each pair of components, and the result is 
+a vector.  For example, the value of</p>
+
+<pre>vec3( 1.0, 2.0, 3.0 ) + vec3( 4.2, -7.0, 1.7 )</pre>
+
+<np>is the vector <i>vec3</i>(5.2,-5.0,4.7).  Note in particular that the usual vector
+arithmetic operations&mdash;addition and subtraction of vectors, multiplication of a vector
+by a scalar, and multiplication of a vector by a matrix&mdash;are written in the natural
+way is GLSL.</np>
+
+<p>The relational operators <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, 
+and&nbsp;<code>&gt;=</code> can only be applied to integer and floating point scalars,
+and the types of the two operands must match exactly.  However, the equality operators
+<code>==</code> and <code>!=</code> have been extended to work on all of the built-in
+types except sampler types.  Two vectors are equal only if the corresponding pairs of 
+components are all equal. The same is true for matrices.  The equality operators cannot be used
+with arrays, but they do work for structs, as long as the structs don't contain any arrays
+or samplers; again, every pair of members in two structs must be equal for the structs
+to be considered equal.</p>
+
+<p>GLSL has logical operators <code>!</code>, <code>&amp;&amp;</code>, <code>||</code>, 
+and&nbsp;<code>^^</code> (the last one being an exclusive or operation).  The operands
+must be of type <ptype>bool</ptype>.</p>
+
+<p>Finally, there are the assignment operators <code>=</code>, <code>+=</code>, <code>&minus;=</code>, 
+<code>*=</code>, and&nbsp;<code>/=</code>, with the usual meanings.</p>
+
+<break/>
+
+<p>GLSL also has a large number of predefined functions, more than I can discuss here.
+All of the functions that I will mention here require floating-point values as parameters,
+even if the function would also make sense for integer values.</p>
+
+<p>Most interesting, perhaps, are functions for vector algebra.  See <localref href="gl1geom.5"/>
+for the definitions of these operations.  These functions have simple formulas, but they
+are provided as functions for convenience and because they might have efficient hardware
+implementations in a GPU.  The function <i>dot</i>(<i>x,y</i>)
+computes the dot product <i>x</i>&middot;<i>y</i> of two vectors of the same length.  
+The return value is a <ptype>float</ptype>;  <i>cross</i>(<i>x,y</i>) computes the
+cross product <i>x</i>&times;<i>y</i>, where the parameters and return value are of type
+<i>vec3</i>; <i>length</i>(<i>x</i>) is the length of the vector <i>x</i> and
+<i>distance</i>(<i>x</i>,<i>y</i>) gives the distance between two vectors;
+<i>normalize</i>(<i>x</i>) returns a unit vector that points in the same direction as <i>x</i>.
+There are also functions named <i>reflect</i> and <i>refract</i> that can be used to
+compute the direction of reflected and refracted light rays; I will cover them when
+I need to use them.</p>
+
+<p>The function <i>mix</i>(<i>x,y,t</i>) computes <i>x</i><code>*</code>(1&minus;<i>t</i>) + <i>y</i><code>*</code><i>t</i>.
+If <i>t</i> is a float in the range 0.0 to 1.0, then the return value is a linear mixture, or weighted average,
+of <i>x</i> and <i>y</i>.  This function might be used, for example, to do alpha-blending of two colors.
+The function <i>clamp</i>(<i>x,low,high</i>) clamps <i>x</i> to the range <i>low</i> to <i>high</i>;
+the return value could be computed as <i>min</i>(<i>max</i>(<i>x,low</i>),<i>high</i>).
+If <i>rgb</i> is a vector representing a color, we could ensure that all of the components of
+the vector lie in the range 0 to 1 with the command</p>
+
+<pre>rgb = clamp( rgb, 0.0, 1.0 );</pre>
+
+<np>If <i>s</i> and <i>t</i> are floats, with <i>s &lt; t</i>, then
+<i>smoothstep</i>(<i>s,t,x</i>) returns 0.0 for <i>x</i> less than <i>s</i> and
+returns 1.0 for <i>x</i> greater than <i>t</i>.  For values of <i>x</i> between <i>s</i>
+and <i>t</i>, the return value is smoothly interpolated from 0.0 to 1.0.  Here is an
+example that might be used in a fragment shader for rendering a <i>gl.POINTS</i>
+primitive, with transparency enabled:</np>
+
+<pre>float dist = distance( gl_PointCoord, vec2(0.5) );
+float alpha = 1.0 - smoothstep( 0.45, 0.5, dist );
+if (alpha == 0.0) {
+    discard; // discard fully transparent pixels
+}
+gl_FragColor = vec4( 1.0, 0.0, 0.0, alpha );</pre>
+
+<np>This would render the point as a red disk, with the color fading smoothly from opaque
+to transparent around the edge of the disk, as <i>dist</i> increases from 0.45 to 0.5.
+Note that for the functions <i>mix</i>, <i>clamp</i>, and <i>smoothstep</i>, the <i>x</i>
+and <i>y</i> parameters can be vectors as well as floats.  In that case, they operate on
+each component of the vector individually.</np>
+
+<p>The usual mathematical functions are available in GLSL, including <i>sin</i>, <i>cos</i>, <i>tan</i>,
+<i>asin</i>, <i>acos</i>, <i>atan</i>, <i>log</i>, <i>exp</i>, <i>pow</i>, <i>sqrt</i>,
+<i>abs</i>, <i>floor</i>, <i>ceil</i>, <i>min</i>, and <i>max</i>.  (In version 3.00, <i>abs</i>,
+<i>min</i>, and <i>max</i> also apply to integer types.)
+For these functions, the parameters can be any of the types <ptype>float</ptype>,
+<i>vec2</i>, <i>vec3</i>, or <i>vec4</i>.  The return value is of the same type,
+and the function is applied to each component separately.  For example,
+the value of <i>sqrt</i>(<i>vec3</i>(16.0,9.0,4.0)) is the vector
+<i>vec3</i>(4.0,3.0,2.0).  For <i>min</i> and <i>max</i>, there is also a 
+second version of the function in which the first parameter is a
+vector and the second parameter is a <ptype>float</ptype>.  For those versions, each component
+of the vector is compared to the float; for example, <i>max</i>(<i>vec3</i>(1.0,2.0,3.0),2.5)
+is <i>vec3(2.5,2.5,3.0)</i>.</p>
+
+<p>The function <i>mod</i>(<i>x,y</i>) computes the modulus, or 
+remainder, when <i>x</i> is divided by <i>y</i>.  The return value is computed as 
+<i>x</i>&nbsp;&minus; <i>y</i><code>*</code>floor(<i>x</i><code>/</code><i>y</i>). 
+As with <i>min</i> and <i>max</i>, <i>y</i> can be either a vector or a float.
+The <i>mod</i> function can be used as a substitute for the <code>%</code> operator, which
+is not supported in GLSL&nbsp;ES&nbsp;1.00.</p>
+
+<p>There are also functions for working with sampler variables. I will
+discuss some of them in the next section.</p>
+
+</subsection>
+
+
+
+<subsection title="Function Definitions" id="webgl.3.5">
+
+<p>A GLSL program can define new functions, with a syntax similar to C.
+Unlike C, function names can be overloaded; that is, two functions can have
+the same name, as long as they have different numbers or types of parameters.
+A function must be declared before it is used.  As in C, it can be declared by
+giving either a full definition or a function prototype.</p>
+
+<p>Function parameters can be of any type.  The return type for a function can
+be any type except for array types. A struct type can be a return type, as long as
+the structure does not include any arrays.
+When an array is used a formal parameter, the length of the array must
+be specified by an integer constant.  For example,</p>
+
+<pre>float arraySum10( float A[10] ) {
+   float sum = 0.0;
+   for ( int i = 0; i &lt; 10; i++ ) {
+       sum += A[i];
+   }
+   return sum;
+}</pre>
+
+<p>Function parameters can be modified by the qualifiers <i>in</i>, <i>out</i>,
+or <i>inout</i>.  The default, if no qualifier is specified, is <i>in</i>.
+The qualifier indicates whether the parameter is used for input to the function,
+output from the function, or both.  For input parameters, the value of the
+actual parameter in the function call is copied into the formal parameter
+in the function definition, and there is no further interaction between
+the formal and actual parameters.  For output parameters, the value
+of the formal parameter is copied to the actual parameter when
+the function returns.  For an <i>inout</i> parameter, the value is
+copied in both directions.  This type of parameter passing is referred to as 
+"call by value/return."  Note that the actual parameter for an <i>out</i>
+or <i>inout</i> parameter must be something to which a value can be
+assigned, such as a variable or swizzler.
+(All parameters in C, Java, and JavaScript are input parameters, but passing
+a pointer as a parameter can have an effect similar to an <i>inout</i> parameter.
+GLSL, of course, has no pointers.)  For example,</p>
+
+<pre>void cumulativeSum( in float A[10], out float B[10]) {
+    B[0] = A[0];
+    for ( int i = 1; i &lt; 10; i++ ) {
+        B[i] = B[i-1] + A[i];
+    }
+}</pre>
+
+<np>Note that recursion is not supported for functions in GLSL.</np>
+
+</subsection>
+
+
+<subsection title="Control Structures" id="webgl.3.6">
+
+<p>The only control structures in GLSL ES 1.00 for WebGL are the <i>if</i> statement and a very
+restricted form of the <i>for</i> loop.  There is no <i>while</i> or <i>do<code>..</code>while</i>
+loop, and there is no <i>switch</i> statement.  However, all of these are supported in
+GLSL&nbsp;ES&nbsp;3.00.</p>
+
+<p><i>If</i> statements are supported with the full syntax from C, including
+<i>else</i> and <i>else&nbsp;if</i>.  In version 3.00, the syntax for all control
+structures is pretty much the same as in&nbsp;C.</p>
+
+
+<p>In a <i>for</i> loop in a version 1.00 shader, the loop control variable must be declared in the loop,
+and it must be of type <ptype>int</ptype> or <ptype>float</ptype>.  The
+initial value for the loop control variable must be a constant expression (that is,
+it can include operators, but all the operands must be literal constants or <i>const</i>
+variables)  The code inside the loop is not allowed to change the value of
+the loop control variable.  The test for ending the loop can only have the
+form <i>var&nbsp;op&nbsp;expression</i>, where <i>var</i> is the loop
+control variable, the <i>op</i> is one of the relational or equality operators,
+and the <i>expression</i> is a constant expression.  Finally, the update expression
+must have one of the forms <i>var</i><code>++</code>, <i>var</i><code>--</code>, 
+<i>var</i><code>+=</code><i>expression</i>, or <i>var</i><code>-=</code><i>expression</i>,
+where <i>var</i> is the loop control variable, and <i>expression</i> is a constant
+expression.  Of course, this is the most typical form for <i>for</i> loops in
+other languages.  Some examples of legal first lines for <i>for</i> loops:</p>
+
+<pre>for (int i = 0; i &lt; 10; i++)
+
+for (float x = 1.0; x &lt; 2.0; x += 0.1)
+
+for (int k = 10; k != 0; k -= 1)</pre>
+
+<np>In version 3.00, these restrictions do not apply.  Note that all loops
+can include <i>break</i> and <i>continue</i> statements.</np>
+
+
+
+</subsection>
+
+
+
+<subsection title="Limits" id="webgl.3.7">
+
+<p>WebGL puts limits on certain resources that are used by WebGL and its GLSL programs,
+such as the number of attribute variables or the size of a texture image.
+The limits are due in many cases to hardware limits in the <word>GPU</word>,
+and they depend on the device on which the program is running,
+and on the implementation of WebGL on that device.  The hardware limits can
+be lower on mobile devices such as tablets and phones, but modern tablets and
+phones have pretty impressive GPUs.  Although the limits can
+vary, WebGL imposes a set of minimum requirements that all implementations
+must satisfy.  I will give the minimums for WebGL&nbsp;1.0.  The minimums
+for WebGL&nbsp;2.0 are greater.</p>
+
+<p>For example, any WebGL implementation must allow at least 8 attributes in
+a vertex shader.  The actual limit for a particular implementation might be
+more, but cannot be less.  The actual limit is available in a GLSL program
+as the value of a predefined constant, <i>gl_MaxVertexAttribs</i>.  More conveniently,
+it is available on the JavaScript side as the value of the expression
+</p>
+
+<pre>gl.getParameter( gl.MAX_VERTEX_ATTRIBS )</pre>
+
+<np>Attribute variables of type <i>float</i>, <i>vec2</i>, <i>vec3</i>, and <i>vec4</i> all 
+count as one attribute against the limit.  For a matrix-valued attribute, each column counts as a separate
+attribute as far as the limit goes.</np>
+
+<p>Similarly, there are limits on varying variables, and there are separate limits
+on uniform variables in the vertex and fragment shaders.  (The limits are on the
+number of four-component "vectors." There can be some packing of separate
+variables into a single vector, but the packing that is used does not have to be optimal.
+No packing is done for attribute variables.)  The limits must satisfy</p>
+
+<pre>gl_MaxVertexAttribs &gt;= 8;
+gl_MaxVertexUniformVectors &gt;= 128;
+gl_MaxFragmentUniformVectors &gt;= 16;
+gl_MaxVaryingVectors &gt;= 8;</pre>
+
+<p>There are also limits in GLSL on the number of texture units, which means essentially
+the number of textures that can be used simultaneously.  These limits must
+satisfy</p>
+
+<pre>gl_MaxTextureImageUnits &gt;= 8;         // limit for fragment shader
+gl_MaxVertexTextureImageUnits &gt;= 0;   // limit for vertex shader
+gl_MaxCombinedTextureImageUnits &gt;= 8; // total limit for both shaders</pre>
+
+<np>Textures are usually used in fragment shaders, but they can sometimes be useful
+in vertex shaders.  Note however, that <i>gl_MaxVertexTextureImageUnits</i> can be zero,
+which means that implementations are not required to allow
+texture units to be used in vertex shaders.  (This possibility is for WebGL 1.0 only.)</np>
+
+<p>There are also limits on other things, including viewport size, texture image size,
+line width for line primitives, and point size for the <i>POINTS</i> primitive.
+All of the limits can be queried from the JavaScript side using <i>gl.getParameter</i>().</p>
+
+<demo src="c6/webgl-limits.html" width="600" height="380"><p><tex>At the end
+of the on-line version of this section, you will find a live demo that shows the
+actual values of the resource limits on the device on which it is running.</tex><web>The
+following demo shows the actual values of the resource limits on the device
+on which you are viewing this page.</web> The demo shows the limits for a WebGL 1.0 graphics context.
+You can use it to check the capabilities
+of various devices on which you want your WebGL programs to run.  In general,
+the actual limits will be significantly larger than the required minimum values.</p></demo>
+
+
+
+</subsection>
+
+
+
+
+</section>

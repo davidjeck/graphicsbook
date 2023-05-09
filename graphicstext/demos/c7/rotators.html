@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Demo of SimpleRotator and TrackballRotator</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/webgl/gl-matrix-min.js"></script>
+<script src="../script/webgl/simple-rotator.js"></script>
+<script src="../script/webgl/trackball-rotator.js"></script>
+
+<script type="x-shader/x-vertex" id="vshader-source">
+    attribute vec3 a_coords;
+    uniform mat4 modelviewProjection;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        gl_Position = modelviewProjection * coords;
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-source">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    uniform vec4 color;
+    void main() {
+        gl_FragColor = color;
+    }
+</script>
+
+<script>
+var gl1, gl2;  // graphics contexts for the two canvases
+
+var a_coords_loc;          // locations of attributes and uniforms in shader program for first canvas
+var a_coords_buffer;       
+var u_color;               
+var u_modelviewProjection;
+
+var a_coords_loc2;         // locations of attributes and uniforms in shader program for second canvas
+var a_coords_buffer2;       
+var u_color2;               
+var u_modelviewProjection2;
+
+var projection = mat4.create();  // projection matrix
+var modelviewProjection = mat4.create();  // combined matrix
+
+var simpleRotator;  // A SimpleRotator for the first canvas.
+var trackballRotator;  // A TrackballRotator for the first canvas.
+
+
+
+
+/**
+ * Draws the image in the first canvas.
+ */
+function draw1() {
+
+    function drawPrimitive( primitiveType, color, vertices ) {
+         gl1.enableVertexAttribArray(a_coords_loc);
+         gl1.bindBuffer(gl1.ARRAY_BUFFER,a_coords_buffer);
+         gl1.bufferData(gl1.ARRAY_BUFFER, new Float32Array(vertices), gl1.STREAM_DRAW);
+         gl1.uniform4fv(u_color, color);
+         gl1.vertexAttribPointer(a_coords_loc, 3, gl1.FLOAT, false, 0, 0);
+         gl1.drawArrays(primitiveType, 0, vertices.length/3);
+    }
+    
+    gl1.clearColor(0,0,0,1);
+    gl1.clear(gl1.COLOR_BUFFER_BIT | gl1.DEPTH_BUFFER_BIT);
+    
+    /* Set the value of projection to represent the projection transformation */
+    
+    mat4.perspective(projection, Math.PI/8, 1, 8, 12);
+    
+    /* Get the view matrix from the SimpleRotator object.
+       There is no modeling transformation in this program. */
+    
+    var modelview = simpleRotator.getViewMatrix();
+        
+    /* Multiply the projection matrix times the modelview matrix to give the
+       combined transformation matrix, and send that to the shader program. */
+       
+    mat4.multiply( modelviewProjection, projection, modelview );
+    gl1.uniformMatrix4fv(u_modelviewProjection, false, modelviewProjection );
+    
+    /* Draw the six faces of a cube, with different colors. */
+    
+    drawPrimitive( gl1.TRIANGLE_FAN, [1,0,0,1], [ -1,-1,1, 1,-1,1, 1,1,1, -1,1,1 ]);
+    drawPrimitive( gl1.TRIANGLE_FAN, [0,1,0,1], [ -1,-1,-1, -1,1,-1, 1,1,-1, 1,-1,-1 ]);
+    drawPrimitive( gl1.TRIANGLE_FAN, [0,0,1,1], [ -1,1,-1, -1,1,1, 1,1,1, 1,1,-1 ]);
+    drawPrimitive( gl1.TRIANGLE_FAN, [1,1,0,1], [ -1,-1,-1, 1,-1,-1, 1,-1,1, -1,-1,1 ]);
+    drawPrimitive( gl1.TRIANGLE_FAN, [1,0,1,1], [ 1,-1,-1, 1,1,-1, 1,1,1, 1,-1,1 ]);
+    drawPrimitive( gl1.TRIANGLE_FAN, [0,1,1,1], [ -1,-1,-1, -1,-1,1, -1,1,1, -1,1,-1 ]);
+    
+    /* Draw coordinate axes as thick colored lines that extend through the cube. */
+    
+    gl1.lineWidth(3);
+    drawPrimitive( gl1.LINES, [1,0,0,1], [ -2,0,0, 2,0,0] );
+    drawPrimitive( gl1.LINES, [0,1,0,1], [ 0,-2,0, 0,2,0] );
+    drawPrimitive( gl1.LINES, [0,0,1,1], [ 0,0,-2, 0,0,2] );
+    gl1.lineWidth(1);
+}
+
+/**
+ *  Draws the image in the second canvas.
+ */
+function draw2() { 
+
+    function drawPrimitive( primitiveType, color, vertices ) {
+         gl2.enableVertexAttribArray(a_coords_loc2);
+         gl2.bindBuffer(gl2.ARRAY_BUFFER,a_coords_buffer2);
+         gl2.bufferData(gl2.ARRAY_BUFFER, new Float32Array(vertices), gl2.STREAM_DRAW);
+         gl2.uniform4fv(u_color2, color);
+         gl2.vertexAttribPointer(a_coords_loc2, 3, gl2.FLOAT, false, 0, 0);
+         gl2.drawArrays(primitiveType, 0, vertices.length/3);
+    }
+    
+    gl2.clearColor(0,0,0,1);
+    gl2.clear(gl2.COLOR_BUFFER_BIT | gl2.DEPTH_BUFFER_BIT);
+    
+    /* Set the value of projection to represent the projection transformation */
+    
+    mat4.perspective(projection, Math.PI/8, 1, 8, 12);
+    
+    /* Get the view matrix from the SimpleRotator object.
+       There is no modeling transformation in this program. */
+    
+    var modelview = trackballRotator.getViewMatrix();
+        
+    /* Multiply the projection matrix times the modelview matrix to give the
+       combined transformation matrix, and send that to the shader program. */
+       
+    mat4.multiply( modelviewProjection, projection, modelview );
+    gl2.uniformMatrix4fv(u_modelviewProjection2, false, modelviewProjection );
+    
+    /* Draw the six faces of a cube, with different colors. */
+    
+    drawPrimitive( gl2.TRIANGLE_FAN, [1,0,0,1], [ -1,-1,1, 1,-1,1, 1,1,1, -1,1,1 ]);
+    drawPrimitive( gl2.TRIANGLE_FAN, [0,1,0,1], [ -1,-1,-1, -1,1,-1, 1,1,-1, 1,-1,-1 ]);
+    drawPrimitive( gl2.TRIANGLE_FAN, [0,0,1,1], [ -1,1,-1, -1,1,1, 1,1,1, 1,1,-1 ]);
+    drawPrimitive( gl2.TRIANGLE_FAN, [1,1,0,1], [ -1,-1,-1, 1,-1,-1, 1,-1,1, -1,-1,1 ]);
+    drawPrimitive( gl2.TRIANGLE_FAN, [1,0,1,1], [ 1,-1,-1, 1,1,-1, 1,1,1, 1,-1,1 ]);
+    drawPrimitive( gl2.TRIANGLE_FAN, [0,1,1,1], [ -1,-1,-1, -1,-1,1, -1,1,1, -1,1,-1 ]);
+    
+    /* Draw coordinate axes as thick colored lines that extend through the cube. */
+    
+    gl2.lineWidth(3);
+    drawPrimitive( gl2.LINES, [1,0,0,1], [ -2,0,0, 2,0,0] );
+    drawPrimitive( gl2.LINES, [0,1,0,1], [ 0,-2,0, 0,2,0] );
+    drawPrimitive( gl2.LINES, [0,0,1,1], [ 0,0,-2, 0,0,2] );
+    gl2.lineWidth(1);
+}
+
+
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are the id attributes for <script>
+ * elements that contain the source code for the vertex and fragment
+ * shaders.
+ */
+function createProgram(gl, vertexShaderID, fragmentShaderID) {
+    function getTextContent( elementID ) {
+            // This nested function retrieves the text content of an
+            // element on the web page.  It is used here to get the shader
+            // source code from the script elements that contain it.
+        var element = document.getElementById(elementID);
+        var node = element.firstChild;
+        var str = "";
+        while (node) {
+            if (node.nodeType == 3) // this is a text node
+                str += node.textContent;
+            node = node.nextSibling;
+        }
+        return str;
+    }
+    try {
+        var vertexShaderSource = getTextContent( vertexShaderID );
+        var fragmentShaderSource = getTextContent( fragmentShaderID );
+    }
+    catch (e) {
+        throw "Error: Could not get shader source code from script elements.";
+    }
+    var vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vertexShaderSource);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw "Error in vertex shader:  " + gl.getShaderInfoLog(vsh);
+     }
+    var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw "Error in fragment shader:  " + gl.getShaderInfoLog(fsh);
+    }
+    var prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+    }
+    return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context.
+ */
+function initGL() {
+    var prog = createProgram( gl1, "vshader-source", "fshader-source" );
+    gl1.useProgram(prog);
+    a_coords_loc =  gl1.getAttribLocation(prog, "a_coords");
+    u_modelviewProjection = gl1.getUniformLocation(prog, "modelviewProjection");
+    u_color =  gl1.getUniformLocation(prog, "color");
+    a_coords_buffer = gl1.createBuffer();
+    gl1.enable(gl1.DEPTH_TEST);
+    var prog2 = createProgram( gl2, "vshader-source", "fshader-source" );
+    gl2.useProgram(prog2);
+    a_coords_loc2 =  gl2.getAttribLocation(prog2, "a_coords");
+    u_modelviewProjection2 = gl2.getUniformLocation(prog2, "modelviewProjection");
+    u_color2 =  gl2.getUniformLocation(prog2, "color");
+    a_coords_buffer2 = gl2.createBuffer();
+    gl2.enable(gl2.DEPTH_TEST);
+}
+
+function init() {
+    var canvas1, canvas2;
+    try {
+        canvas1 = document.getElementById("webglcanvas1");
+        gl1 = canvas1.getContext("webgl") || 
+                         canvas1.getContext("experimental-webgl");
+        canvas2 = document.getElementById("webglcanvas2");
+        gl2 = canvas2.getContext("webgl") || 
+                         canvas2.getContext("experimental-webgl");
+        if ( ! gl1 || ! gl2) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    simpleRotator = new SimpleRotator(canvas1, draw1, 10, 10, 15);
+    trackballRotator = new TrackballRotator(canvas2, draw2, 10, [-3,5,15]);
+    draw1();
+    draw2();
+ }
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">SimpleRotator vs. TrackballRotator</h3>
+
+<div id="canvas-holder">
+<table cellspacing=0 cellpadding=6 border=0>
+<tr>
+    <td>
+       <canvas id="webglcanvas1" width="300" height="300"></canvas>
+    </td>
+    <td>
+       <canvas id="webglcanvas2" width="300" height="300"></canvas>
+    </td>
+</tr>
+
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>There are two classes for implementing rotation of a 3D WebGL scene
+by mouse (or touchscreen):  <i>SimpleRotator</i>, defined in
+simple-rotator.js, and <i>TrackballRotator</i>, defined in
+trackball-rotator.js. The main difference is that a <i>TrackballRotator</i>
+allows completely free rotation, but with a <i>SimpleRotator</i>, the
+projection of the <i>y</i>-axis on the screen always points upward.
+The rotation in a <i>SimpleRotator</i> consists of a rotation about the
+<i>y</i>-axis, followed by a rotation about the <i>x</i>-axis, and the
+rotation about the <i>x</i>-axis is restricted to the range -85 to 85 degrees.</p>
+<p>The demo lets the user compare the two kinds of rotators.
+There are two canvases on which cubes are drawn using WebGL.
+The user can rotate the cube in either canvas by dragging the mouse
+on that canvas.  The canvas on the left uses a <i>SimpleRotator</i>
+while the one on the right uses a <i>TrackballRotator</i>.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

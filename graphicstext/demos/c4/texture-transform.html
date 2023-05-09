@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<!--
+  Shows a variety of texture images on a variety of objects, with
+  a variety of texture transforms, all under the user's control.
+-->
+<head>
+<meta charset="UTF-8">
+<title>Textures and Texture Transforms</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+#texcanvas {
+    background-image: url("textures/NightEarth-512x256.jpg");
+    background-size: 100px 100px;
+}
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/teapot-model-IFS.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var camera;
+
+var graphics;  // for drawing on the canvas that shows the texture
+
+var frameNumber = 0;  // frame number for the animation
+
+var sphere, cubeModel, cylinder, cone, torus, teapot;  // model data for six objects.
+
+var sliderScale, sliderTranslateX, sliderTranslateY, sliderRotate;
+
+var scale = 1;
+var translateX = 0;
+var translateY = 0;
+var rotate = 0;
+
+var loadingImages = true;
+var textureImages = new Array();  // Will hold Image objects loaded from image URLs.
+var textureImageURLs = [
+    "textures/brick001.jpg",
+    "textures/Earth-1024x512.jpg",
+    "textures/NightEarth-512x256.jpg",
+    "textures/marble.jpg",
+    "textures/metal003.gif",
+    "textures/mandelbrot.jpeg"
+];
+
+function draw() {
+
+    scale = sliderScale.value(0);
+    rotate = sliderRotate.value(0);
+    translateX = sliderTranslateX.value(0);
+    translateY = sliderTranslateY.value(0);
+
+    drawTextureCanvas(); // Draws the canvas that displays the texture.
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    if (loadingImages) {
+        return;
+    }
+    
+    var texnum = Number(document.getElementById("texture").value);
+    var objectNumber = Number(document.getElementById("object").value);
+    var image = textureImages[texnum];
+    glEnable(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,image.width,image.height,0,GL_RGBA,GL_UNSIGNED_BYTE,image);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);  // MUST set this since we don't have mipmaps
+    
+    glMatrixMode(GL_TEXTURE);
+    glLoadIdentity();
+    glTranslatef(translateX,translateY, 0);
+    glRotatef(rotate,0,0,1);
+    glScalef(scale,scale,1);
+    glMatrixMode(GL_MODELVIEW);
+    
+    camera.apply();
+    
+    switch(objectNumber) {
+    case 0:
+        glRotatef(-90,1,0,0);
+        glScalef(1.5,1.5,1.5);
+        drawModel(sphere);
+        break;
+    case 1:
+        glScalef(1.2,1.2,1.2);
+         drawModel(cubeModel);
+         break;
+    case 2:
+        glRotatef(-90,1,0,0);
+        glScalef(1.3,1.3,1.3);
+        drawModel(cylinder);
+        break;
+    case 3:
+        glRotatef(-90,1,0,0);
+        glScalef(1.3,1.3,1.3);
+        drawModel(cone);
+        break;
+    case 4:
+        glScalef(1.6,1.6,1.6);
+        drawModel(torus);
+        break;
+    case 5:
+        glScalef(0.06, 0.06, 0.06);
+        drawModel(teapot);
+        break;
+    }
+}
+
+function drawTextureCanvas() {
+    if (loadingImages) {
+        graphics.fillStyle = "white";
+        graphics.fillRect(0,0,300,300);
+        graphics.fillStyle = "black";
+        graphics.font = "14px serif";
+        graphics.fillText("Waiting for images to load...", 10, 40);
+        return;
+    }
+    graphics.clearRect(0,0,300,300);
+    graphics.save();
+    graphics.translate(100,200);
+    graphics.scale(1,-1);
+    graphics.translate(translateX*100,translateY*100);
+    graphics.rotate(rotate/180 * Math.PI);
+    graphics.scale(scale,scale);
+    graphics.lineWidth = 5/scale;
+    graphics.strokeStyle = "white";
+    graphics.strokeRect(-.5,-.5,100,100);
+    graphics.lineWidth = 1/scale;
+    graphics.strokeStyle = "black";
+    graphics.strokeRect(-.5,-.5,100,100);
+    graphics.restore();
+}
+
+/**
+ *  Draws a model using glDrawElements.  The model data must be in the format produced by
+ *  the functions in basic-object-models-IFS.js.
+ */
+function drawModel(model) {
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3,GL_FLOAT,0,model.vertexPositions);
+    glEnableClientState(GL_NORMAL_ARRAY);
+    glNormalPointer(GL_FLOAT, 0, model.vertexNormals);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2,GL_FLOAT,0,model.vertexTextureCoords);
+    glDrawElements(GL_TRIANGLES, model.indices.length, GL_UNSIGNED_BYTE, model.indices);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);    
+}
+
+function initGL() {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [ 1, 1, 1, 1 ]); // white, for texturing
+    glClearColor(0,0,0,1);
+}
+
+function loadImages() {
+    var loadedCt = 0;
+    for (var i = 0; i < textureImageURLs.length; i++) {
+        textureImages[i] = new Image();
+        textureImages[i].onload = imageLoaded;
+        textureImages[i].src = textureImageURLs[i];
+    }
+    function imageLoaded() {
+        loadedCt++;
+        if (loadedCt == textureImageURLs.length) {
+            loadingImages = false;
+            glEnable(GL_TEXTURE_2D);
+            var texnum = Number(document.getElementById("texture").value);
+            var image = textureImages[texnum];
+            try {
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,image.width,image.height,0,GL_RGBA,GL_UNSIGNED_BYTE,image);
+            } catch(e) {
+                // Some browsers (Chrome at least) get a Security error if they try to use an image from the local disk.
+				document.getElementById("headline").innerHTML="Can't access texture.<br>Note: Some browsers can't use a file from a local disk."
+                return;
+            }
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);  // MUST set this since we don't have mipmaps
+            draw();
+            document.getElementById("object").disabled = false;
+            document.getElementById("texture").disabled = false;
+        }
+    }
+}
+
+function changeTexture() {
+    var texnum = Number(document.getElementById("texture").value);
+    document.getElementById("texcanvas").style.backgroundImage = "url('" + textureImageURLs[texnum] + "')";
+    var image = textureImages[texnum];
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,image.width,image.height,0,GL_RGBA,GL_UNSIGNED_BYTE,image);
+    draw();
+}
+
+function doReset() {
+    sliderRotate.setValue(0,0);
+    sliderScale.setValue(0,1);
+    sliderTranslateX.setValue(0,0);
+    sliderTranslateY.setValue(0,0);
+    camera.lookAt(10,7,20);
+    draw();
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+        var texcanvas = document.getElementById("texcanvas");
+        graphics = texcanvas.getContext('2d');
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    document.getElementById("reset").onclick = doReset;
+    document.getElementById("object").value = "1";
+    document.getElementById("object").onchange = draw;
+    document.getElementById("texture").value = "2";
+    document.getElementById("texture").onchange = changeTexture;
+    document.getElementById("object").disabled = true;
+    document.getElementById("texture").disabled = true;
+    sliderRotate = new SliderCanvas(document.getElementById("scRotate"));
+    sliderRotate.addSlider({label:"rotate", min:-180, max:180, value:0});
+    sliderScale = new SliderCanvas(document.getElementById("scScale"));
+    sliderScale.addSlider({label:"scale", min: 0.5, max:2, step:0.01, value:1, decimals:2});
+    sliderTranslateX = new SliderCanvas(document.getElementById("scTransX"));
+    sliderTranslateX.addSlider({label:"x-trans.", min: -0.5, max:0.5, step:0.01, value:0, decimals:2});
+    sliderTranslateY = new SliderCanvas(document.getElementById("scTransY"));
+    sliderTranslateY.addSlider({label:"y-trans.", min: -0.5, max:0.5, step:0.01, value:0, decimals:2});
+    sliderRotate.onChange = draw;
+    sliderScale.onChange = draw;
+    sliderTranslateX.onChange = draw;
+    sliderTranslateY.onChange = draw;
+    initGL();
+    camera = new Camera();
+    camera.setScale(1);
+    camera.lookAt(10,7,20);
+    camera.installTrackball(draw);
+    sphere = uvSphere();
+    cubeModel = cube();
+    cylinder = uvCylinder();
+    cone = uvCone();
+    torus = uvTorus();
+    teapot = teapotModel;  // (This one is just a variable, defined in teapot-model-IFS.js)
+    sliderRotate.draw();
+    sliderScale.draw();
+    sliderTranslateX.draw();
+    sliderTranslateY.draw();
+    drawTextureCanvas();
+    loadImages();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Textures and Texture Transforms</h3>
+<table border="0" cellspacing="0" cellpadding="8">
+<tr>
+<td><div id="canvas-holder"><canvas id="texcanvas" width="300" height="300"></canvas></div></td>
+<td><canvas id="maincanvas" width="300" height="300"></canvas></td>
+</tr>
+<tr align="center">
+<td colspan="2">
+    <b>Texture:</b>
+    <select id="texture">
+        <option value="0">Brick</option>
+        <option value="1">Topographic Earth</option>
+        <option value="2">Earth At Night</option>
+        <option value="3">Marble</option>
+        <option value="4">Metal</option>
+        <option value="5">Mandelbrot</option>
+    </select>
+    <b style="margin-left:40px">Object</b>:
+    <select id="object">
+       <option value="0">Sphere</option>
+       <option value="1">Cube</option>
+       <option value="2">Cylinder</option>
+       <option value="3">Cone</option>
+       <option value="4">Torus</option>
+       <option value="5">Teapot</option>
+    </select>
+    <button id="reset" style="margin-left:40px">Reset</button>
+</td>
+</tr>
+<tr align=center>
+<td>
+    <canvas id="scScale" width="280" height="50"></canvas>
+</td>
+<td>
+    <canvas id="scTransX" width="280" height="50"></canvas>
+</td>
+</tr>
+<tr align=center>
+<td>
+    <canvas id="scRotate" width="280" height="50"></canvas>
+</td>
+<td>
+    <canvas id="scTransY" width="280" height="50"></canvas>
+</td>
+</tr>
+</table>
+
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>Textured objects are shown in the display at the upper right.
+Use the pop-up menus to select the texture and the object that
+you want to view.  You can use your mouse to rotate the objects.</p>
+<p>The display on the upper left shows the <i>st</i>-plane, where
+the texture lives.  In the display, <i>s</i> and <i>t</i> range
+from &minus;1 to 2.  A box is drawn around the original texture
+image, with <i>s</i> and <i>t</i> ranging from 0 to 1.  The
+point (0,0) is at the lower left corner of that box.  Note that
+(0,0) is not at the center of the display.</p>
+<p>Four sliders allow you apply texture transformations.  The
+transform can be seen as a coordinate transformation in the <i>st</i>-plane, or
+as a modeling transformation that applies to the box.  As a modeling transform,
+the box is first scaled, then rotated, then translated.  </p>
+<p>The same transform is also applied as a texture transformation on the textured
+object.  The result
+is easiest to see on the cube: <i>Each face of the cube shows a copy
+of the part of the <i>st</i>-plane that is inside the box.</i> </p>
+<p>Try adjusting just
+one slider while the others are at their default values.
+(Click "Reset" between experiments.)  Note that when the
+box is translated to the left, the image on the cube moves to the right.
+When the box grows, the image on the cube shrinks (because you are
+seeing a larger region in the <i>st</i>-plane mapped to the same
+area on the cube).  When the box rotates counterclockwise, the
+image on the cube rotates clockwise.</p>
+<p>Although the effect is easiest to understand on the cube, it's
+fun to watch a texture moving around on an object.  Try it!
+I especially like a rotating texture on the torus.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

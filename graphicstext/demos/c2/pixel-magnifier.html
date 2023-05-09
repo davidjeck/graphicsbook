@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Demo Title</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script>
+
+var maincanvas, pixelcanvas;  // the two canvases
+var gMain, gPixel;  // graphics contexts for canvases
+
+var items = [];
+var dragitem = null;
+
+var currentItemType = "line";
+
+function draw() {
+    gMain.fillStyle="white";
+    gMain.fillRect(0,0,maincanvas.width,maincanvas.height);
+    for (var i = 0; i  < items.length; i++) {
+        var item = items[i];
+        switch (item.type) {
+        case "intro":
+            gMain.fillStyle = "black";
+            gMain.font = "16pt serif";
+            gMain.fillText("Draw on this area.", 20, 40);
+            gMain.font = "12pt serif";
+            gMain.fillText("Line from (30,120)", 20, 80);
+            gMain.fillText("to (270,120):", 100, 105);
+            gMain.strokeStyle = "black";
+            gMain.beginPath();
+            gMain.moveTo(30,120);
+            gMain.lineTo(270,120);
+            gMain.stroke();
+            gMain.fillText("Line from (30.5,240.5)", 20,200);
+            gMain.fillText("to (270.5,240.5):", 100, 225);
+            gMain.beginPath();
+            gMain.moveTo(30.5,240.5);
+            gMain.lineTo(270.5,240.5);
+            gMain.stroke();
+            break;
+        case "line":
+            gMain.strokeStyle = "black";
+            gMain.beginPath();
+            gMain.moveTo(item.x1,item.y1);
+            gMain.lineTo(item.x2,item.y2);
+            gMain.stroke();
+            break;
+        case "rect":
+            gMain.fillStyle = "red";
+            var left = Math.min(item.x1,item.x2);
+            var top = Math.min(item.y1,item.y2);
+            var width = Math.max(item.x1,item.x2) - left;
+            var height = Math.max(item.y1,item.y2) - top;
+            gMain.fillRect(left,top,width,height);
+            break;
+        case "circ":
+            gMain.fillStyle = "blue";
+            var dx = item.x1 - item.x2;
+            var dy = item.y1 - item.y2;
+            var radius = Math.sqrt(dx*dx + dy*dy);
+            gMain.beginPath();
+            gMain.moveTo(item.x1+radius,item.y1);
+            gMain.arc(item.x1,item.y1,radius,0,2*Math.PI);
+            gMain.closePath();
+            gMain.fill();
+        }
+    }
+}
+
+function setType() {
+    if (document.getElementById("tool-line").checked) {
+        currentItemType = "line";
+    }
+    else if (document.getElementById("tool-rect").checked) {
+        currentItemType = "rect";
+    }
+    else if (document.getElementById("tool-circ").checked) {
+        currentItemType = "circ";
+    }
+    else {
+        currentItemType = "none";
+    }
+}
+
+function showPixelsAt(x,y) {
+    gPixel.fillStyle = "white";
+    gPixel.fillRect(0,0,pixelcanvas.width,pixelcanvas.height);
+    var data = gMain.getImageData(x-8,y-8,19,19).data;
+    var k = 0;
+    for (var i = 0; i < 19; i++) {
+        for (var j = 0; j < 19; j++) {
+            var r = data[k];
+            var g = data[k+1];
+            var b = data[k+2];
+            var a = data[k+3];
+            k = k + 4;
+            if (a > 0) {
+                gPixel.fillStyle ="rgb(" + r + "," + g + "," + b + ")";
+                gPixel.fillRect(8*j,8*i,8,8);
+            }
+            else {
+                gPixel.beginPath();
+                gPixel.moveTo(8*j,8*i);
+                gPixel.lineTo(8*j+8,8*i+8)
+                gPixel.moveTo(8*j,8*i+8);
+                gPixel.lineTo(8*j+8,8*i)
+                gPixel.stroke();
+            }
+        }
+    }
+    gPixel.strokeStyle = "gray";
+    gPixel.beginPath();    
+    for (var i = 0; i < 153; i += 8) {
+        gPixel.moveTo(i,0);
+        gPixel.lineTo(i,152);
+        gPixel.moveTo(0,i);
+        gPixel.lineTo(152,i);
+    }
+    gPixel.stroke();
+}
+
+function showPixels(evt) {
+    var r = maincanvas.getBoundingClientRect();
+    var x = Math.round(evt.clientX - r.left);
+    var y = Math.round(evt.clientY - r.top);
+    showPixelsAt(x,y);
+}
+
+function showPixelsTouch(evt) {
+    var r = maincanvas.getBoundingClientRect();
+    var x = Math.round(evt.touches[0].clientX - r.left);
+    var y = Math.round(evt.touches[0].clientY - r.top);
+    showPixelsAt(x,y);
+}
+
+function clearPixels() {
+    gPixel.fillStyle = "lightgray";
+    gPixel.fillRect(0,0,pixelcanvas.width,pixelcanvas.height);
+    gPixel.strokeStyle = "black";
+    gPixel.strokeRect(0.5,0.5,pixelcanvas.width-1,pixelcanvas.height-1);
+}
+
+function doClear() {
+    items = [];
+    draw();
+}
+
+function doReset() {
+    items = [ { type: "intro" } ];
+    draw();
+}
+
+function mouseDown(x,y,evt) {
+    if (currentItemType == "none") {
+        return false;
+    }
+    dragitem = {};
+    dragitem.type = currentItemType;
+    x = Math.round(x);
+    y = Math.round(y);
+    dragitem.x1 = dragitem.x2 = x;
+    dragitem.y1 = dragitem.y2 = y;
+    items.push(dragitem);
+    return true;
+}
+
+function mouseDrag(x,y) {
+    x = Math.round(x);
+    y = Math.round(y);
+    dragitem.x2 = x;
+    dragitem.y2 = y;
+    draw();
+}
+
+function init() {
+    maincanvas = document.getElementById("maincanvas");
+    pixelcanvas = document.getElementById("pixels");
+    if (!maincanvas.getContext) {
+        document.getElementById("headline").innerHTML = "ERROR: Canvas not supported";
+        return;
+    }
+    gMain = maincanvas.getContext("2d");
+    gPixel = pixelcanvas.getContext("2d");
+    maincanvas.addEventListener("mousemove",showPixels);
+    maincanvas.addEventListener("mouseleave",clearPixels);
+    maincanvas.addEventListener("touchstart",showPixelsTouch);
+    maincanvas.addEventListener("touchmove",showPixelsTouch);
+    maincanvas.addEventListener("touchend",clearPixels);
+    clearPixels();
+    setUpMouseHander(maincanvas,mouseDown,mouseDrag);
+    setUpTouchHander(maincanvas,mouseDown,mouseDrag);
+    document.getElementById("tool-line").checked = true;
+    items.push( {type:"intro"} );
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Pixel Magnifier Demo</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools" style="font: 10pt sans-serif">
+<table border="0" cellpadding="3">
+   <tr>
+   <td><label><input type="radio" name="tool" id="tool-rect" onclick="setType()">Rect</label></td>
+   <td><label><input type="radio" name="tool" id="tool-line" onclick="setType()">Line</label></td>
+   </tr>
+   <tr>
+   <td><label><input type="radio" name="tool" id="tool-circ" onclick="setType()">Circle</label></td>
+   <td><label><input type="radio" name="tool" id="tool-none" onclick="setType()">None</label></td>
+   </tr>
+</table>
+<button onclick="doClear()">Clear</button> <button onclick="doReset()">Reset</button><br><br>
+<canvas id="pixels" width=152 height=152></canvas>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>Whenever the mouse is over the large, white drawing
+area on the left, a 19-by-19 block of pixels is extracted
+from the drawing, and a magnified copy is shown in the
+area on the bottom right.  Each pixel from the original
+image is shown as a square that is 8 pixels on a side.
+Results can be different in different browsers.</p>
+<p>(Note for touch screen users:  You have to touch the
+display area to see the magnified pixels.)</p>
+<p>You can draw on the drawing area by <b>dragging</b> your
+mouse on it.  The radio buttons on the right let you
+draw black lines, red rectangles, and blue circles.
+Selecting "None" means that dragging the mouse will only
+display unmagnified pixels.</p>
+<p>The "Clear" button fills the drawing area with white.
+The "Reset" button restores the original image.</p>
+<p>Things to try:  Point your mouse at the text in the
+original image, and note how the text is anitaliased.
+Check out the difference between the 
+two lines in the original image.  Draw a line that is 
+almost vertical or almost horizontal, and look
+at how the line is antialiased.  Look at the boundary
+of a circle.  Draw a red rectangle
+then a blue circle that intersects it, and look at how the
+blue blends with the red along the boundary between them.</p>
+<p>To close this help screen, click the "Close" button
+at the top left.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

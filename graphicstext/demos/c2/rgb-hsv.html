@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>RGB/HSV Color Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+    var sliders;
+    function init() {
+        sliders = new SliderCanvas(document.getElementById("sliders"));
+        sliders.addSlider({label:"Red", max:1, step:0.001, value:1, decimals:3});
+        sliders.addSlider({label:"Green", max:1, step:0.001, value: 0, decimals:3});
+        sliders.addSlider({label:"Blue", max:1, step:0.001, value: 0, decimals:3});
+        sliders.addSlider({label:"Hue", max:359, step: 1, value: 0});
+        sliders.addSlider({label:"Saturation", max:1, step:0.001, value: 1, decimals:3});
+        sliders.addSlider({label:"Value", max:1, step:0.001, value: 1, decimals:3});
+        sliders.draw();
+        sliders.onChange = function(newval, oldVal, sliderNum) {
+            if (sliderNum <= 2) {
+                setHSVFromRGB(sliders.value(0), sliders.value(1), sliders.value(2));
+            }
+            else {
+                setRGBFromHSV(sliders.value(3), sliders.value(4), sliders.value(5));
+            }
+            setColor(sliders.value(0), sliders.value(1), sliders.value(2));
+        }
+        setHSVFromRGB(1,0,0);
+        setColor(1,0,0);
+    }
+    function setHSVFromRGB(r,g,b) {
+        var h, s, v;
+        var min = Math.min(r,Math.min(g,b));
+        var max = Math.max(r,Math.max(g,b));
+        v = max;
+        s = (max == 0)? 0 : (max-min)/max;
+        if (max == r) {
+            h = Math.round(60*(g-b)/(max-min));
+            if (h < 0) {
+                h = 360 + h;
+            }
+        }
+        else if (max == g) {
+            h = 120 + Math.round(60*(b-r)/(max-min));
+        }
+        else {
+            h = 240 + Math.round(60*(r-g)/(max-min));
+        }
+        sliders.setValue(3,h);
+        sliders.setValue(4,s);
+        sliders.setValue(5,v);
+    }
+    function setRGBFromHSV(h,s,v) {
+        var r,g,b;
+        var c,x;
+        c = v*s;
+        x = (h < 120)? h/60 : (h < 240)? (h-120)/60 : (h-240)/60;
+        x = c * (1-Math.abs(x-1));
+        x += (v-c);
+        switch (Math.floor(h/60)) {
+            case 0: r = v; g = x; b = v-c; break;
+            case 1: r = x; g = v; b = v-c; break;
+            case 2: r = v-c; g = v; b = x; break;
+            case 3: r = v-c; g = x; b = v; break;
+            case 4: r = x; g = v-c; b = v; break;
+            case 5: r = v; g = v-c; b = x; break;
+        }
+        sliders.setValue(0,r);
+        sliders.setValue(1,g);
+        sliders.setValue(2,b);
+    }
+    function setColor(r,g,b) {
+        r = Math.max(0, Math.min(255, Math.round(r*255)));
+        g = Math.max(0, Math.min(255, Math.round(g*255)));
+        b = Math.max(0, Math.min(255, Math.round(b*255)));
+        document.getElementById("maincanvas").style.backgroundColor =
+                       "rgb(" + r + "," + g + "," + b + ")";
+    }
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3>RGB and HSV Color Model Demo</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="200" height="300"></canvas>
+</div>
+
+<div style="float:left">
+<canvas width="350" height="300" id="sliders"></canvas>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>There is a large patch of color on the left.
+There are six sliders on the right.  The top three represent
+the RGB color values for the color patch.  The bottom three
+represent the HSV color values for the same color.  You can
+use the sliders to adjust the color.  Note that the sliders
+are not independent!  Changing an RGB slider can force the
+HSV sliders to change; changing an HSV slider can force the
+RGB sliders to change.</p>
+<p>(Note: Change the value on a slider by dragging the
+tab or by clicking in the bar.)</p>
+<p>Some things to try:
+Check the 8 colors that that you can get by letting
+Red, Green, and Blue equal 0&nbsp;or&nbsp;1.
+Try other settings on the RGB sliders.
+Set Saturation and Value to 1 and slowly
+drag the Hue slider; note how the RGB sliders change.
+Also try dragging the Hue slider with Saturation and Value set to
+values other than&nbsp;1.
+Set Saturation to 0 and drag the Value slider; this gives
+shades of gray, and the Hue slider is irrelevant in this
+case.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<!--
+   This demo lets the user apply filters to images.
+   A filter computes a new image by replacing each
+   color component of each pixel in the image by a
+   weighted average of the colors of that pixel and
+   its neighbors.  The demo illustrates the use
+   of graphics.getImageData, graphics.createImageData,
+   and graphics.putImageData.
+-->
+<head>
+<meta charset="UTF-8">
+<title>Image Filter Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    button {
+        margin-top: 2px;
+    }
+</style>
+<script src="../script/demo-core.js"></script>
+
+<script>
+
+"use strict";
+
+var canvas;
+var graphics;
+
+var imageURLs = [  // Public domain images from wikimedia commons.
+        "image-320x240/space-station.jpg",
+        "image-320x240/bluejay.jpg",
+        "image-320x240/house.jpg",
+        "image-320x240/shore.jpg",
+        "image-320x240/pine-cones.jpg"
+    ];
+var images = new Array(imageURLs.length);  // Saves actual images that have been loaded.
+var currentImageNum;  // The index in the array of the image that is currently displayed.
+
+/**
+ *  For enabling/disabling all the buttons while an image is being loaded or
+ *  a filter is being computed.
+ */
+function setButtonsEnabled(enable) {
+    var buttons = document.getElementsByTagName("button");
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = !enable;
+    }
+}
+
+/**
+ * Draws an image onto the canvas.  The number of the image is given by the
+ * value of a pop-up menu.  The value is an index into the array of image URLs.
+ * If the image has not previously been loaded, then the image file is loaded,
+ * and the image is drawn after it has been loaded. If the image was previously
+ * loaded, then the loaded image is drawn onto the canvas immediately.
+ */
+function loadImage() {
+    var imageNum = Number(document.getElementById("image").value);
+    if (images[imageNum]) {  // image already loaded, just show it now.
+        graphics.drawImage(images[imageNum],0,0,canvas.width,canvas.height);
+        currentImageNum = imageNum;
+        return;
+    }
+    setButtonsEnabled(false);
+    graphics.clearRect(0,0,canvas.width,canvas.height);
+    var img = document.createElement("img");
+    img.onload = imageLoaded;  // Call the imageLoaded function when the image is done loading.
+    img.src = imageURLs[imageNum];
+    function imageLoaded() {
+        images[imageNum] = img;
+        currentImageNum = imageNum;
+        graphics.drawImage(img,0,0,canvas.width,canvas.height);
+        setButtonsEnabled(true);
+    }
+}
+
+/**
+ *  This is called when the user clicks "Reload Current" button.  It draws the
+ *  current image onto the canvas.  (This allows the user to recover the original
+ *  image after applying a filter to it.)
+ */
+function reload() { 
+    graphics.drawImage(images[currentImageNum],0,0,canvas.width,canvas.height);
+}
+
+/**
+ * Applies a filter to the contents of the canvas.  Note that for convenience,
+ * a 1-pixel border around the image is left unmodified, since pixels in the
+ * border don't have a full set of neighbors and would have to be treated as
+ * a special case.  In a color data array, there are four array elements per
+ * pixel, giving the RGBA componets of the color of each pixel, starting with
+ * the pixel in the upper left and proceding row-by-row down the image.
+ */
+function filter(filterName) {
+    setButtonsEnabled(false);
+    var filterArray; // The 9 weights in the weighted average.
+    var v;
+    switch (filterName) {
+    case "Blur":
+        v = 1/9;
+        filterArray = [ v,v,v, v,v,v, v,v,v ];  // (simple average, all weights equal)
+        break;
+    case "Sharpen":
+        v = 1/3;
+        filterArray = [ 0,-v,0, -v,7*v,-v, 0,-v,0 ];
+        break;
+    case "Edge Detect":
+        filterArray = [ 0,1,0, 1,-4,1, 0,1,0 ];
+        break;
+    case "Emboss":
+        filterArray = [ -2,-1,0, -1,1,1, 0,1,2 ];
+        break;
+    }
+    var currentImage; // The full set of color component data from the existing image.
+    try {
+        currentImage = graphics.getImageData(0,0,canvas.width,canvas.height);
+    } catch(e) {
+        document.getElementById("canvas-holder").innerHTML = "<p>" +
+        "An error occurred while trying to process the image.<br>" +
+        "Note that some browsers will not allow you to work with<br>" +
+        "an image loaded from a local file.  If you are loading this<br>" +
+        "page from a local file, you might try the on-line version." +
+        "</p>";
+        return;
+    }
+    var newImage;  // The new color components, computed as weighted averages of current data.
+    newImage = graphics.createImageData(canvas.width,canvas.height);
+    var offsets = [ // Tells where to find the 9 numbers that need to be averaged.
+                    // The offsets are added to an array index to find the indices
+                    // of the corresponding color component of the neighboring pixels.
+        -4*currentImage.width-4, -4*currentImage.width, -4*currentImage.width+4,
+        -4, 0, 4,
+        4*currentImage.width-4, 4*currentImage.width, 4*currentImage.width+4,
+    ];
+    for (var r = 1; r < currentImage.height-1; r++) {  // traverse rows of pixels
+        for (var c = 1; c < currentImage.width-1; c++) {  // traverse columns of pixels
+            for (var k = 0; k < 3; k++) {  // Computer the R, G, and B color coponents fo rthis pixel.
+                var total = 0;  // The weighted average
+                var loc = 4*(currentImage.width*r + c) + k; // index in the array of value for this pixel.
+                for (var i = 0; i < 9; i++) {  // Sum the values from a pixel and 8 neighbors.
+                    total += filterArray[i]*currentImage.data[loc+offsets[i]];
+                }
+                newImage.data[loc] = total;  // The new color value for this pixel.
+            }
+            newImage.data[4*(currentImage.width*r + c) + 3] = 255; // Alpha componet is always 255.
+        }
+    }
+    graphics.putImageData(newImage,0,0,1,1,canvas.width-2,canvas.height-2);
+       // The putImageData copies the new color data onto the canvas.  The last four
+       // parameters specify the "dirty" rectangle in the data, which is the only part that
+       // is actually copied.  In this case, a 1-pixel border around the edge of the canvas
+       // is omitted.
+    setButtonsEnabled(true);
+}
+
+function init() {
+    canvas = document.getElementById("maincanvas");
+    if (!canvas.getContext) {
+        document.getElementById("headline").innerHTML = "ERROR: Canvas not supported";
+        return;
+    }
+    graphics = canvas.getContext("2d");
+    document.getElementById("image").value = "0";
+    document.getElementById("image").onchange = loadImage;
+    loadImage();  // Load the first image into the canvas.
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Image Filter Demo</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="320" height="240"></canvas>
+</div>
+
+<div id="tools">
+<p><b>Image:</b>
+   <select id="image">
+   <option value="0">Space Station</option>
+   <option value="1">Bluejay</option>
+   <option value="2">House</option>
+   <option value="3">Shore</option>
+   <option value="4">Pine Cones</option>
+   </select><br>
+   <button onclick="reload()">Reload Current</button>
+</p>
+<p>
+<button onclick="filter('Blur')">Apply Blur</button><br>
+<button onclick="filter('Sharpen')">Apply Sharpen</button><br>
+<button onclick="filter('Edge Detect')">Apply Edge Detect</button><br>
+<button onclick="filter('Emboss')">Apply Emboss</button><br>
+</p>
+
+</div>
+
+</div>
+
+
+<div id="help-content" style="display:none">
+<h3>About This Demo...</h3>
+<p>The demo lets you apply "filters" to images.  A filter replaces the color
+of each pixel in the image with a weighted average of the color of the pixel
+and its neighbors.  In this case, only the eight neighbors immediately surrounding
+the pixel are used.  For a "Blur" filter, all the weights are equal, so you get a
+simple average.  Using different weights for different neighbors can give
+surprising effects, considering how simple the basic algorithm is.</p>
+<p>You can look at the source code for the demo to see how the colors of
+individual pixels can be manipulated.</p>
+<p>(The images used in this demo are public domain images
+from <a href="http://commons.wikimedia.org" target="_BLANK">Wikimedia Commons</a>.)</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

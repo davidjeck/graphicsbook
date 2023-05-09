@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<!--
+     This page is a rather silly WebGL 2.0 demo using the
+     texelFetch() function, which is only available in
+     GLSL ES 3.00.  A single gl.POINTS primitive consisting
+     of 25,000 points is drawn, taking the points' colors
+     from a texture in the vertex shader.  The colors
+     are grabbed using texelFetch(), based on the position
+     of the vertex in canvas coordinates.  Since the texture
+     is the same size as the cavas, that's the same as
+     texel coordinates in the textrue.  When animation is turned
+     on, the vertex coordinates for the primitive are updated
+     in each frame, making the points move.  This program requires
+     that the texture be at relative URL "textures/mons-lisa.jpg".
+     (The texture image comes from Wikimedia and is in the public
+     domain.)
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGL2 texelFetch example</title>
+
+
+<script>
+
+"use strict";
+
+
+const  vertexShaderSource = `#version 300 es
+in vec2 a_coords; // Coordinates in cavas coordinates, 0 to canvas.width and 0 to canvas.height.
+uniform float u_width;    // canvas width
+uniform float u_height;   // canvas height
+uniform sampler2D u_picture;   // The Mona Lisa texture
+out vec4 v_color; 
+void main() {
+
+   float x = -1.0 + 2.0*(a_coords.x / u_width);  // transform to clip coordinates
+   float y = 1.0 - 2.0*(a_coords.y / u_height);
+   gl_Position = vec4(x, y, 0.0, 1.0);
+   
+   ivec2 texelCoords = ivec2(round(a_coords));
+       // texelFetch requires integer coords.
+   v_color = texelFetch(u_picture, texelCoords, 0);
+   
+   gl_PointSize = 2.0;
+}`;
+
+const fragmentShaderSource = `#version 300 es
+precision mediump float;
+in vec4 v_color;
+out vec4 color;
+void main() {
+    color = v_color; // just pass on the color from the vertex shader.
+}`;
+
+//--------------------------------------------------------------------
+
+let  canvas;  // The canvas where WebGL draws.
+let  gl;      // The WebGL graphics context.
+
+let  uniformWidth;   // Location of uniform named "u_width"
+let  uniformHeight;  // Location of uniform named "u_height"
+
+let uniformPicture;  // Location of the uniform sampler varible "u_picture"
+let textureLoaded = false;  // Will be set to true if textue is successfuly loaded.
+
+let  attributeCoords;  // Location of the attribute named "a_coords".
+let  bufferCoords;     // A vertex buffer object to hold the values for coords.
+
+let  animating;  // is the animation running?
+
+/* Data for the points, including their coordinates and velocities. */
+
+const  POINT_COUNT = 25000;
+const  pointCoords = new Float32Array( 2*POINT_COUNT );  // Used for loading coords into a WebGL buffer.
+const  pointVelocities = new Float32Array( 2*POINT_COUNT );  // (Could be a regular JavaScript array.)
+
+
+/**
+ *   Create initial positions for the points and create their velocities.
+ *   Positions will be updated in each frame, but velocities are constant.
+ */
+function createPointData() {
+    for (let i = 0; i < POINT_COUNT; i++) {
+           // Each point has two coordinates and two velocities.  Velocity number k
+           // tells how fast coordinate number k changes in pixels per frame.
+        pointCoords[2*i] = canvas.width * Math.random();  // x-coordinate of point
+        pointCoords[2*i+1] = canvas.height * Math.random();  // y-coordinate of point
+        let  randomVelocity = 15 + 20*Math.random();  // velocity in pixels per second
+        let  randomAngle = 2*Math.PI * Math.random();
+        pointVelocities[2*i] = randomVelocity * Math.cos(randomAngle);
+        pointVelocities[2*i+1] = randomVelocity * Math.sin(randomAngle);
+    }
+}
+
+/**
+ *  Called between frames to update point coordinates.  The parameter give the
+ *  time in seconds since the previous frame.   The points are moved.  If a point
+ *  crosses an edge of the canvas, its velocity is reveresed, making it bounce
+ *  off the edge.
+ */
+function updatePointCoordsForFrame(deltaTime) {
+    for (let i = 0; i < 2*POINT_COUNT; i += 2) { // x-coords
+        pointCoords[i] += pointVelocities[i] * deltaTime;
+        if (pointCoords[i] < 0) {
+            pointCoords[i] = (pointCoords[i]);// move coord back onto canvas
+            pointVelocities[i] = Math.abs(pointVelocities[i]); // and make sure point is moving in positive direction
+        }
+        else if (pointCoords[i] > canvas.width) {
+            pointCoords[i] = canvas.width - (pointCoords[i] - canvas.width);// move coord back onto canvas
+            pointVelocities[i] = -Math.abs(pointVelocities[i]); // and make sure point is moving in negative direction
+        }
+    }
+    for (let i = 1; i < 2*POINT_COUNT; i += 2) { // y-coords
+        pointCoords[i] += pointVelocities[i] * deltaTime;
+        if (pointCoords[i] < 0) {
+            pointCoords[i] = (pointCoords[i]);// move coord back onto canvas
+            pointVelocities[i] = Math.abs(pointVelocities[i]); // and make sure point is moving in positive direction
+        }
+        else if (pointCoords[i] > canvas.height) {
+            pointCoords[i] = canvas.height - (pointCoords[i] - canvas.height);// move coord back onto canvas
+            pointVelocities[i] = -Math.abs(pointVelocities[i]); // and make sure point is moving in negative direction
+        }
+    }
+}
+
+
+/**
+ *  Draws the content of the canvas, in this case, just the moving points.
+ */
+function draw() {
+
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas to black
+    
+    if ( ! textureLoaded ) { // Don't try to draw anything if texture has not been loaded.
+        return;
+    }
+    
+    /* Set up values for the "coords" attribute */
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);  // (Not actually needed; only one buffer is ever bound.)
+    gl.bufferData(gl.ARRAY_BUFFER, pointCoords, gl.STREAM_DRAW);
+   
+    /* Draw all the points with one command. */
+   
+    gl.drawArrays(gl.POINTS, 0, POINT_COUNT);
+    
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+
+/**
+ *  Loads the MonaLisa texture image asynchronously.  The parameter is the
+ *  texture object into which the image is to be loaded.  When the image
+ *  has finished loading, the value of textureLoaded will be set to true
+ *  and draw() will be called.  Also, if an error occurs during loading,
+ *  an error message is displayed on the page, and the animation is stopped.)
+ */
+function loadMondaLisaTexture(textureObject ) {
+    const  img = new Image();  //  A DOM image element to represent the image.
+    img.onload = function() { 
+        // This function will be called after the image loads successfully.
+        // We have to bind the texture object to the TEXTURE_2D target before
+        // loading the image into the texture object. 
+        gl.bindTexture(gl.TEXTURE_2D, textureObject);
+        try {
+           gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+           textureLoaded = true;
+        }
+        catch (e) { // Probably a security exception, because this page has been
+                    // loaded through a file:// URL.
+            document.getElementById("canvas-holder").innerHTML =
+              "Sorry, couldn't load texture.<br>" +
+              "Some web browsers won't use images from a local disk";
+            animating = false;
+            document.getElementById("animateCheckbox").checked = true
+        }
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+       // gl.generateMipmap(gl.TEXTURE_2D);  // Create mipmaps; you must either
+                              // do this or change the minification filter.
+        draw();  // Draw the canvas, with the texture.  
+    };
+    img.onerror = function(e) { 
+        // This function will be called if an error occurs while loading.
+        document.getElementById("canvas-holder").innerHTML =
+                        "<p>Sorry, textures/mona-lisa.jpg could not be loaded.</p>";
+        animating = false;
+        document.getElementById("animateCheckbox").checked = false;
+    };
+    img.src = "textures/mona-lisa.jpg";  // Start loading of the image.
+}
+
+
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    gl.clearColor(0,0,0,1);  // background will be opaque black
+
+    let  prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    
+    gl.useProgram(prog);
+    attributeCoords = gl.getAttribLocation(prog, "a_coords");
+    uniformHeight = gl.getUniformLocation(prog, "u_height");
+    uniformWidth = gl.getUniformLocation(prog, "u_width");
+    gl.uniform1f(uniformHeight, canvas.height);
+    gl.uniform1f(uniformWidth, canvas.width);
+    
+    createPointData();
+    bufferCoords = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);
+    gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attributeCoords); 
+
+    uniformPicture = gl.getUniformLocation(prog, "u_picture");
+    gl.uniform1i(uniformPicture, 0);
+        
+    let textureObject = gl.createTexture();
+    loadMondaLisaTexture(textureObject);
+}
+
+/*------------ Animation support ------------*/
+
+let previousTime;  // value of time parameter the last time doFrame was called.
+                   // this is set to null in doAnimationCheckbox() when an animation
+                   // is started.
+                   
+function doFrame(time) {
+    if (animating) {
+        if (previousTime === null) {  // animation is just starting
+            previousTime = time;
+        }
+        else {
+            let elapsedTimeInSeconds = (time - previousTime) / 1000;
+            previousTime = time;
+            updatePointCoordsForFrame(elapsedTimeInSeconds);
+            draw();
+        }
+        requestAnimationFrame(doFrame);
+    }
+}
+
+function doAnimationCheckbox() {
+    let  anim = document.getElementById("animateCheckbox").checked;
+    if (anim !== animating) {
+        animating = anim;
+        if (animating) {
+            previousTime = null;
+            requestAnimationFrame(doFrame);
+        }
+    }
+}
+
+
+/*----------------------------------------------------------------*/
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        let  options = {
+                // Turn off antialiasing to make sure that the points are rendered
+                // as sharp 2-by-2 pixel squares.
+            depth: false,
+            antialias: false
+        };
+        gl = canvas.getContext("webgl2", options);
+              // Note: this page requires webgl2.
+        if ( ! gl ) {
+            throw "Browser does not support WebGL 2.0";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL 2.0 graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        return;
+    }
+    document.getElementById("animateCheckbox").checked = true;
+    document.getElementById("animateCheckbox").onchange = doAnimationCheckbox;
+    animating = false;
+    doAnimationCheckbox();
+}
+
+
+window.onload = init;  // Arrange for init() to be called after page has loaded.
+
+</script>
+</head>
+<body>
+
+<h2>WebGL2 texelFetch -- a silly demo with Mona Lisa</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<p>
+    <label><b><input type="checkbox" id="animateCheckbox">&nbsp;Animate</b></label>
+</p>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="600" height="768"></canvas>
+</div>
+
+</body>
+</html>

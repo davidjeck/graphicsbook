@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>One of the goals of computer graphics is physical realism, that is, making
+images that look like they could be photographs of reality.  This is not the only 
+goal.  For example, for scientific visualization, the goal is to use computer 
+graphics to present information accurately and clearly.  Artists can use computer
+graphics to create abstract rather than realistic art.  However, realism is a
+major goal of some of the most visible uses of computer graphics, such as video
+games, movies, and advertising.</p1>
+
+<p>One important aspect of physical realism is <word>lighting</word>:
+the play of light and shadow, the way that light reflects from different 
+<word term="material">materials</word>, the
+way it can bend or be diffracted as it passes through translucent
+objects.  The techniques that are used to produce the most realistic graphics
+can take all these factors and more into account.</p>
+
+<p>However, another goal of computer graphics is <i>speed</i>.  OpenGL, in particular,
+was designed for <newword>real-time graphics</newword>, where the time that is available
+for rendering an image is a fraction of a second.  For an animated movie, it's OK if
+it takes hours to <word term="rendering">render</word> each frame.  But a video game is expected to
+render sixty frames every second.  Even with the incredible speed of modern computer graphics
+hardware, compromises are necessary to get that speed.  And thirty years ago, when OpenGL
+was still new, the compromises were a lot bigger</p>
+
+<p>In this chapter, we look at light and material in OpenGL 1.1.   You will learn how to
+configure light sources and how to assign material properties to objects.  Material properties determine how
+the objects interact with light.  And you will learn how to apply an image to a surface
+as a <word>texture</word>.  The support for light, material, and texture in OpenGL 1.1
+is relatively crude and incomplete, by today's standards.  But the concepts that it uses
+still serve as the foundation for modern real-time graphics and, to a significant extent,
+even for the most realistic computer graphics.</p>
+
+
+</intro>

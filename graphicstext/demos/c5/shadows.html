@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/three.min.js"></script>
+<script src="../script/threejs/OrbitControls.js"></script>
+<script>
+
+var canvas, scene, renderer, camera;
+
+
+var firstLight, secondLight;  // The lights -- actually complex objects that
+                               // a light plus a small sphere to show its position.
+
+var base;  // The base, on which the shadows are cast.
+
+var sphere, bar, cyl;  // The objects in the scene that cast shadows.
+
+
+
+
+function render() {  
+    renderer.render(scene,camera);
+}
+
+function createWorld() {
+    scene = new THREE.Scene();
+    renderer.setClearColor("black");
+    camera = new THREE.PerspectiveCamera(45, canvas.width/canvas.height, 0.1, 100);
+    var light = new THREE.PointLight(0xffffff, 0.3);  // A dim viewpoint light, so there is always at least some illumination.
+    camera.position.z = 35;
+    camera.position.y = 15;
+    camera.lookAt( new THREE.Vector3(0,0,0));
+    camera.add(light);  // viewpoint light moves with camera
+    scene.add(camera);
+    
+    renderer.shadowMap.enabled = true; // This is required for this renderer to
+                                       // do shadow computations.  Note that
+                                       // renderer.setSize(width,height) must also be
+                                       // called for the rendering with shadows to work.
+    renderer.setSize( canvas.width, canvas.height );
+    
+    /* The base on which the objects rest. */
+    base = new THREE.Mesh( 
+         new THREE.PlaneGeometry(25,25),
+         new THREE.MeshPhongMaterial({ color:"white" })
+    );
+    base.rotation.x = -Math.PI/2;  // Rotate so it's parallel to xz-plane.
+    base.position.y = -3;  // The "floor" is lowered 3 units.
+    base.receiveShadow = true;  // This allows shadows to be rendered onto the base.
+    scene.add(base);
+    /* Due to a bug(?) in three.js, shadows are rendered onto the back (non-illuminated) side
+       of the base.  So, instead of making the base material two-sided, I hide the back with
+       another plane that does not receive shadows. */
+    var baseBack = new THREE.Mesh(
+         new THREE.PlaneGeometry(25,25),
+         new THREE.MeshPhongMaterial({ color:"white" })
+    );
+    baseBack.rotation.x = Math.PI/2;
+    baseBack.position.y = -3.01;
+    scene.add(baseBack);
+    
+    /* Create the three objects that cast shadows. */
+    sphere = new THREE.Mesh(
+         new THREE.SphereGeometry(3,32,20),
+         new THREE.MeshPhongMaterial({ color: 0x00AA99 })
+    );
+    sphere.position.set(6,0,3);
+    sphere.castShadow = true;  // This allows the sphere to cast a shadow.
+    scene.add(sphere);
+    bar = new THREE.Mesh(
+         new THREE.CylinderGeometry(1,1,5,16,1),
+         new THREE.MeshPhongMaterial({ color: 0xBB9900 })
+    );
+    bar.rotation.z = Math.PI/2;
+    bar.position.set(-5, -1, 1);
+    bar.castShadow = true;    // This allows the bar to cast a shadow.
+    scene.add(bar);
+    cyl = new THREE.Mesh(
+         new THREE.CylinderGeometry(1,2,7,5,1),
+         new THREE.MeshPhongMaterial({ color: 0xCC77EE })
+    );
+    cyl.position.set(1, 0.5, -5);
+    cyl.castShadow = true;   // This allows the cylinder to cast a shadow.
+    cyl.receiveShadow = true;  // Shadows can also be cast onto cyl.
+    scene.add(cyl);
+    
+    /* Create a directional light that casts shadows. Also make a small sphere that
+       will be in the same position as the light.  Put the light and the sphere into
+       another object that is used to animate the light/sphere position. */
+    var light1 = new THREE.DirectionalLight(0xffffff, 0.7);
+    light1.castShadow = true;  // allows the light to cast shadows
+    light1.shadow.camera.near = 1; // Note: It is VITAL to set the camera camera properties!
+    light1.shadow.camera.far = 30;
+    light1.shadow.camera.left = -20;
+    light1.shadow.camera.bottom = -20;
+    light1.shadow.camera.right = 20;
+    light1.shadow.camera.top = 20;
+    light1.shadow.mapSize.width = 1024;
+    light1.shadow.mapSize.height = 1024;
+    light1.add( new THREE.Mesh(
+        new THREE.SphereGeometry(0.5),
+        new THREE.MeshBasicMaterial({ color: 0xcccccc })
+    ));
+    light1.position.set(10,10,0);
+    firstLight = new THREE.Object3D();
+    firstLight.add(light1);
+    scene.add(firstLight);
+    
+    /* Now create a spotlight that casts its own set of shadows. */
+    var light2 = new THREE.SpotLight(0xffffff, 0.7);
+    light2.castShadow = true;
+    light2.shadow.camera.near = 10;
+    light2.shadow.camera.far = 50;
+    light2.shadow.camera.fov = 45;
+    light2.shadow.mapSize.Width = 1024;
+    light2.shadow.mapSize.height = 1024;
+    var light2Sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.5),
+        new THREE.MeshBasicMaterial({ color: 0xcccccc })
+    );
+    light2.position.set(-20,20,0);
+    light2Sphere.position.set(-9,9,0); // Not actually the position of the light, but indicates its direction.
+    secondLight = new THREE.Object3D();
+    secondLight.add(light2);
+    secondLight.add(light2Sphere);
+    scene.add(secondLight);
+}  // end createWorld();
+
+/**
+ *  This function is called when the user changes the setting of the "First Light" checkbox.
+ *  Adds/removes the first shadow light according to the setting of checkbox.
+ */
+function doFirstLightCheckbox() {
+    if (document.getElementById("firstLightCheckbox").checked)
+        scene.add(firstLight);
+    else
+        scene.remove(firstLight);
+    base.material.needsUpdate = true;  // If omitted, the shawdow from a light might remain after light is removed.
+    cyl.material.needsUpdate = true;   // Cyl can also have stray shadows if this is omitted.
+    if (!animating)
+        render();
+}
+
+
+/**
+ *  This function is called when the user changes the setting of the "Second Light" checkbox.
+ *  Adds/removes the second shadow light according to the setting of the checkbox.
+ */
+function doSecondLightCheckbox() {
+    if (document.getElementById("secondLightCheckbox").checked)
+        scene.add(secondLight);
+    else
+        scene.remove(secondLight);
+    base.material.needsUpdate = true; 
+    cyl.material.needsUpdate = true;
+    if (!animating)
+        render();
+}
+
+
+/**
+ *  When an animation is in progress, this function is called just before rendering each
+ *  frame of the animation.  In this case, the shadow-casting lights are animated so that
+ *  they move in a circle around the y-axis and at the same time move up and down.  In
+ *  addition, the bar, one of the objects that casts a shadow, spins.
+ */
+function updateForFrame() { 
+    var time = clock.getElapsedTime();
+    firstLight.rotation.y = 1 + time/3;  // circular motion at the rate of 1/3 radian per second.
+    secondLight.rotation.y = -time/1.87;
+    firstLight.rotation.z = 0.5*Math.sin(time/2.7);  // up and down motion
+    secondLight.rotation.z = 0.35*Math.cos(time/5.2);
+    bar.rotation.y = time;  // spin the bar at the rate of 1 radian per second
+}
+
+
+//--------------------------- animation support -----------------------------------
+
+var clock = new THREE.Clock(false);  // Keeps track of elapsed time of animation.
+
+var animating = false;
+
+function doFrame() {  
+	if (animating) {
+	    updateForFrame();
+	    render();
+		requestAnimationFrame(doFrame); 
+	}
+}
+
+function startAnimation() {
+    if (!animating) {
+	   clock.start();
+	   animating = true;
+	   requestAnimationFrame(doFrame);
+	}
+}
+
+function pauseAnimation() {
+	if (animating) {
+	    clock.stop();
+	    animating = false;
+	}
+}
+
+function doAnimationCheckbox() { 
+    if ( document.getElementById("animationCheckbox").checked )
+    	startAnimation();
+    else
+    	pauseAnimation();
+}
+
+function installOrbitControls() {
+    var controls = new THREE.OrbitControls(camera,canvas);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.addEventListener("change",render);
+}
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true
+        });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    document.getElementById("animationCheckbox").checked = false;
+    document.getElementById("firstLightCheckbox").checked = true;
+    document.getElementById("secondLightCheckbox").checked = true;
+    createWorld();
+    installOrbitControls();
+    updateForFrame();
+    render();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Three.js Shadow Demo</h3>
+
+<p><input type="checkbox" id="animationCheckbox" onchange="doAnimationCheckbox()"> 
+    <label for="animationCheckbox">Animate</label>
+   <input type="checkbox" id="firstLightCheckbox" onchange="doFirstLightCheckbox()" style="margin-left:20px"> 
+    <label for="firstLightCheckbox">Light 1 (Directional)</label>
+   <input type="checkbox" id="secondLightCheckbox" onchange="doSecondLightCheckbox()" style="margin-left:20px"> 
+    <label for="secondLightCheckbox">Light 2 (Spot) </label>
+</p>
+
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="500" height="400"></canvas>
+</div>
+
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>A demonstration of support for shadows in <i>three.js</i>. 
+<p>Shadows require a lot of configuration and tuning to get right, and they are still not
+perfect. For example, a spotlight generates shadows outside its cone of illumination,
+and the shadow doesn't seem to take the color of the light into account.  However,
+the demo shows that reasonable looking shadows are possible.</p>
+<p>The "Animate" checkbox makes the lights move and one of the objects rotate in place, so
+you can see how the shadows depend on the light positions as well as the objects.</p>
+<p>The scene can be rotated using the mouse.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

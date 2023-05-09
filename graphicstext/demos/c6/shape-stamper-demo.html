@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<!--
+   This page lets the user place shapes on the canvas
+   by clicking the canvas, as a demo of WebGL graphics.
+   (The application is actually more suited to the 2D canvas
+   graphics API.)
+   
+   Pop-up menus allow the user to control the shape, the color
+   of the shape, and the degree of opaqueness.
+   
+   Note that in this program, the WebGL context option preserveDrawingBuffer
+   is set to true, which means that the image in the buffer will be retained
+   after the image is copied to the web page.  This is essential in this
+   program because the response to a click is simply to draw one shape -- the
+   previous image still has to be there!
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGL Shape Stamper Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    select {
+        margin-left: 25px;
+        margin-top: 8px;
+    }
+</style>
+
+<script src="../script/demo-core.js"></script>
+
+<script>
+
+"use strict";
+
+var vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "uniform float u_width;\n" +
+       "uniform float u_height;\n" +
+       "uniform vec2 u_translation;\n" +
+       "void main() {\n" +
+       "   float x = -1.0 + 2.0*((a_coords.x + u_translation.x) / u_width);\n" +
+       "   float y = 1.0 - 2.0*((a_coords.y + u_translation.y) / u_height);\n" +
+       "   gl_Position = vec4(x, y, 0.0, 1.0);\n" +
+       "}\n";
+
+var fragmentShaderSource =
+       "precision mediump float;\n" +
+       "uniform vec3 u_color;\n" +
+       "uniform float u_alpha;\n" +
+       "void main() {\n" +
+       "   gl_FragColor = vec4(u_color, u_alpha);\n" +
+       "}\n";
+
+var canvas;  // The canvas where WebGL draws.
+
+var gl;  // The WebGL graphics context.
+
+var uniformWidth;   // Location of uniform named "u_width"
+var uniformHeight;  // Location of uniform named "u_height"
+var uniformColor;   // Location of uniform named "u_color" (for RGB components)
+var uniformAlpha;   // Location of uniform named "u_alpha" (for alpha components)
+var uniformTranslation;  // Location of the "u_translation" uniform
+
+var attributeCoords;  // Location of the attribute named "a_coords".
+
+var bufferCoordsCircle;   // A vertex buffer object to hold the values for coords of circle
+var bufferCoordsSquare;   //  ...of the square
+var bufferCoordsTriangle; //  ...of the triangle
+var bufferCoordsStar;     //  ...and of the star.
+
+var colorList = [ // available colors for shapes
+        [ 1, 0, 0 ],
+        [ 0, 0.8, 0 ],
+        [ 0, 0, 1 ],
+        [ 0, 1, 1 ],
+        [ 1, 0, 1 ],
+        [ 1, 1, 0 ],
+        [ 0, 0, 0 ],
+        [ 0.5, 0.5, 0.5 ]
+    ];
+
+/**
+ *  The init() function installs this function as a handler for mousedown events
+ *  on the canvas.  It calles putShape to draw a shape at the current mouse position.
+ */
+function doMouseDown(event) {
+    
+    /* Get mouse position (x,y) in pixel coords on the canvas. */
+    
+    var r = canvas.getBoundingClientRect();
+    var x = event.clientX - r.left;
+    var y = event.clientY - r.top;
+    
+    putShape(x,y);
+}
+
+/**
+ *  The init() function installs this function as a handler for touchstart events
+ *  on the canvas.  For a one-finger touch, this method calls putShape to add
+ *  a shape to the canvas at the location of the touch.
+ */
+function doTouch(evt) {
+    if (evt.touches.length != 1) {
+       return;  // Don't respond to multi-touches
+    }
+    evt.preventDefault(); // don't generate mouse event on devices that support mouse and touch
+    var r = canvas.getBoundingClientRect();
+    var x = evt.touches[0].clientX - r.left;
+    var y = evt.touches[0].clientY - r.top;
+    putShape(x,y);
+}
+
+
+/**
+ * draw one shape at (x,y),  with the properties specified by the popup menus. 
+ */
+function putShape(x, y) {
+
+    gl.uniform2f(uniformTranslation, x, y);  // will translate shape from (0,0) to (x,y).
+    
+    /* Get settings from the pop-up menu, and use them to set the color and alpha uniforms. */
+    
+    var color = Number(document.getElementById("colorChoice").value);
+    var alpha = Number(document.getElementById("opacityChoice").value);
+    
+    gl.uniform3fv( uniformColor, colorList[color] );
+    gl.uniform1f( uniformAlpha, alpha );
+    
+    /* Get the shape selection from the pop-up menu, and draw the shape.  To get
+       the correct data into the shader, we have to call gl.vertexAttribPointer
+       while the correct buffer for that shape is bound. */
+    
+    var shape = document.getElementById("shapeChoice").value;
+       
+    switch (shape) {
+        case "Circle":
+            gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoordsCircle);
+            gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, 32);
+            break;
+        case "Square":
+            gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoordsSquare);
+            gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+            break;
+        case "Triangle":
+            gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoordsTriangle);
+            gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, 3);
+            break;
+        default: // "Star
+            gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoordsStar);
+            gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, 12);
+            break;
+    }
+   
+}
+
+
+/**
+ *  This function is called as part the WebGL initialization to create buffers
+ *  to hold values for the "a_coords" attribute.  One buffer is created and
+ *  and filled with data for each of the four possible shapes.
+ *    Note that all shapes are centered at (0,0).  They are translated to
+ *  a different position when they are drawn, using the u_translation uniform.
+ */
+function createShapeBuffers() {
+
+    var coords;  // a Float32Array to hold the coordinates
+    
+    /* Create data for a circle, approximated as a 32-vertex regular polygon. */
+    
+    coords = new Float32Array(64);  // 32 vertices; two numbers per vertex.
+    var k = 0;  // index into the coords array
+    for (var i = 0; i < 32; i++) {
+        var angle = i/32 * 2*Math.PI;
+        coords[k++] = 50*Math.cos(angle);  // x-coord of vertex
+        coords[k++] = 50*Math.sin(angle);  // y-coord of vertex
+    }
+
+    bufferCoordsCircle = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, bufferCoordsCircle );
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+    
+    /* Create data for a square with 80 pixels on a side */
+
+    coords = new Float32Array(8);
+    coords[0] = -40;
+    coords[1] = -40;
+    coords[2] = -40;
+    coords[3] = +40;
+    coords[4] = +40;
+    coords[5] = +40;
+    coords[6] = +40;
+    coords[7] = -40;
+
+    bufferCoordsSquare = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, bufferCoordsSquare );
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+    
+    /* Create data for a triangle  */
+
+    coords = new Float32Array(6);
+    coords[0] = -50;
+    coords[1] = +40;
+    coords[2] = +50;
+    coords[3] = +40;
+    coords[4] = 0;
+    coords[5] = -60;
+
+    bufferCoordsTriangle = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, bufferCoordsTriangle );
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+    
+    /* Create data for a star.  The star is a polygon in which the
+       odd-numbered vertices have a smaller "radius" than the even-numbered
+       vertices.  To make gl.TRIANGLE_FAN work correctly for this non-convex
+       polygon, the first vertex of the shape is set to the center of the
+       star. */
+    
+    coords = new Float32Array(24);
+    k = 0;
+    coords[k++] = 0;
+    coords[k++] = 0;
+    for (var i = 0; i <= 10; i++) {
+        var angle = -Math.PI/2 + i/10 * 2*Math.PI;
+        var radius = (i % 2 == 0)? 50 : 21;
+        coords[k++] = radius*Math.cos(angle);  // x-coord of vertex
+        coords[k++] = radius*Math.sin(angle);  // y-coord of vertex
+    }
+
+    bufferCoordsStar = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, bufferCoordsStar );
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+}
+
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   var vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw "Error in vertex shader:  " + gl.getShaderInfoLog(vsh);
+   }
+   var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw "Error in fragment shader:  " + gl.getShaderInfoLog(fsh);
+   }
+   var prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+   }
+   return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context, and fill the canvas with white.
+ */
+function initGL() {
+    var prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    attributeCoords = gl.getAttribLocation(prog, "a_coords");
+    gl.enableVertexAttribArray(attributeCoords); 
+    uniformWidth = gl.getUniformLocation(prog, "u_width");
+    uniformHeight = gl.getUniformLocation(prog, "u_height");
+    uniformColor = gl.getUniformLocation(prog, "u_color");
+    uniformAlpha = gl.getUniformLocation(prog, "u_alpha");
+    uniformTranslation = gl.getUniformLocation(prog, "u_translation");
+    gl.uniform1f(uniformHeight, canvas.height);
+    gl.uniform1f(uniformWidth, canvas.width);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clearColor(1,1,1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    createShapeBuffers();
+} 
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        var options = {  // no need for alpha channel or depth buffer in this program,
+                         // but we need to preserve the image in the drawingBuffer
+            alpha: false,
+            depth: false,
+            preserveDrawingBuffer: true
+        };
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    document.getElementById("shapeChoice").value = "Star";
+    document.getElementById("colorChoice").value = "0";
+    document.getElementById("opacityChoice").value = "0.5";
+    canvas.addEventListener("mousedown", doMouseDown, false);
+    canvas.addEventListener("touchstart", doTouch, false);
+    document.getElementById("clearButton").onclick = function() {
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">A "Shape-Stamper" in WebGL</h3>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="400" height="400"></canvas>
+</div>
+
+<div id="tools">
+<p>
+    <label><b>Shape:</b><br>
+    <select id="shapeChoice">
+        <option>Circle</option>
+        <option>Square</option>
+        <option>Triangle</option>
+        <option>Star</option>
+    </select></label>
+</p>
+<p>
+    <label><b>Color:</b><br>
+    <select id="colorChoice">
+        <option value="0">Red</option>
+        <option value="1">Green</option>
+        <option value="2">Blue</option>
+        <option value="3">Cyan</option>
+        <option value="4">Magenta</option>
+        <option value="5">Yellow</option>
+        <option value="6">Black</option>
+        <option value="7">Gray</option>
+    </select></label>
+</p>
+<p>
+    <label><b>Opacity:</b><br>
+    <select id="opacityChoice">
+        <option value="1.0">100%</option>
+        <option value="0.75">75%</option>
+        <option value="0.5">50%</option>
+        <option value="0.25">25%</option>
+        <option value="0.1">10%</option>
+    </select></label>
+</p>
+<p>
+    <button id="clearButton">Clear</button>
+</p>
+<p>
+    <b>Click the<br>
+    canvas<br>
+    to add<br>
+    a shape!</b>
+</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This is a demo version of a sample WebGL program, shape-stamper.html.
+There is not much to say about its functionality.  Click the canvas to
+add a shape.  When a shape is added, its properties are taken from the
+popup menus on the right.  The "Clear" button will clear the canvas by filling
+it with white.</p>
+<p>It's worth looking at the source code for both the sample program and
+the demo, since there is a significant difference in the way that they
+draw the shapes.  The sample program uses a single VBO to hold the
+coordinates for the shape.  When a shape is drawn, a new set of coordinates
+is computed and is loaded into the VBO.  The demo uses four VBOs, one
+for each shape.  Coordinates for the shape are computed and loaded into
+the buffers during initialization, and the contents of the buffers are
+not changed after that. However, since the coordinates for the shapes assume
+that the shapes are centered at (0,0), a translation was added to
+the vertex shader to move the shape into the desired position.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

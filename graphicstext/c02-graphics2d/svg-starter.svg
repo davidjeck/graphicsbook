@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" 
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+
+<!-- This document shows a possible structure for an SVG document,
+and it contains examples of basic shapes, attributes, and transforms. 
+The "?xml" and "DOCTYPE" lines, above, and the first line of the "<svg>"
+tag, below, should always appear as shown.  The second line of
+the svg tag is only necessary if the document contains "use" elements.
+   The width and height in the next line give the preferred size for the
+image when it is displayed. The viewbox defines the coordinate system
+used for drawing on the image, in the format  x y width height.  (x,y) are
+the coordinates for the upper left corner of the image, horizontal
+coordinates range from x to x+width, and vertical coordinates range
+from y to y+height; the width and height must be positive.  The
+content of the svg element, everything from the <svg> tag to the 
+closing </svg> tag, specifies the scene in the image.
+   The value for preserveAspectRatio shown here is the default.  If
+the actual aspect ratio of the rectangle that holds the image when 
+it is displayed does not match the aspect ratio of the viewBox, then the
+viewBox limits are extended either horizontally or vertically to match
+the aspect ratio of the viewBox, and the requested viewBox occupies the 
+center of the display rectangle.  If the value of preserveAspectRatio
+is set to "none", then the viewBox limits will be kept as given, and
+the image will be stretched to fill the display rectangle.
+-->
+
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" 
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="4in" height="4in" 
+     viewBox="0 0 400 400"
+     preserveAspectRatio="xMidYMid">
+     
+    <defs>
+       <!--  The optional "defs" section can define objects without drawing them.
+             the objects should be given id's so they be referred to later.  A defined
+             object can be included in the scene, or in a later defined object, with
+             a <use> element. -->
+             
+       <!--  First, define a circle with a black border and a translucent fill.  The center
+             is at (0,0) and the radius is 30.  No fill color is specified, but one can be
+             given when the circle definition is used later. -->
+       <circle id="tcirc" cx="0" cy="0" r="30" stroke="black" stroke-width="1" fill-opacity="0.4"/>
+       
+       <!-- Define a "T" shape as a group consisting of two lines.  The base of the T is
+            at (0,0), and it extends to the right.  -->
+       
+       <g id="tshape" stroke="black" stroke-width="5">
+           <line x1="0" y1="0" x2="100" y2="0"/>
+           <line x1="100" y1="30" x2="100" y2="-30"/>
+       </g>
+       
+    </defs>
+
+    <!-- Draw a white rectangle with a black border to fill the entire image. -->
+	<rect x="0" y="0" width="400" height="400" fill="white" stroke="black" stroke-width="2"/>
+	
+	<!--  Draw some basic shapes across the top of the image, with different styles -->
+	<ellipse cx="40" cy="30" ry="20" rx="30" fill="rgb(150,200,255)"/>
+	<circle cx="120" cy="30" r="20" stroke-width="3" stroke="red" fill="none"/> <!-- default fill is black -->
+	<polygon points="180,50 230,50 200,10"/>
+	<polyline points="260,50 270,10 280,40 290,20 380,30" stroke="blue" stroke-width="6" 
+	                    stroke-linecap="round" stroke-linejoin="bevel" fill="none"/>
+	<!-- general path, with line segments and Bezier curves -->
+	<path d="M 20,70 C 150,70 250,350 380,350 L 380,380 C 250,380 150,100 20,100 Z" 
+	   fill="yellow" stroke-width="2" stroke="black"/> 
+	   
+	<!-- Draw three copies of the circle object defined in the <defs> section, with different
+	     fill colors and translations.  Put them all in a group so that they can be translated
+	     together to their final position.  I also decided to make the set of circles bigger. -->
+
+	<g transform="translate(300,150) scale(1.5,1.5)">
+		<use xlink:href="#tcirc" fill="red" transform="translate(20,20)"/>
+		<use xlink:href="#tcirc" fill="green" transform="translate(-20,20)"/>
+		<use xlink:href="#tcirc" fill="blue" transform="translate(0,-12)"/>
+	</g>
+	
+	<!-- Similarly, make a shape consisting of 8 copies of the object with id="tshape",
+	     with different rotations.  Unfortunately, there is no way to do this with a loop. -->
+	     
+	<g transform="translate(110,290) scale(0.7,0.7)">
+		<use xlink:href="#tshape"/>
+		<use xlink:href="#tshape" transform="rotate(45)"/>
+		<use xlink:href="#tshape" transform="rotate(90)"/>
+		<use xlink:href="#tshape" transform="rotate(135)"/>
+		<use xlink:href="#tshape" transform="rotate(180)"/>
+		<use xlink:href="#tshape" transform="rotate(225)"/>
+		<use xlink:href="#tshape" transform="rotate(270)"/>
+		<use xlink:href="#tshape" transform="rotate(315)"/>
+	</g>
+	
+</svg>
+
+

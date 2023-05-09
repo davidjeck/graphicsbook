@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js InstancedMesh</title>
+<style>
+</style>
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+
+/* Demonstrates the use of THREE.InstancedMesh to drow
+ * large numbers of copies of an object.  The basic object
+ * is a sphere.  It used to make an 11-by-11-by-11 cube
+ * of colored spheres.  An InstancedMesh allows each instance
+ * to have its own color and transformation; those are the
+ * only property that can vary.
+ *    This program uses WebGL2, which might not be available
+ * in all web browsers.  It also works with a WebGL1Rendered,
+ * but that presumably doesn't support true hardware instancing.
+ */
+
+let scene, camera, renderer;  // Three.js rendering basics.
+
+let canvas;  // The canvas on which the image is rendered.
+
+/*  Create the scene graph.  This function is called once, as soon as the page loads.
+ *  The renderer has already been created before this function is called.
+ */
+function createWorld() {
+   renderer.setClearColor( 0x808080 );
+   scene = new THREE.Scene();
+   
+   // create a camera, sitting on the positive z-axis. 
+   camera = new THREE.PerspectiveCamera(35, canvas.width/canvas.height, 1, 100);
+   camera.position.z = 30;
+   
+   // create some lights and add them to the scene.
+   let light = new THREE.DirectionalLight( 0xffffff, 0.8 );
+   light.position.set(0,0,1);  // shines down the z-axis
+   camera.add(light); // light rotates with the camera.
+   scene.add(camera);
+   scene.add(new THREE.AmbientLight(0x303030));
+   
+   // Create the instanced mesh object.  The geometry of
+   // the mesh will be rendered 1331 times, with different
+   // transformations and different colors.
+   
+   const material = new THREE.MeshLambertMaterial();
+   
+   const geometry = new THREE.SphereGeometry(0.45, 32, 16);
+   
+   const count = 11 * 11 * 11;  // number of instances
+   
+   let object = new THREE.InstancedMesh(geometry, material, count);
+   
+   // Create the data for the instances.  Each instance has its
+   // own translation (x,y,z), where x, y, and z range from -5 to 5.
+   // The transformations are installed into the InstancedMesh
+   // using the setMatrixAt() method.  At the same time, each
+   // gets its own color, which are installed using the setColorAt()
+   // method.
+   
+   let matrix = new THREE.Matrix4();
+   let color = new THREE.Color();
+   let i = 0;
+   for (let z = -5; z <= 5; z++)
+       for (let y = -5; y <= 5; y++)
+           for (let x = -5; x <= 5; x++) {
+               color.r = (x+5)/10;  // Red component ranges from 0 to 1 in the x-direction.
+               color.g = (y+5)/10;  // Green component ranges from 0 to 1 in the y-direction.
+               color.b = 1 - (z+5)/10;  // Blue component ranges from 1 to 0 in the y-direction.
+               object.setColorAt(i, color);
+               matrix.makeTranslation(x,y,z);
+               object.setMatrixAt(i++, matrix);
+           }
+   scene.add(object);
+   
+}
+
+
+/*  Render the scene.
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+/**
+ *  This init() function is called when by the onload event when the document has loaded.
+ */
+function init() {
+   try {
+       canvas = document.getElementById("glcanvas");
+       renderer = new THREE.WebGLRenderer( {
+          canvas: canvas,
+          antialias: true
+      } );
+   }
+   catch (e) {
+      document.getElementById("canvas-holder").innerHTML =
+               "<h3><b>Sorry, WebGL2 is required but is not available.</b><h3>";
+      return;
+   }
+   createWorld();
+   let controls = new THREE.OrbitControls(camera,canvas);
+   controls.enablePan = false;
+   controls.enableZoom = false;
+   controls.addEventListener("change", render);
+   render();
+}
+
+
+window.onload = init;  // Arrange for init function to be called after the page is loaded.
+
+</script>
+</head>
+<body>
+
+<h2>Three.js InstancedMesh Example</h2>
+
+<p>Use your mouse (or finger) to rotate the scene.</p>
+
+<div id="canvas-holder">
+<canvas id="glcanvas" width="700" height="700"></canvas>
+</div>
+
+</body>
+</html>

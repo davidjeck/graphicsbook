@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd">
+
+<section id="introduction.1" title="Painting and Drawing">
+
+<p1>The main focus of this book is three-dimensional (3D) graphics,
+where most of the work goes into producing a 3D model of a scene.
+But ultimately, in almost all cases, the end result of a computer
+graphics project is a two-dimensional image.   And of course,
+the direct production and manipulation of 2D images is an important
+topic in its own right.  Furthermore, a lot of ideas carry over
+from two dimensions to three.  So, it makes sense to start
+with graphics in 2D.</p1>
+
+<p>An image that is presented on the computer screen is made up of <newword term="pixel">pixels</newword>.  The screen
+consists of a rectangular grid of pixels, arranged in rows and columns.  The pixels are small enough that
+they are not easy to see individually.  In fact, for many very high-resolution displays, they become
+essentially invisible.  At a given time, each pixel can
+show only one color.  Most screens these days use 24-bit color, where
+a color can be specified by three 8-bit numbers, giving the levels of red, green, and blue in the color.
+Any color that can be shown on the screen is made up of some combination of these three "primary" colors.
+Other formats are possible, such as <newword>grayscale</newword>, where each pixel is some shade of gray
+and the pixel color is given by one number that specifies the level of gray on a black-to-white scale.
+Typically, 256 shades of gray are used.
+Early computer screens used <newword>indexed color</newword>, where only a small set of colors, usually
+16 or 256, could be displayed.  For an indexed color display, there is a numbered list of possible colors,
+and the color of a pixel is specified by an integer giving the position of the color in the list.</p>
+
+<p>In any case, the color values for all the pixels on the screen are stored in a large block of memory
+known as a <newword>frame buffer</newword>.  Changing the image on the screen requires changing
+color values that are stored in the frame buffer.  The screen is redrawn many times per second, so that almost immediately
+after the color values are changed in the frame buffer, the colors of the pixels on the screen will
+be changed to match, and the displayed image will change.</p>
+
+<p>A computer screen used in this way is the basic model of <newword>raster graphics</newword>.  The term "raster" technically
+refers to the mechanism used on older vacuum tube computer monitors:  An electron beam would move along
+the rows of pixels, making them glow.  The beam was moved
+across the screen by powerful magnets that would deflect the path of the electrons.
+The stronger the beam, the brighter the glow of the pixel, so the brightness of
+the pixels could be controlled by modulating the intensity of the electron beam.  The color values
+stored in the frame buffer were used to determine the intensity of the electron beam.  (For a color
+screen, each pixel had a red dot, a green dot, and a blue dot, which were separately illuminated by
+the beam.)
+</p>
+
+<p>A modern flat-screen computer monitor is not a raster in the same sense.  There is no moving
+electron beam.  The mechanism that controls the colors of the pixels is different for different
+types of screen.  But the screen is still made up of pixels, and the color values for all the
+pixels are still stored in a frame buffer.  The idea of an image consisting of a grid of
+pixels, with numerical color values for each pixel, defines raster graphics.
+</p>
+
+<break/>
+
+<p>Although images on the computer screen are represented using pixels, specifying individual
+pixel colors is not always the best way to create an image.  Another way
+is to specify the basic geometric objects that it contains, shapes such as lines, circles,
+triangles, and rectangles.  This is the idea that defines <newword>vector graphics</newword>:  Represent an
+image as a list of the geometric shapes that it contains.  To make things more interesting,
+the shapes can have <newword term="attribute">attributes</newword>, such as the thickness of a line or the
+color that fills a rectangle.  Of course, not every image can be composed from simple
+geometric shapes. This approach certainly wouldn't work for a picture of a beautiful sunset
+(or for most any other photographic image).  However, it works well for many types of
+images, such as architectural blueprints and scientific illustrations.
+</p>
+
+<p>In fact, early in the history of computing, vector graphics was even used directly on
+computer screens.  When the first graphical computer displays were developed,
+raster displays were too slow and expensive to be practical.  Fortunately, it was
+possible to use vacuum tube technology in another way:  The electron beam could be made
+to directly draw a line on the screen, simply by sweeping the beam along that line.
+A vector graphics display would store a <newword>display list</newword> of lines
+that should appear on the screen.  Since a point on the screen would glow only very briefly
+after being illuminated by the electron beam, the graphics display would go through
+the display list over and over, continually redrawing all the lines on the list.
+To change the image, it would only be necessary to change the contents of the display list.
+Of course, if the display list became too long, the image would start to flicker
+because a line would have a chance to visibly fade before its next turn to be redrawn.
+</p>
+
+<p>But here is the point: For an image that can be specified as a reasonably small
+number of geometric shapes, the amount of information needed to represent the image
+is much smaller using a vector representation than using a raster representation.
+Consider an image made up of one thousand line segments.  For a vector representation
+of the image, you only need to store the coordinates of two thousand points, the
+endpoints of the lines.  This would take up only a few kilobytes of memory.  To store
+the image in a frame buffer for a raster display would require much more memory.  
+Similarly, a vector display could
+draw the lines on the screen more quickly than a raster display could copy the the same image from
+the frame buffer to the screen.  (As soon as raster displays became fast and 
+inexpensive, however, they quickly displaced vector displays because of their
+ability to display all types of images reasonably well.)
+</p>
+
+<break/>
+
+<p>The divide between raster graphics and vector graphics persists in several areas
+of computer graphics.  For example, it can be seen in a division between two
+categories of programs that can be used to create images:  <newword term="painting program">painting programs</newword>
+and <newword term="drawing program">drawing programs</newword>.  In a painting program, the image is represented
+as a grid of pixels, and the user creates an image by assigning colors to pixels.
+This might be done by using a "drawing tool" that acts like a painter's brush,
+or even by tools that draw geometric shapes such as lines or rectangles. But the point in a
+painting program is to color the individual pixels, and it is only the pixel colors that are saved.
+To make this clearer, suppose that you use a painting program to draw a house, then
+draw a tree in front of the house.  If you then erase the tree, you'll only reveal a blank
+background, not a house.  In fact, the image never really contained a "house" at all&mdash;only
+individually colored pixels that the viewer might perceive as making up a picture of a house.
+</p>
+
+<p>In a drawing program, the user creates an image by adding geometric shapes, and the
+image is represented as a list of those shapes.  If you place a house shape (or collection of shapes
+making up a house) in the image, and you then place a tree shape on
+top of the house, the house is still there, since it
+is stored in the list of shapes that the image contains.  If you delete the tree, the house will
+still be in the image, just as it was before you added the tree.  Furthermore, you should be able
+to select one of the shapes in the image and move it or change its size, so drawing programs
+offer a rich set of editing operations that are not possible in painting programs.  (The reverse,
+however, is also true.)
+</p>
+
+<p>A practical program for image creation and editing might combine elements of painting and
+drawing, although one or the other is usually dominant.  For example, a drawing program might
+allow the user to include a raster-type image, treating it as one shape.  A painting program
+might let the user create "layers," which are separate images that can be layered one on top
+of another to create the final image.  The layers can then be manipulated much like the shapes
+in a drawing program (so that you could keep both your house and your tree in separate layers,
+even if in the image of the house is in back of the tree).
+</p>
+
+<p>Two well-known graphics programs are <i>Adobe Photoshop</i> and <i>Adobe Illustrator</i>.
+<i>Photoshop</i> is in the category of painting programs, while <i>Illustrator</i> is more of a drawing program.
+In the world of free software, the GNU image-processing program, <i>Gimp</i>, is a good alternative
+to <i>Photoshop</i>, while <i>Inkscape</i> is a reasonably capable free drawing program.
+Short introductions to Gimp and Inkscape can be found in <localref href="gimp"/>.</p>
+
+<break/>
+
+<p>The divide between raster and vector graphics also appears in the field of graphics file formats.
+There are many ways to represent an image as data stored in a file.  If the original image
+is to be recovered from the bits stored in the file, the representation must follow some exact, known
+specification.  Such a specification is called a graphics file format.  Some popular graphics file
+formats include GIF, PNG, JPEG, WebP, and SVG.  Most images used on the Web are GIF, PNG, or JPEG,
+but most browsers also have support for SVG images and for the newer WebP format.</p>
+
+<p>GIF, PNG, JPEG, and WebP are basically raster graphics formats; an image is specified by storing a color 
+value for each pixel.  GIF is an older file format,
+which has largely been superseded by PNG, but you can still find GIF images on the web.  (The GIF
+format supports animated images, so GIFs are often used for simple animations on Web pages.) GIF uses
+an indexed color model with a maximum of 256 colors.  PNG can use either indexed or full 24-bit color,
+while JPEG is meant for full color images. 
+</p>
+
+<p>The amount of data necessary to represent a raster image can be quite
+large.  However, the data usually contains a lot of redundancy, and the data can be "compressed"
+to reduce its size.  GIF and PNG use <newword>lossless data compression</newword>, which means that the
+original image can be recovered perfectly from the compressed data.
+JPEG uses a <newword>lossy data compression</newword> algorithm,
+which means that the image that is recovered from
+a JPEG file is not exactly the same as the original image; some information has been lost.
+This might not sound like a good idea, but in fact the difference is often not very noticeable, and
+using lossy compression usually permits a greater reduction in the size of the compressed data.
+JPEG generally works well for photographic images, but not as well for images that have sharp edges
+between different colors.  It is especially bad for line drawings and images that contain text; PNG is 
+the preferred format for such images.  WebP can use both lossless and lossy compression.
+</p>
+
+<p>SVG, on the other hand, is fundamentally a vector graphics format (although SVG images can include
+raster images).  SVG is actually an XML-based language for describing two-dimensional vector graphics
+images.  "SVG" stands for "Scalable Vector Graphics," and the term "scalable" indicates one of the
+advantages of vector graphics: There is no loss of quality  when the size of the image is increased.
+A line between two points can be represented at any scale, and it is still the same perfect geometric line.
+If you try to greatly increase the size of a raster image, on the other hand, you will find that you don't
+have enough color values for all the pixels in the new image; each pixel from the original image
+will be expanded to cover a rectangle of pixels in the scaled image, and you will get multi-pixel blocks of
+uniform color.  The scalable nature of SVG images make them a good choice for web browsers and for
+graphical elements on your computer's desktop.  And indeed, some desktop environments are now using
+SVG images for their desktop icons.</p>
+
+<break/>
+
+<p>A digital image, no matter what its format, is specified using a <newword>coordinate system</newword>.
+A coordinate system sets up a correspondence between numbers and geometric points.  In two dimensions,
+each point is assigned a pair of numbers, which are called the coordinates of the point.  The two coordinates
+of a point are often called its <i>x</i>-coordinate and <i>y</i>-coordinate, although the names
+"x" and "y" are arbitrary.</p>
+
+<p>A raster image is a two-dimensional grid of pixels arranged into
+rows and columns.  As such, it has a natural coordinate system in which each pixel corresponds 
+to a pair of integers giving the number of the row and the number of the column that contain the
+pixel.  (Even in this simple case, there is some disagreement as to whether the rows should be numbered from top-to-bottom
+or from bottom-to-top.)</p>
+
+<p>For a vector image, it is natural to use real-number coordinates.  The coordinate system for an
+image is arbitrary to some degree; that is, the same image can be specified using different coordinate
+systems.  I do not want to say a lot about coordinate systems here, but they will be a major
+focus of a large part of the book, and they are even more important in three-dimensional graphics
+than in two dimensions.</p>
+
+</section>

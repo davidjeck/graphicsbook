@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="3D Coordinates and Transforms" id="gl1geom.2">
+
+<p1>In <localref href="graphics2d"/>, we looked fairly closely at 
+<word term="coordinate system">coordinate systems</word> and 
+<word term="geometric transform">transforms</word> 
+in two-dimensional computer graphics.  In this section and the
+<localref href="gl1geom.3">next</localref>, we will move that 
+discussion into 3D.  Things are more complicated in three
+dimensions, but a lot of the basic concepts remain the
+same.</p1>
+
+<subsection title="3D Coordinates" id="gl1geom.2.1">
+
+<p>A coordinate system is a way of assigning numbers to points.
+In two dimensions, you need a pair of numbers to specify a
+point.  The coordinates are often referred to as <i>x</i> and
+<i>y</i>, although of course, the names are arbitrary.  More than that,
+the assignment of pairs of numbers to points is itself arbitrary to
+a large extent.  Points and objects are real things, but
+coordinates are just numbers that we assign to them so that
+we can refer to them easily and work with them mathematically.
+We have seen the power of this when we discussed transforms, 
+which are defined mathematically in terms of coordinates but which have
+real, useful physical meanings.</p>
+
+<p>In three dimensions, you need three numbers to specify a point.
+(That's essentially what it means to be three dimensional.)
+The third coordinate is often called <i>z</i>.  The <i>z</i>-axis
+is perpendicular to both the <i>x</i>-axis and the <i>y</i>-axis.</p>
+
+
+<demo src="c3/axes3D.html" width="350" height="370">
+<p><web>This demo</web><tex>This image</tex> illustrates a 3D coordinate
+system.  The positive directions of the <i>x</i>, <i>y</i>,
+and <i>z</i> axes are shown as big arrows.  The <i>x</i>-axis is green,
+the <i>y</i>-axis is blue, and the <i>z</i>-axis is red. <web>You can</web><tex>The
+on-line version of this section has a demo version of this image in
+which you</tex> drag on the axes to rotate the image.</p>
+</demo>
+<texdiv><img tex="axes3D.eps" texscale="0.6"/></texdiv>
+
+<p>This example is a 2D image, but it has a 3D look.  (The illusion is
+much stronger if you <tex>can </tex>rotate the image.)  Several things
+contribute to the effect.  For one thing, objects that are farther
+away from the viewer in 3D look smaller in the 2D image.  This is
+due to the way that the 3D scene is "projected" onto 2D.  We will
+discuss projection in the <localref href="gl1geom.3">next section</localref>.
+Another factor is the "shading" of the objects.  The objects are shaded
+in a way that imitates the interaction of objects with the light that
+illuminates them.  We will put off a discussion of lighting until
+<localref href="gl1light"/>.  In this section, we will concentrate on
+how to construct a scene in 3D&mdash;what we have referred to as
+<word term="modeling transformation">modeling</word>.</p>
+
+<p>OpenGL programmers usually think in terms of a coordinate system in which
+the <i>x</i>- and <i>y</i>-axes lie in the plane of the screen, and the <i>z</i>-axis is perpendicular
+to the screen with the positive direction of the <i>z</i>-axis pointing <b>out
+of</b> the screen towards the viewer.   Now, the default
+coordinate system in OpenGL, the one that you are using if you
+apply no transformations at all, is similar but has the positive direction of the <i>z</i>-axis
+pointing <b>into</b> the screen.  This is not a contradiction:  The coordinate
+system that is actually used is arbitrary.  It is set up by a transformation.
+The convention in OpenGL is to work with a coordinate system in which the
+positive <i>z</i>-direction points toward the viewer and the negative
+<i>z</i>-direction points away from the viewer.  The transformation into
+default coordinates reverses the direction of the <i>z</i>-axis.</p>
+
+<p>This conventional arrangement of the axes produces a 
+<newword>right-handed coordinate system</newword>.  This means that if
+you point the thumb of your right hand in the direction of the positive
+<i>z</i>-axis, then when you curl the fingers of that hand, they will curl
+in the direction from the positive <i>x</i>-axis towards the positive <i>y</i>-axis.
+If you are looking at the tip of your thumb, the curl will be in the counterclockwise
+direction.  Another way to think about it is that if you curl the figures of your
+right hand from the positive <i>x</i> to the positive <i>y</i>-axis, then your
+thumb will point in the direction of the positive <i>z</i>-axis.
+The default OpenGL coordinate system (which, again, is hardly ever used)
+is a left-handed system.  You should spend some time trying to visualize
+right- and left-handed coordinates systems.  Use your hands!</p>
+
+<p>All of that describes the natural coordinate system from the viewer's point of view,
+the so-called "eye" or "viewing" coordinate system.
+However, these <newword>eye coordinates</newword> are not necessarily the natural coordinates on the world.
+The coordinate system on the world&mdash;the coordinate system in
+which the scene is assembled&mdash;is referred to as
+<newword>world coordinates</newword>.</p>
+
+<p>Recall that objects are not usually specified directly in world coordinates.
+Instead, objects are specified in their own coordinate system,
+known as <word>object coordinates</word>, and then <word term="modeling transformation">modeling transforms</word>
+are applied to place the objects into the world, or into more complex objects.
+In OpenGL, object coordinates are the numbers that are used in the
+<i>glVertex*</i> function to specify the vertices of the object.  However,
+before the objects appear on the screen, they are usually subject to a sequence
+of transformations, starting with a modeling transform.</p>
+
+</subsection>
+
+<subsection title="Basic 3D Transforms" id="gl1geom.2.2">
+
+<p>The basic transforms in 3D are extensions of the basic transforms that
+you are already familiar with from 2D:  <word>rotation</word>, 
+<word>scaling</word>, and <word>translation</word>.  We will look at
+the 3D equivalents and see how they affect objects when applied as
+modeling transforms.  We will also discuss how to use the transforms
+in OpenGL.</p>
+
+<p>Translation is easiest.  In 2D, a translation adds some number onto each coordinate.  The
+same is true in 3D; we just need three numbers, to specify the amount of motion
+in the direction of each of the coordinate axes.  A translation by (<i>dx,dy,dz</i>)
+transforms a point (<i>x,y,z</i>) to the point (<i>x+dx,&nbsp;y+dy,&nbsp;z+dz</i>).
+In OpenGL, this translation would be specified by the command</p>
+
+<pre>glTranslatef( dx, dy, dz );</pre>
+
+<np>or by the command</np>
+
+<pre>glTranslated( dx, dy, dz );</pre>
+
+<np>The translation will affect any drawing that is done after the command is given.
+Note that there are two versions of the command.  The first, with a name ending in "f",
+takes three <ptype>float</ptype> values as parameters.  The second, with a name ending in "d",
+takes parameters of type <ptype>double</ptype>.  As an example,</np>
+
+<pre>glTranslatef( 0, 0, 1 );</pre>
+
+<np>would translate objects by one unit in the <i>z</i> direction.</np>
+
+<p>Scaling works in a similar way: Instead of one scaling factor, you need three.  The
+OpenGL command for scaling is <i>glScale*</i>, where the "*" can be either "f" or "d".
+The command</p>
+
+<pre>glScalef( sx, sy, sz );</pre>
+
+<np>transforms a point (<i>x,y,z</i>) to (<i>x*sx,&nbsp;y*sy,&nbsp;z*sz</i>).  That is,
+it scales by a factor of <i>sx</i> in the <i>x</i> direction, <i>sy</i> in the <i>y</i>
+direction, and <i>sz</i> in the <i>z</i> direction.  Scaling is about the origin;
+that is, it moves points farther from or closer to the origin, (0,0,0).  For
+uniform scaling, all three factors would be the same.  You can use scaling by
+a factor of minus one to apply a reflection.  For example,</np>
+
+<pre>glScalef( 1, 1, -1 );</pre>
+
+<np>reflects objects through the <i>xy</i>-plane by reversing the sign of the <i>z</i>
+coordinate.  Note that a reflection will convert a right-handed coordinate system into
+a left-handed coordinate system, and <i>vice versa</i>.  Remember
+that the left/right handed distinction is not a property of the world, just
+of the way that one chooses to lay out coordinates on the world.</np>
+
+<p>Rotation in 3D is harder.  In 2D, rotation is rotation about a point, which is usually
+taken to be the origin.  In 3D, rotation is rotation about a line, which is called
+the <newword>axis of rotation</newword>.  Think of the Earth rotating
+about its axis.  The axis of rotation is the line that passes through the North Pole 
+and the South Pole.  The axis stays fixed as the Earth rotates around it,
+and points that are not on the
+axis move in circles about the axis.  Any line can be an axis of rotation, but
+we generally use an axis that passes through the origin.  The most
+common choices for axis of rotation are the coordinates axes, that is,
+the <i>x</i>-axis, the <i>y</i>-axis, or the <i>z</i>-axis.  Sometimes,
+however, it's convenient to be able to use a different line
+as the axis.</p>
+
+<p>There is an easy way to specify a line that
+passes through the origin:  Just specify one other
+point that is on the line, in addition to the origin.   That's how things are
+done in OpenGL:  An axis of rotation is specified by three numbers,
+(<i>ax,ay,az</i>), which are not all zero.  The axis is the line
+through (0,0,0) and (<i>ax,ay,az</i>).  To specify a rotation transformation in 3D,
+you have to specify an axis and the angle of rotation about that axis.</p>
+
+<p>We still have to account for the difference between positive and negative
+angles.  We can't just say clockwise or counterclockwise.  If you look down on
+the rotating Earth from above the North pole, you see a counterclockwise rotation; if you
+look down on it from above the South pole, you see a clockwise rotation.
+So, the difference between the two is not well-defined.  To define the
+direction of rotation in 3D, we use the <newword>right-hand rule</newword>, which
+says:  Point the thumb of your right hand in the direction of the
+axis &mdash; from the point (0,0,0) towards the point (<i>ax,ay,az</i>) that determines the
+axis. Then the direction of rotation for positive angles is given by the
+direction in which your fingers curl. I should emphasize that the right-hand rule
+only works if you are working in a right-handed coordinate system.  If you have
+switched to a left-handed coordinate system, then you need to use a
+left-hand rule to determine the positive direction of rotation.</p>
+
+<demo src="c3/rotation-axis.html" width="600" height="375">
+<p><web>You can use the following demo to help you understand rotation about an
+axis in three-dimensional space.  Use the buttons labeled "+X", "-X", and so on to
+make the cube rotate about the coordinate axes, or enter any (<i>x,y,z</i>) point
+and click "Set".  Drag your mouse on the image to rotate the 
+scene.</web><tex>The demo <demoref href="c3/rotation-axis.html"/>
+can help you to understand rotation in three-dimensional space.</tex></p>
+</demo>
+
+<p>The rotation function in OpenGL is <i>glRotatef</i>(<i>r,ax,ay,az</i>).
+You can also use <i>glRotated</i>.
+The first parameter specifies the angle of rotation, measured in degrees.
+The other three parameters specify the axis of rotation, which is the line
+from (0,0,0) to (<i>ax,ay,az</i>).</p>
+
+<p>Here are a few examples of scaling, translation, and scaling in OpenGL:</p>
+
+<pre>glScalef(2,2,2);        // Uniform scaling by a factor of 2.
+
+glScalef(0.5,1,1);      // Shrink by half in the x-direction only.
+
+glScalef(-1,1,1);       // Reflect through the yz-plane.
+                        // Reflects the positive x-axis onto negative x.
+
+glTranslatef(5,0,0);    // Move 5 units in the positive x-direction.
+
+glTranslatef(3,5,-7.5); // Move each point (x,y,z) to (x+3, y+5, z-7.5).
+
+glRotatef(90,1,0,0);    // Rotate 90 degrees about the x-axis.
+                        // Moves the +y axis onto the +z axis
+                        //    and the +z axis onto the -y axis.
+                        
+glRotatef(-90,-1,0,0);  // Has the same effect as the previous rotation.
+
+glRotatef(90,0,1,0);    // Rotate 90 degrees about the y-axis.
+                        // Moves the +z axis onto the +x axis
+                        //    and the +x axis onto the -z axis.
+                        
+glRotatef(90,0,0,1);    // Rotate 90 degrees about the z-axis.
+                        // Moves the +x axis onto the +y axis
+                        //    and the +y axis onto the -x axis.
+                        
+glRotatef(30,1.5,2,-3); // Rotate 30 degrees about the line through
+                        //    the points (0,0,0) and (1.5,2,-3).</pre>
+                        
+<np>Remember that transforms are applied to objects that are drawn after
+the transformation function is called, and that transformations apply to
+objects in the opposite order of the order in which they appear in the code.</np>
+
+<p>Of course, OpenGL can draw in 2D as well as in 3D.  For 2D drawing in OpenGL,
+you can draw on the <i>xy</i>-plane, using zero for the <i>z</i> coordinate.
+When drawing in 2D, you will probably want to apply 2D versions of rotation, scaling,
+and translation.  OpenGL does not have 2D transform functions, but you can just use
+the 3D versions with appropriate parameters:</p>
+
+<ul>
+<li>For translation by (<i>dx,dy</i>) in 2D, use <i>glTranslatef</i>(<i>dx,&nbsp;dy,&nbsp;0</i>).
+The zero translation in the <i>z</i> direction means that the transform doesn't change
+the <i>z</i> coordinate, so it maps the <i>xy</i>-plane to itself.  (Of course, you
+could use <i>glTranslated</i> instead of <i>glTranslatef</i>.)</li>
+<li>For scaling by (<i>sx,sy</i>) in 2D, use <i>glScalef</i>(<i>sx,&nbsp;sy,&nbsp;1</i>), which
+scales only in the <i>x</i> and <i>y</i> directions, leaving the <i>z</i> coordinate
+unchanged.</li>
+<li>For rotation through an angle <i>r</i> about the origin in 2D, use <i>glRotatef</i>(<i>r,&nbsp;0,&nbsp;0,&nbsp;1</i>).
+This is rotation about the <i>z</i>-axis, which rotates the <i>xy</i>-plane into itself.
+In the usual OpenGL coordinate system, the <i>z</i>-axis points out of the screen, 
+and the right-hand rule says that rotation by a positive angle will be in the counterclockwise 
+direction in the <i>xy</i>-plane.  Since the <i>x</i>-axis points to the right and the
+<i>y</i>-axis points upwards, a counterclockwise rotation rotates the positive <i>x</i>-axis
+in the direction of the positive <i>y</i>-axis.  This is the same convention that we have
+used previously for the positive direction of rotation.</li>
+</ul>
+
+</subsection>
+
+
+<subsection title="Hierarchical Modeling" id="gl1geom.2.3">
+
+<p>Modeling transformations are often used in <word>hierarchical modeling</word>,
+which allows complex objects to be built up out of simpler objects.  See
+<localref href="graphics2d.4"/>.  To review briefly:  In hierarchical modeling, an object can
+be defined in its own natural coordinate system, usually using (0,0,0) as a reference
+point.  The object can then be scaled, rotated, and translated to place it into
+world coordinates or into a more complex object.  To implement this, we need
+a way of limiting the effect of a modeling transformation to one object or to
+part of an object.  That can be done using a stack of transforms.  Before
+drawing an object, push a copy of the current transform onto the stack.  After drawing
+the object and its sub-objects, using any necessary temporary transformations,
+restore the previous transform by popping it from the stack.</p>
+
+<p>OpenGL 1.1 maintains a stack of transforms and provides functions for
+manipulating that stack.  (In fact it has several transform stacks, for different
+purposes, which introduces some complications that we will postpone to the 
+<localref href="gl1geom.3">next section</localref>.)  Since transforms are
+represented as <word term="matrix">matrices</word>, the stack is actually a stack of matrices.
+In OpenGL, the functions for operating on the stack are named <i>glPushMatrix</i>() and
+<i>glPopMatrix</i>().</p>
+
+<p>These functions do not take parameters or return a value.  OpenGL keeps track of
+a current matrix, which is the composition of all transforms that have been applied.
+Calling a function such as <i>glScalef</i> simply modifies the current matrix.  When
+an object is drawn, using the <i>glVertex*</i> functions, the coordinates that were specified
+for the object are transformed by the current matrix.  There is another function
+that affects the current matrix:  <i>glLoadIdentity</i>().  Calling
+<i>glLoadIdentity</i> sets the current matrix to be the <word>identity transform</word>,
+which represents no change of coordinates at all and is the usual starting point for
+a series of transformations.</p>
+
+<p>When the function <i>glPushMatrix</i>() is called, a copy of the current matrix is
+pushed onto the stack.  Note that this does not change the current matrix; it just
+saves a copy on the stack.  When <i>glPopMatrix</i>() is called, the matrix on the
+top of the stack is popped from the stack, and that matrix replaces the current matrix.
+Note that <i>glPushMatrix</i> and <i>glPopMatrix</i> must always occur in
+corresponding pairs; <i>glPushMatrix</i> saves a copy of the current matrix, and a corresponding
+call to <i>glPopMatrix</i> restores that copy.  Between a call to <i>glPushMatrix</i> and
+the corresponding call to <i>glPopMatrix</i>, there can be additional calls of these
+functions, as long as they are properly paired.  Usually, you will call <i>glPushMatrix</i>
+before drawing an object and <i>glPopMatrix</i> after finishing that object.  In between,
+drawing sub-objects might require additional pairs of calls to those functions.</p>
+
+<p>As an example, suppose that we want to draw a cube.  It's not hard to draw each
+face using glBegin/glEnd, but let's do it with transformations.  We can start with
+a function that draws a square in the position of the front face of the cube.
+For a cube of size 1, the front face would sit one-half unit in front of the screen,
+in the plane <i>z</i>&nbsp;=&nbsp;0.5, and it would have vertices at
+(-0.5,&nbsp;-0.5,&nbsp;0.5), (0.5,&nbsp;-0.5,&nbsp;0.5), (0.5,&nbsp;0.5,&nbsp;0.5), and (-0.5,&nbsp;0.5,&nbsp;0.5).
+Here is a function that draws the square.  The function's parameters are floating 
+point numbers in the range 0.0 to 1.0
+that give the <word>RGB color</word> of the square:</p>
+
+<pre>void square( float r, float g, float b ) {
+    glColor3f(r,g,b);  // Set the color for the square.
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-0.5, -0.5, 0.5);
+    glVertex3f(0.5, -0.5, 0.5);
+    glVertex3f(0.5, 0.5, 0.5);
+    glVertex3f(-0.5, 0.5, 0.5);
+    glEnd();
+}</pre>
+
+<np>To make a red front face for the cube, we just need to call <i>square</i>(1,0,0).
+Now, consider the right face, which is perpendicular to the <i>x</i>-axis, in the plane
+<i>x</i>&nbsp;=&nbsp;0.5.  To make a right face, we can start with a front face and rotate
+it 90 degrees about the <i>y</i>-axis.  Think about rotating the front face (red) to the position
+of the right face (green) in this illustration by rotating the red square about the <i>y-axis</i>:</np>
+
+<img src="rotate-cube-side.png" width="188" height="178" bordered="true" tex="rotate-cube-side.eps" texscale="0.8"/>
+
+<np>So, we can draw a green right face for the cube with</np>
+
+<pre>glPushMatrix();
+glRotatef(90, 0, 1, 0);
+square(0, 1, 0);
+glPopMatrix();</pre>
+
+<np>The calls to <i>glPushMatrix</i> and <i>glPopMatrix</i> ensure that the rotation that
+is applied to the square will not carry over to objects that are drawn later.
+The other four faces can be made in a similar way, by rotating the front face about the
+coordinate axes.  You should try to visualize the rotation that you need in each case.
+We can combine it all into a function that draws a cube.  To make it more interesting,
+the size of the cube is a parameter:</np>
+
+<pre>void cube(float size) {  // Draws a cube with side length = size.
+
+    glPushMatrix();  // Save a copy of the current matrix.
+    glScalef(size,size,size); // Scale unit cube to desired size.
+    
+    square(1, 0, 0); // red front face
+    
+    glPushMatrix();
+    glRotatef(90, 0, 1, 0);
+    square(0, 1, 0); // green right face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(-90, 1, 0, 0);
+    square(0, 0, 1); // blue top face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(180, 0, 1, 0);
+    square(0, 1, 1); // cyan back face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(-90, 0, 1, 0);
+    square(1, 0, 1); // magenta left face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(90, 1, 0, 0);
+    square(1, 1, 0); // yellow bottom face
+    glPopMatrix();
+    
+    glPopMatrix(); // Restore matrix to its state before cube() was called.
+
+}</pre>
+
+<np>The sample program <sourceref href="glut/unlit-cube.c"/> uses this function to
+draw a cube, and lets you rotate the cube by pressing the arrow keys.
+A Java version is <sourceref href="jogl/UnlitCube.java"/>, and a web version is
+<sourceref href="glsim/unlit-cube.html"/>.  Here is an image of the cube, rotated
+by 15 degrees about the <i>x</i>-axis and -15 degrees about the <i>y</i>-axis to make
+the top and right sides visible:</np>
+
+<img src="unlit-cube.png" width="180" height="175" tex="unlit-cube.eps" texscale="0.8"/> 
+
+<p>For a more complex example of hierarchical modeling with <i>glPushMatrix</i> and
+<i>glPopMatrix</i>, you can check out an OpenGL equivalent of the "cart and windmills"
+animation that was used as an example in <localref href="graphics2d.4.1"/>.  
+The three versions of the example are:
+<sourceref href="glut/opengl-cart-and-windmill-2d.c"/>,
+<sourceref href="jogl/CartAndWindmillJogl2D.java"/>, and
+<sourceref href="glsim/opengl-cart-and-windmill.html"/>.
+This program is an example of hierarchical 2D graphics in OpenGL.</p>
+
+<break/>
+
+<p>Keep in mind that transformation and matrix functions such as <i>glRotated</i>() and
+<i>glPushMatrix</i>() are old-fashioned OpenGL.  In WebGL and other modern graphics APIs,
+you will be responsible for managing transforms and matrices on your own.  You are quite
+likely to do that using a software library that provides functions very similar to those
+that are built into OpenGL&nbsp;1.1.</p>
+
+</subsection>
+
+
+</section>

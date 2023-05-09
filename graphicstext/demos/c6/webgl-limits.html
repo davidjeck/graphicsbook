@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGL and GLSL Limits</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+   #holder {
+       overflow: auto;
+       height: 300px;
+       margin: 5px;
+       padding: 5px;
+       background-color: white;
+       border: thin solid black;       
+   }
+   .item {
+       font-weight: bold;
+       color: #660000;
+   }
+   .value {
+       font-weight: bold;
+        color: #0000AA;
+   }
+   .meaning {
+         font-size: 80%;
+         font-style: italic;
+   }
+   .itempar {
+         margin-top: 8px;
+         margin-left: 25px;
+         text-indent: -25px;
+   }
+</style>
+<script src="../script/demo-core.js"></script>
+<script>
+
+
+var gl;
+
+function limit(paramname, description) {
+    var item = document.createElement("p");
+    item.className = "itempar";
+    var content = "<span class=item>" +
+                       paramname + "</span> = <span class=value>" +
+                       gl.getParameter(gl[paramname]) + "</span>";
+    if (description) {
+        content += "<br><span class=meaning>" + description + "</span>";
+    }
+    item.innerHTML = content;
+    return item;
+}
+
+function rangeLimit(paramname, description) {
+    var item = document.createElement("p");
+    var range = gl.getParameter(gl[paramname]);
+    console.log(paramname + " " + range);
+    item.className = "itempar";
+    var content = "<span class=item>" +
+                       paramname + "</span> = <span class=value>[ " +
+                       range[0] + ", " + range[1] + " ]</span>";
+    if (description) {
+        content += "<br><span class=meaning>" + description + "</span>";
+    }
+    console.log(content);
+    item.innerHTML = content;
+    return item;
+}
+
+
+
+
+function showLimits() {
+    var elem = document.getElementById("holder");
+    elem.innerHTML = "";
+    elem.appendChild(limit("RENDERER", "what's doing the WebGL rendering"));
+    elem.appendChild(limit("MAX_VERTEX_ATTRIBS", "limit on number of attributes"));
+    elem.appendChild(limit("MAX_VERTEX_UNIFORM_VECTORS", "limit on number of uniforms in vertex shader"));
+    elem.appendChild(limit("MAX_FRAGMENT_UNIFORM_VECTORS", "limit on number of uniforms in fragment shader"));
+    elem.appendChild(limit("MAX_VARYING_VECTORS", "limit on number of varying variables"));
+    elem.appendChild(rangeLimit("MAX_VIEWPORT_DIMS", "maximum width and height of the viewport"));
+    elem.appendChild(rangeLimit("ALIASED_POINT_SIZE_RANGE", "range of supported values for gl_PointSize"));
+    elem.appendChild(rangeLimit("ALIASED_LINE_WIDTH_RANGE", "range of supported values for line width"));
+    elem.appendChild(limit("MAX_TEXTURE_SIZE", "maximum width and height of texture images"));
+    elem.appendChild(limit("MAX_CUBE_MAP_TEXTURE_SIZE", "maximum width and height of images in cube map textures"));
+    elem.appendChild(limit("MAX_TEXTURE_IMAGE_UNITS", "limit on number of texture units accessed from fragment shader"));
+    elem.appendChild(limit("MAX_VERTEX_TEXTURE_IMAGE_UNITS", "limit on number of texture units accessed from vertex shader"));
+    elem.appendChild(limit("MAX_COMBINED_TEXTURE_IMAGE_UNITS", "limit on total number of texture units accessed from both shaders"));
+    elem.appendChild(limit("MAX_RENDERBUFFER_SIZE", "maximum width and height for auxiliary drawing buffers"));
+}
+
+
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        var options = {
+            // alpha: false, for example...
+        };
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    showLimits();
+ }
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">WebGL 1.0 / GLSL Limits on this Device</h3>
+
+<div id="holder">
+<canvas id="webglcanvas"></canvas>
+</div>
+
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo does not do any drawing and is not interactive.  Its purpose
+is to show the implementation-dependent values associated with certain constants
+on the device on which it is run.  The values are obtained by calling
+<i>gl.getParameeter</i>().  Scroll down the list of constants to see all available
+values.</p>
+<p>The value for the first constant, <i>RENDERER</i>, is
+the name of the system that does WebGL rendering
+in the web browser that you are using to view this demo.</p>
+<p>The remaining constants represent limits that are enforced by the WebGL
+renderer.  Many of them are limitations on GLSL shaders.  For example,
+MAX_VERTEX_ATTRIBS gives the maximum number of attributes that can
+be used in a vertex shader.  The limitations on texture units refer
+to the number of values of sampler variables in the shader.</p>
+<p>(The word "ALIASED" in <i>ALIASED_POINT_SIZE_RANGE</i> and
+<i>ALIASED_LINE_WIDTH_RANGE</i> is a leftover from OpenGL,
+where the limits applied to antialised points and lines.  In
+WebGL, the limits have nothing to do with aliasing.  They apply to
+all points and lines.)</p>
+<p>The demo uses a WebGL 1.0 drawing context.  It is possible that
+some values might differ for a WebGL 2.0 context on the same
+device.  (On my computer, that's true for <i>ALIASED_LINE_WIDTH_RANGE</i>.)
+</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

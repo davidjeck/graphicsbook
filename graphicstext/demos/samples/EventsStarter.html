@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<!--
+   This web page does the minimal setup for using mouse and key events along
+   with 2D canvas graphics.  Use it as a starting point for experimentation.
+-->
+<head>
+<meta charset="UTF-8">
+<title>Canvas Graphics Starter with Events</title>
+<style>
+    /* This style section is here to make the canvas more obvious on the
+       page.  It is white on a light gray page background, with a thin
+       black border.  Also, turn off text selection to avoid having
+       selection interfere with mouse action. */
+    body {
+        background-color: #DDDDDD;
+        -webkit-user-select: none; /* turn off text selection  / Webkit */
+        -moz-user-select: none;    /* Firefox */
+        -ms-user-select: none;     /* IE 10  */
+        user-select: none;
+    }
+    canvas {
+        background-color: white;
+        display: block;
+    }
+    #canvasholder {
+        border:2px solid black;
+        float: left; /* This makes the border exactly fit the canvas. */
+    }
+</style>
+<script>
+
+    "use strict";  // gives improved error-checking in scripts.
+
+    let canvas;    // The canvas element on which we will draw.
+    let graphics;  // A 2D graphics context for drawing on the canvas.
+    
+    /**
+     *  The draw() method is not currently used in this example.
+     *  You might use it to completely redraw the canvas, based on
+     *  values of variables.  Event-handling mehtods would modify
+     *  those variables and call draw() to update the canvas to
+     *  reflect the new data.  In this example, the event-handling
+     *  methods draw on the canvas directly.
+     */
+    function draw() {
+    }
+    
+    
+    /**
+     * This function is called in init() to set up mouse event handling
+     * on the canvas.  You can modify the nested functions doMouseDown,
+     * doMouseDrag, and possibly doMouseUp to change the reponse to
+     * mouse events.  As an example, this program does some simple drawing.
+     */
+    function installMouseHandler() {
+
+        let dragging = false;  // set to true when a drag action is in progress.
+        let startX, startY;    // coordinates of mouse at start of drag.
+        let prevX, prevY;      // previous mouse position during a drag.
+        
+        function doMouseDown(evt) {
+                // This function is called when the user presses a button on the mouse.
+                // Only the main mouse button will start a drag.
+            if (dragging) {
+                return;  // if a drag is in progress, don't start another.
+            }
+            if (evt.button != 0) {
+                return;  // don't respond unless the button is the main (left) mouse button.
+            }
+            const r = canvas.getBoundingClientRect();
+            const x = Math.round(evt.clientX - r.left);  // translate mouse position from screen coords to canvas coords.
+            const y = Math.round(evt.clientY - r.top);   // round to integer values; some browsers would give non-integers.
+            dragging = true;  // (this won't be the case for all mousedowns in all programs)
+            if (dragging) {
+                startX = prevX = x;
+                startY = prevY = y;
+                document.addEventListener("mousemove", doMouseMove, false);
+                document.addEventListener("mouseup", doMouseUp, false);
+            }
+        }
+        
+        function doMouseMove(evt) {
+                // This function is called when the user moves the mouse during a drag.
+            if (!dragging) {
+                return;  // (shouldn't be possible)
+            }
+            const r = canvas.getBoundingClientRect();
+            const x = Math.round(evt.clientX - r.left);   // (x,y) mouse position in canvas coordinates
+            const y = Math.round(evt.clientY - r.top);
+            
+            // As an example, if the shift key is down, then a black line is drawn from the
+            // previous mouse position to the current position.  Otherwise, a randomly colored
+            // square is drawn at the current mouse position.
+            if (evt.shiftKey) {
+                graphics.lineWidth = 10;
+                graphics.stroekStyle = "black";
+                graphics.lineCap = "round";
+                graphics.beginPath();
+                graphics.moveTo(prevX,prevY);
+                graphics.lineTo(x,y);
+                graphics.stroke();
+            }
+            else {
+                const r = Math.floor(Math.random()*256);
+                const g = Math.floor(Math.random()*256);
+                const b = Math.floor(Math.random()*256);
+                graphics.fillStyle = "rgb(" + r + "," + g +"," + b + ")";
+                graphics.fillRect(x-15,y-15,30,30);
+            }
+            
+            prevX = x;  // update prevX,prevY to prepare for next call to doMouseMove
+            prevY = y;
+        }
+        
+        function doMouseUp(evt) {
+                // This function is called when the user releases a mouse button during a drag.
+            if (!dragging) {
+                return;  // (shouldn't be possible)
+            }
+            dragging = false;
+            document.removeEventListener("mousemove", doMouseMove, false);
+            document.removeEventListener("mouseup", doMouseMove, false);
+         }
+         
+         canvas.addEventListener("mousedown", doMouseDown, false);
+
+   } // end installMouseHandler
+
+
+    let sqLoc = { x: 380, y: 280 }; // Data for this example, location of red square.
+    
+    /**
+     *  Respond when the user presses a key.  The keyCode in the event
+     *  tells what key was pressed.  Several keyCodes are shown here as
+     *  examples, with simple responses: The space bar clears the canvas;
+     *  the arrow keys draw a red square at a changing position.  (The square
+     *  is not drawn at all until the first time an arrow key is pressed.)
+     */
+    function doKeyDown(evt) {
+        let code = evt.keyCode;  // Numerical code for key that was pressed.
+        switch (code) {
+        case 37:  // left arrow key
+            sqLoc.x -= 40;
+            graphics.fillStyle = "red";
+            graphics.fillRect(sqLoc.x, sqLoc.y, 40, 40);
+            break;
+        case 39:  // right arrow key
+            sqLoc.x += 40;
+            graphics.fillStyle = "red";
+            graphics.fillRect(sqLoc.x, sqLoc.y, 40, 40);
+            break;
+        case 38:  // up arrow key
+            sqLoc.y -= 40;
+            graphics.fillStyle = "red";
+            graphics.fillRect(sqLoc.x, sqLoc.y, 40, 40);
+            break;
+        case 40:  // down arrow key
+            sqLoc.y += 40;
+            graphics.fillStyle = "red";
+            graphics.fillRect(sqLoc.x, sqLoc.y, 40, 40);
+            break;
+        case 32:  // space key
+            graphics.clearRect(0,0,canvas.width,canvas.height);
+            sqLoc.x = 380;  // also put the square back at the center.
+            sqLoc.y = 280;
+            break;
+        }
+        if (code <= 40 && code >=37) {
+            evt.preventDefault(); // Stop arrow keys from scrolling the page.
+        }
+    }
+    
+       
+    /**
+     * The init() function is called after the page has been
+     * loaded.  It initializes the canvas and graphics variables,
+     * and it installs mouse and key listeners.  If an error
+     * occurs, a message is displayed in place of the canvas.
+     */
+    function init() {
+        try {
+            canvas = document.getElementById("canvas");
+            graphics = canvas.getContext("2d");
+        } catch(e) {
+            document.getElementById("canvasholder").innerHTML =
+               "<p>Canvas graphics is not supported.<br>" +
+               "An error occurred while initializing graphics.</p>";
+            return;
+        }
+        installMouseHandler();
+        document.addEventListener("keydown", doKeyDown, false);
+    }
+    
+    window.onload = init; // arranges for function init to be called when page is loaded
+
+</script>
+</head>
+<body>
+
+<h2>Canvas Graphics Starter with Events</h2>
+
+<noscript>
+    <!-- This message will be shown in the page if JavaScript is not available. -->
+<p>JavaScript is required to use this page.</p>
+</noscript>
+
+<div id="canvasholder">
+<canvas id="canvas" width="800" height="600">
+    <!-- This message is shown on the page if the browser doesn't support the canvas element. -->
+Canvas not supported.
+</canvas>
+</div>
+
+</body>
+</html>

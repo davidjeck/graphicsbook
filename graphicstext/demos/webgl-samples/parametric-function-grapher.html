@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>WebGL Example: Parametric Function</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+    }
+</style>
+
+<!--
+   Graphs a parametric function (x(u,v),y(u,v),z(u,v)) input by the
+   user.   The two sides of the graph are colored yellow and blue.
+   A demo of using multiple lights and two-sided lighting.
+   Note that the functions are defined using JavaScript syntax,
+   except that certain Math functions have been given alternative
+   named without the "Math." in front.
+-->
+
+
+
+<script src="gl-matrix-min.js"></script>
+<script src="trackball-rotator.js"></script>
+
+<script>
+
+//"use strict";
+
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        v_normal = normalize(a_normal);
+        v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    struct MaterialProperties {
+        vec3 diffuseColor;
+        vec3 specularColor;
+        float specularExponent;
+    };
+    struct LightProperties {
+        bool enabled;
+        vec4 position;
+        vec3 color;
+    };
+    uniform MaterialProperties frontMaterial;
+    uniform MaterialProperties backMaterial;
+    uniform LightProperties lights[3];
+    uniform bool lit;
+    uniform vec3 color;
+    uniform mat3 normalMatrix;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    vec3 lightingEquation( LightProperties light, MaterialProperties material, 
+                                vec3 eyeCoords, vec3 N, vec3 V ) {
+           // N is normal vector, V is direction to viewer.
+        vec3 L, R; // Light direction and reflected light direction.
+        if ( light.position.w == 0.0 ) {
+            L = normalize( light.position.xyz );
+        }
+        else {
+            L = normalize( light.position.xyz/light.position.w - v_eyeCoords );
+        }
+        if (dot(L,N) <= 0.0) {
+            return vec3(0.0);
+        }
+        vec3 reflection = dot(L,N) * light.color * material.diffuseColor;
+        R = -reflect(L,N);
+        if (dot(R,V) > 0.0) {
+            float factor = pow(dot(R,V),material.specularExponent);
+            reflection += factor * material.specularColor * light.color;
+        }
+        return reflection;
+    }
+    void main() {
+        if (!lit) {
+            gl_FragColor = vec4(color, 1.0);
+            return;
+        }
+        vec3 normal = normalize( normalMatrix*v_normal );
+        vec3 viewDirection = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        vec3 color = vec3(0.0);
+        for (int i = 0; i < 3; i++) {
+            if (lights[i].enabled) {
+                if (gl_FrontFacing) {
+                    color += lightingEquation( lights[i], frontMaterial, v_eyeCoords,
+                                                    normal, viewDirection);
+                }
+                else {
+                    color += lightingEquation( lights[i], backMaterial, v_eyeCoords,
+                                                    -normal, viewDirection);
+                }
+            }
+        }
+        gl_FragColor = vec4(color,1.0);
+    }`;
+
+let gl;   // The webgl context.
+
+let a_coords_loc;       // Location of the a_coords attribute variable in the shader program.
+let a_coords_buffer;    // Buffer to hold the values for a_coords fo surface/gridlines.
+let axes_coords_buffer; // Buffer used for drawing axes.
+let a_normal_loc;       // Location of a_normal attribute.
+let a_normal_buffer;    // Buffer for a_normal.
+let index_buffer;       // Buffer to hold vetex indices for surface.
+let grid_index_buffer;  // Buffer to hold vertex indices for grid lines.
+
+let u_modelview;       // Locations for uniform matrices
+let u_projection;
+let u_normalMatrix;
+
+let u_front_material;  // Holds uniform locations for front material.
+let u_back_material;   // Holds uniform locations for back material.
+let u_lights;           // Holds uniform locations for light properties.
+
+let u_lit;
+let u_color;
+
+const projection = mat4.create();    // projection matrix
+let modelview;                       // modelview matrix; value comes from rotator
+const normalMatrix = mat3.create();  // matrix, derived from modelview matrix, for transforming normal vectors
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+let graphOK = false;
+let scale;
+
+const RESOLUTION = 61; //61;  // Number of points along each side of the uv grid
+const GRID_SPACING = 4;  // MUST divide RESOLUTION-1.
+const GRID_LINES = Math.floor((RESOLUTION-1)/GRID_SPACING + 1);
+
+function draw() {
+    if (!graphOK) {
+        gl.clearColor(0,0,0,0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        return;
+    }
+
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    mat4.perspective(projection,Math.PI/4,1,scale,5*scale);
+    
+    modelview = rotator.getViewMatrix(); 
+    
+    /* Get the matrix for transforming normal vectors from the modelview matrix,
+       and send matrices to the shader program*/
+    
+    mat3.normalFromMat4(normalMatrix, modelview);
+    
+    gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+    gl.uniformMatrix4fv(u_modelview, false, modelview );
+    gl.uniformMatrix4fv(u_projection, false, projection );
+    
+    /* Draw the model.  The data for the model was set up in installModel() */
+    
+    gl.uniform1i(u_lit, 1);  // Turn on lighting for drawin the graph.
+    gl.enable(gl.POLYGON_OFFSET_FILL);  // polygon offset is used to make grid lines show up properly
+    gl.polygonOffset(1,1);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);  // Set a_coods attribute to get data from a_coords_buffer
+    gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_normal_buffer);
+    gl.vertexAttribPointer(a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+    
+    gl.drawElements(gl.TRIANGLES, 2*3*(RESOLUTION-1)*(RESOLUTION-1), gl.UNSIGNED_SHORT, 0);
+    gl.disable(gl.POLYGON_OFFSET_FILL); 
+    gl.uniform1i(u_lit, 0);  // Turn off lighting for drawin the grid lines and axes.
+    
+    /* Draw the grid lines */
+    if (document.getElementById("drawgrid").checked) {
+        gl.uniform3f(u_color, 0.2, 0.2, 0.2);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, grid_index_buffer);
+        gl.drawElements(gl.LINES, 2*2*(GRID_LINES)*(RESOLUTION-1), gl.UNSIGNED_SHORT, 0);
+    }
+
+    /* Draw the axes */
+    if (document.getElementById("drawaxes").checked) {
+        gl.lineWidth(3);
+        drawPrimitive( gl.LINES, [1,0,0], [ -scale,0,0, scale,0,0] );
+        drawPrimitive( gl.LINES, [0,1,0], [ 0,-scale,0, 0,scale,0] );
+        drawPrimitive( gl.LINES, [0,0,1], [ 0,0,-scale, 0,0,scale] );
+        gl.lineWidth(1);
+    }
+
+} // end draw()
+
+
+/* Used only for drawing the lines that represent the axes; uses a different buffer
+   for the coodinates than the one that is used for the graph and grid lines. */
+function drawPrimitive( primitiveType, color, vertices ) { 
+     gl.bindBuffer(gl.ARRAY_BUFFER,axes_coords_buffer);  // Set a_coods attribute to get data from axes_coords_buffer
+     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+     gl.uniform3fv(u_color, color);
+     gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+     gl.drawArrays(primitiveType, 0, vertices.length/3);
+         // (Note: a_normal is still geting values from a_normal_buffer, but the values aren't used in the shader)
+}
+
+
+const sin = Math.sin;   // Make it possible to leave "Math." out of function definitions for x(u,v), y(u,v), z(u,v).
+const cos = Math.cos;
+const pow = Math.pow;
+const abs = Math.abs;
+const exp = Math.exp;
+const log = Math.log;
+const sqrt = Math.sqrt;
+const atan = Math.atan;
+const pi = Math.PI;
+
+/* Called during init() and when the user clicks Draw Graph to create the data for
+   graphing the graph.  The vertex coordinates and normals are stored in the buffers
+   a_coords_buffer and a_coords_normal.  If any error occurs, an error message
+   is displayed and graphOK is set to false; the canvas will turn red.
+*/
+function installFunction() {
+    function getNumber(id) { // get a numerical value from an input box
+        let text = document.getElementById(id+"Input").value.trim(); 
+        let val = Number(text);
+        if (!text || isNaN(val)) {
+            throw "The value for " + id + " must be a number!";
+        }
+        return val;
+    }
+    function getFunction(id) { // get a function defintion from an input box.
+        let text = document.getElementById(id+"Input").value.trim(); 
+        if (!text) {
+            throw "The function " + id + "(u,v) needs a definition!";
+        }
+        try {
+           let f = new Function(["u","v"], "return (" + text + ")");
+           f(1,1);  // Will throw an exception if f contains undefined variables / functions
+           return f;
+        } catch(e) {
+            throw "The definition of " + id + "(u,v) is not a legal function of u and v!";   
+        }
+    }
+    function cross(c,v,w) {
+        c[0] = v[1]*w[2] - v[2]*w[1];
+        c[1] = v[2]*w[0] - v[0]*w[2];
+        c[2] = v[0]*w[1] - v[1]*w[0];
+    }
+    function getNormal(u,v,N) {
+            // compute an approximate unit normal vector, using a cross product of approximate tangent vectors.
+        let ddu = [
+            (x(u+0.000001,v) - x(u-0.000001,v))/0.000002,
+            (y(u+0.000001,v) - y(u-0.000001,v))/0.000002,
+            (z(u+0.000001,v) - z(u-0.000001,v))/0.000002
+        ];
+        let ddv = [ // This is the negaitve of the usual derivative to get normal direction to match front-face direction
+            (x(u,v-0.000001) - x(u,v+0.000001))/0.000002,
+            (y(u,v-0.000001) - y(u,v+0.000001))/0.000002,
+            (z(u,v-0.000001) - z(u,v+0.000001))/0.000002        
+        ];
+        cross(N, ddu, ddv);
+        let length = Math.sqrt(N[0]*N[0] + N[1]*N[1] + N[2]*N[2]);
+        N[0] /= length;  // normalize
+        N[1] /= length;
+        N[2] /= length;
+        if (!isFinite(N[0])) { // correct normal contains undefined values
+            N = [0,0,1];
+        }
+    }
+    graphOK = false;
+    let x,y,z;  // functions of (u,v)
+    let umin, umax, vmin, vmax;  // ranges of values for u and v
+    let newscale;
+    try { // get data from the input boxes
+        x = getFunction("x");
+        y = getFunction("y");
+        z = getFunction("z");
+        newscale = getNumber("scale");
+        umin = getNumber("umin");
+        umax = getNumber("umax");
+        vmin = getNumber("vmin");
+        vmax = getNumber("vmax");
+        if (newscale < 0) {
+            throw "scale must be a positive number!";
+        }
+        if (umin >= umax) {
+            throw "umin must be less than umax!";
+        }
+        if (vmin >= vmax) {
+            throw "vmin must be less than vmax!";
+        }
+    } catch(e) {
+        document.getElementById("message").innerHTML = "<b>Can't graph the function: " + e + "<b>";
+        draw();
+        return;
+    }
+    
+    /* Compute the vertex coordinates and normal and store them in Float32Arrays. */
+    
+    let vertexCt = RESOLUTION*RESOLUTION;
+    let vertices = new Float32Array(3*vertexCt);  // three coordinates per vertex
+    let normals = new Float32Array(3*vertexCt);
+    let k = 0;
+    let du = (umax-umin)/(RESOLUTION-1);
+    let dv = (vmax-vmin)/(RESOLUTION-1);
+    let ok = 0;  // count of vertices for which all coordinates are undefined
+    let v = vmin;
+    let N = new Array(3);
+    for (let i = 0; i < RESOLUTION; ++i) {
+        let u = umin;
+        for (let j = 0; j < RESOLUTION; ++j) {
+            let a = x(u,v);
+            let b = y(u,v);
+            let c = z(u,v);
+            if (isFinite(a) && isFinite(b) && isFinite(c)) {
+                ok++;
+            }
+            vertices[k] = a;
+            vertices[k+1] = b;
+            vertices[k+2] = c;
+            getNormal(u,v,N);
+            normals[k++] = N[0];
+            normals[k++] = N[1];
+            normals[k++] = N[2];
+            u += du;
+        }
+        v += dv;
+    }
+    if (ok == 0) {
+        document.getElementById("message").innerHTML = "<b>Error: Your (x,y,z) is not defined for ANY (u,v) points!<b>";
+        draw();
+        return;
+    }
+    if (ok <= RESOLUTION*RESOLUTION*0.1) {
+        document.getElementById("message").innerHTML = "<b>Error: Your (x,y,z) is undefined for almost all (u,v) points!<b>";
+        draw();
+        return;
+    }
+    
+    /* Copy the data for the vertices and normals into the buffers. */
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_normal_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+    
+    scale = newscale;
+    rotator.setView(3*scale,[2,1,3]);  // reset the view, using the scale specified by user
+    graphOK = true;
+    if (ok <= RESOLUTION*RESOLUTION/2) {
+        document.getElementById("message").innerHTML = "<b>WARNING: Your (x,y,z) are undefined for more than half the points!<b>";
+    }
+    else {
+        document.getElementById("message").innerHTML = "Drag on the graph to rotate it.";
+    }
+    
+} // end installFunction()
+
+
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    gl.enable(gl.DEPTH_TEST);
+    
+    /* Get attribute and uniform locations and create the buffers */
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    gl.enableVertexAttribArray(a_normal_loc);
+    gl.enableVertexAttribArray(a_coords_loc);
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    u_front_material = {
+        diffuseColor: gl.getUniformLocation(prog, "frontMaterial.diffuseColor"),
+        specularColor: gl.getUniformLocation(prog, "frontMaterial.specularColor"),
+        specularExponent: gl.getUniformLocation(prog, "frontMaterial.specularExponent")
+    };
+    u_back_material = {
+        diffuseColor: gl.getUniformLocation(prog, "backMaterial.diffuseColor"),
+        specularColor: gl.getUniformLocation(prog, "backMaterial.specularColor"),
+        specularExponent: gl.getUniformLocation(prog, "backMaterial.specularExponent")
+    };
+    u_lights = new Array(3);
+    for (let i = 0; i < 3; i++) {
+        u_lights[i] = {
+            enabled: gl.getUniformLocation(prog, "lights[" + i + "].enabled"),
+            position: gl.getUniformLocation(prog, "lights[" + i + "].position"),
+            color: gl.getUniformLocation(prog, "lights[" + i + "].color"),
+        };
+    }
+    u_lit = gl.getUniformLocation(prog, "lit");
+    u_color = gl.getUniformLocation(prog, "color");
+    a_coords_buffer = gl.createBuffer();
+    axes_coords_buffer = gl.createBuffer();
+    a_normal_buffer = gl.createBuffer();
+    index_buffer = gl.createBuffer();
+    grid_index_buffer = gl.createBuffer();
+    
+    /* Set up values for material and light uniforms; these values don't change in this program. */
+    
+    gl.uniform3f( u_front_material.diffuseColor, 1, 1, 0.5 );
+    gl.uniform3f( u_front_material.specularColor, 0.2, 0.2, 0.2 );
+    gl.uniform1f( u_front_material.specularExponent, 32 );
+    gl.uniform3f( u_back_material.diffuseColor, 0.5, 0.5, 1 );
+    gl.uniform3f( u_back_material.specularColor, 0.1, 0.1, 0.1 );
+    gl.uniform1f( u_back_material.specularExponent, 32 );
+    for (let i = 0; i < 3; i++) {
+        gl.uniform1i( u_lights[i].enabled, 1 ); 
+    }
+    gl.uniform4f( u_lights[0].position, 0, 0, 0, 1 );
+    gl.uniform3f( u_lights[0].color, 0.6, 0.6, 0.6 );
+    gl.uniform4f( u_lights[1].position, 0, 1, 1, 0 );
+    gl.uniform3f( u_lights[1].color, 0.3, 0.3, 0.3 );
+    gl.uniform4f( u_lights[2].position, 0, -1, 0, 0 );
+    gl.uniform3f( u_lights[2].color, 0.3, 0.3, 0.3 );
+    
+    /* Create the data for the element buffer that holds indices for drawing the graph.
+        This involves figuring out the index for each vertex of each triangle. */
+    
+    let indices = new Uint16Array(3*2*(RESOLUTION-1)*(RESOLUTION-1)); // three indices per triangle
+    let k = 0;
+    for (let i = 0; i < RESOLUTION-1; i++) {
+        let startOfRow = (i*RESOLUTION);
+        let startOfNext = ((i+1)*RESOLUTION);
+        for (let j = 0; j < RESOLUTION-1; j++) { // data for two triangles
+            indices[k++] = startOfRow + j;
+            indices[k++] = startOfNext + j;
+            indices[k++] = startOfNext + j + 1;
+            indices[k++] = startOfRow + j;
+            indices[k++] = startOfNext + j + 1;
+            indices[k++] = startOfRow + j + 1;
+        }
+    }
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,index_buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    
+    /* Create the data for the element buffer that holds indices for drawing the grid.
+        This involves figuring the index for each vertex of each line segment. */
+    
+    indices = new Uint16Array(2*2*(GRID_LINES)*(RESOLUTION-1)); // 2 vertices per line, two sets of grid lines, each line has (RESOLUTION-1) segments
+    k = 0;
+    for (let i = 0; i < GRID_LINES; i++) {
+        for (let j = 0; j < RESOLUTION-1; j++) {
+            indices[k++] = i*GRID_SPACING + j*RESOLUTION;
+            indices[k++] = i*GRID_SPACING + (j+1)*RESOLUTION;
+        }
+    }
+    for (let i = 0; i < GRID_LINES; i++) {
+        let startOfRow = i*GRID_SPACING*RESOLUTION;
+        for (let j = 0; j < RESOLUTION-1; j++) {
+            indices[k++] = startOfRow + j;
+            indices[k++] = startOfRow + j + 1;
+        }
+    }
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, grid_index_buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+} // end initGL()
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        return;
+    }
+    document.getElementById("xInput").value = "u";
+    document.getElementById("yInput").value = "2 * sin(u) * cos(2*v)";
+    document.getElementById("zInput").value = "v";
+    document.getElementById("scaleInput").value = "8";
+    document.getElementById("uminInput").value = "-6";
+    document.getElementById("umaxInput").value = "6";
+    document.getElementById("vminInput").value = "-6";
+    document.getElementById("vmaxInput").value = "6";
+    document.getElementById("drawgrid").checked = false;
+    document.getElementById("drawgrid").onchange = draw;
+    document.getElementById("drawaxes").checked = false;
+    document.getElementById("drawaxes").onchange = draw;
+    document.getElementById("drawGraph").onclick = function() {
+        installFunction();
+        draw();
+    };
+    rotator = new TrackballRotator(canvas, draw, 15);
+    installFunction();
+    draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGL Parametric Function Grapher</h2>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p id="message">Drag on the graph to rotate it.</p>
+
+<div id="canvas-holder" style="float:left">
+   <canvas width=500 height=500 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+<div style="float:left; margin-left:30px; border:medium solid black; background-color: white; padding:8px">
+<p>
+<label><b>x(u,v) = </b><input type="text" id="xInput" size=40"></label><br>
+<label><b>y(u,v) = </b><input type="text" id="yInput" size=40"></label><br>
+<label><b>z(u,v) = </b><input type="text" id="zInput" size=40"></label>
+</p>
+<p>
+<label><b>scale = </b><input type="text" id="scaleInput" size="5"></label>
+</p>
+<p>
+<label><b>umin = </b><input type="text" id="uminInput" size="5"></label>
+<label style="margin-left:30px"><b>umax = </b><input type="text" id="umaxInput" size="5"></label>
+</p>
+<p>
+<label><b>vmin = </b><input type="text" id="vminInput" size="5"></label>
+<label style="margin-left:30px"><b>vmax = </b><input type="text" id="vmaxInput" size="5"></label>
+</p>
+<p>
+<label><input type="checkbox" id="drawgrid"><b>Draw Grid</b></label>
+<label style="margin-left:30px"><input type="checkbox" id="drawaxes"><b>Draw Axes</b></label>
+</p>
+<p>
+<button id="drawGraph"><b>DRAW THE GRAPH / Reset Rotation</b></button>
+</p>
+<p style="width:450px; margin-top:30px; text-indent: 30px; font-size: 80%">The definitions of x(u,v), y(u,v),
+and z(u,v) can use: the variables <i>u</i> and <i>v</i>; the operators +, &minus;, <code>*</code>,
+and <code>/</code>; the functions <i>sin</i>(<i>x</i>), <i>cos</i>(<i>x</i>), <i>atan</i>(<i>x</i>),
+<i>abs</i>(<i>x</i>), <i>exp</i>(<i>x</i>), <i>log</i>(<i>x</i>), and <i>pow</i>(<i>x,y</i>); and
+the constant <i>pi</i>.  Note that the operator ** can probably be used to do exponentiation,
+but that pow(x,y) can do the same thing.  Angles are measured in radians. The <i>scale</i> determines the range of
+coordinates that are in view.  Coordinates in the range &minus;<i>scale</i> to <i>scale</i>
+should be visible. If axes are drawn, they extend from &minus;<i>scale</i> to scale along
+each coordinate axis.  In the default view, the y-axis (green) points upward, the z-axis (blue) points out of the screen,
+and the x-axis (red) points to the right.</p>
+</div>
+
+
+</body>
+</html>
+

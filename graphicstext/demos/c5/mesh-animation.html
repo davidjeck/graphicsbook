@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Mesh Animation</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/three.min.js"></script>
+<script src="../script/threejs/GLTFLoader.js"></script>
+<script src="../script/threejs/OrbitControls.js"></script>
+<script>
+
+/* Can show animated models of a horse and of a stork.
+   The basic outline is the same as my sample program
+   model-viewer.html, but the animation technique
+   was lifted from an example in the three.js download.
+ */
+
+var canvas, scene, renderer, camera;
+
+var animating = false;
+
+var mixer = null;  // The object that animates the model, of type THREE.AnimationMixer
+var prevMixerTime; // Used to record time of last update of mixer
+
+var controls;  // An OrbitControls object that is used to implement
+               // rotation of the scene using the mouse.  (It actually rotates
+               // the camera around the scene.)
+
+var model = null; // The three.js object that represents the current model.
+
+
+var modelURLs = [  // paths to the model files
+    "models/Horse.glb",
+    "models/Stork.glb",
+];
+
+var modelRotations = [ // rotations to be applied to models.
+    [Math.PI/12,-Math.PI/4,0],
+    [Math.PI/8,Math.PI/2,0],
+];
+
+
+/**
+ *  The render function draws the scene.
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+/*  This function is called by the init() method to create the world.  In this program,
+ *  it just creates a light and a camera.  The model will be added in modelLoaded,
+ *  after the model has been loaded.
+ */
+function createWorld() {
+    renderer.setClearColor(0xE8E8E8);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(35, canvas.width/canvas.height, 0.1, 100);
+    camera.position.z = 30;
+    var light;  // A light shining from the direction of the camera; moves with the camera.
+    light = new THREE.DirectionalLight();
+    light.position.set(0,0,1);
+    camera.add(light);
+    scene.add(camera);
+    scene.add(new THREE.AmbientLight(0x404040));
+}
+
+
+/**
+ * This function will be called when the GLTFLoader has
+ * finished loading a model.  This function creates a three.js
+ * Mesh object to hold the model.  It translates the object so that
+ * its center is at the origin.  It wraps the object in another object
+ * that is used to scale and rotate the object.  The scale is set
+ * so that the maximum coordinate in its vertices, in absolute
+ * value, is scaled to 10.  The rotation is set to the second parameter,
+ * which is used to set up an appropriate orientation for viewing
+ * the model. 
+ */ 
+function modelLoaded(dataFromModel, rotation) {
+
+    document.getElementById("headline").innerHTML = "Three.js Mesh Animation";
+    var object = dataFromModel.scene.children[0];
+
+    /* Determine the ranges of x, y, and z in the vertices of the geometry. */
+
+    var geometry = object.geometry;
+    vertices = geometry.getAttribute("position");
+    var xmin = Infinity;
+    var xmax = -Infinity;
+    var ymin = Infinity;
+    var ymax = -Infinity;
+    var zmin = Infinity;
+    var zmax = -Infinity;
+    for (var i = 0; i < vertices.count; i++) {
+        var x = vertices.getX(i); // get vertex coords from the geometry "position" attribute.
+        var y = vertices.getY(i);
+        var z = vertices.getZ(i);
+        if (x < xmin)
+            xmin = x;
+        else if (x > xmax)
+            xmax = x;
+        if (y < ymin)
+            ymin = y;
+        else if (y > ymax)
+            ymax = y;
+        if (z < zmin)
+            zmin = z;
+        else if (z > zmax)
+            zmax = z;
+    }
+    
+    /* Remove any transformation that has been applied to the object. */
+    object.scale.set(1,1,1);
+    object.position.set(0,0,0);
+    object.rotation.set(0,0,0);
+     
+    /* translate the center of the object to the origin */
+    var centerX = (xmin+xmax)/2;
+    var centerY = (ymin+ymax)/2; 
+    var centerZ = (zmin+zmax)/2;
+    var max = Math.max(centerX - xmin, xmax - centerX);
+    max = Math.max(max, Math.max(centerY - ymin, ymax - centerY) );
+    max = Math.max(max, Math.max(centerZ - zmin, zmax - centerZ) );
+    var scale = 10/max;
+    object.position.set( -centerX, -centerY, -centerZ );
+    
+    /* Create the wrapper, model, to scale and rotate the object. */
+    
+    model = new THREE.Object3D();
+    model.add(object);
+    model.scale.set(scale,scale,scale);
+    model.rotation.set(rotation[0],rotation[1],rotation[2]);
+    scene.add(model);
+    mixer = new THREE.AnimationMixer( object );
+    var clip = dataFromModel.animations[0];
+    var animationAction = mixer.clipAction(clip);
+    animationAction.setDuration(1);
+    animationAction.play();  // Note that it is the mixer.update() in doFrame() that actually drives the animation.
+    document.getElementById("animate").disabled  = false;
+    render();
+}
+
+
+/**
+ * Called when the setting of the model-selection radio buttons is changed.
+ * starts loading the model from the specified file.  When the model has
+ * has been loaded, the function modelLoaded() will be called.
+ */
+function installModel(modelNumber) {
+    document.getElementById("headline").innerHTML = "Loading Model";
+    if (model) {
+        scene.remove(model);
+    }
+    controls.reset();  // return camera to original position.
+    mixer = null;  // delete the animator used by current model, if any
+    render();  // draw without model while loading
+    if (animating) { // turn off animation.
+       document.getElementById("animate").checked = false;
+       doAnimationCheckbox();
+    }
+    document.getElementById("animate").disabled = true;
+    var loader = new THREE.GLTFLoader();
+    loader.load(modelURLs[modelNumber], callback, undefined, error);
+    function callback(data) {  // callback function to be executed when loading finishes.
+        modelLoaded(data, modelRotations[modelNumber]);
+    }
+    function error() {
+        document.getElementById("headline").innerHTML =
+            "Could not load model! Note that some browsers<br>can't load models from a local disk.";
+    }
+}
+
+
+function resetControls() {
+    controls.reset();
+    if (!animating) {
+      render();
+    }
+}
+
+
+//--------------------------- animation support -----------------------------------
+
+function doFrame() { 
+   if (animating && mixer) {
+        var time = Date.now();
+        mixer.update( ( time - prevMixerTime ) * 0.001 );
+        prevMixerTime = time;
+	    render();
+	    requestAnimationFrame(doFrame); 
+	}
+}
+
+function startAnimation() {
+    if (!animating) {
+	   animating = true;
+       prevMixerTime = Date.now();
+	   requestAnimationFrame(doFrame);
+	}
+}
+
+function pauseAnimation() {
+   if (animating) {
+	    animating = false;
+	}
+}
+
+function doAnimationCheckbox() {
+    var anim = document.getElementById("animate").checked;
+    if ( anim == animating ) { // should not happen
+      return;
+    }
+    if ( anim )
+       startAnimation();
+    else
+       pauseAnimation();
+}
+
+//----------------------------------------------------------------------------------
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true
+        });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    document.getElementById("animate").checked = false;
+    document.getElementById("horse").checked = true;
+    document.getElementById("animate").onchange = doAnimationCheckbox;
+    document.getElementById("horse").onchange = function() { installModel(0); };
+    document.getElementById("stork").onchange = function() { installModel(1); };
+    renderer.setClearColor(0xAAAAAA);
+    createWorld();
+    controls = new THREE.OrbitControls(camera,canvas);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.addEventListener("change", render);
+    installModel(0);
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Three.js Mesh Animation</h3>
+
+<p>
+<label><input type="checkbox" id="animate">Animate</label>
+<label style="margin-left: 50px"><input type="radio" name="model" id="horse">Horse</label>
+<label style="margin-left: 10px"><input type="radio" name="model" id="stork">Stork</label>
+<button style="margin-left: 40px" onclick="resetControls()">Reset Rotation</button>
+</p>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="500" height="380"></canvas>
+</div>
+
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This mesh-animation demo uses an object of type <i>THREE.AnimationMixer</i> to
+animate models of a running horse and a flying stork.</p>
+
+<p>The models are in
+the GLTF format used by <i>three.js</i> and are part of the <i>three.js</i> download (version 129).
+A GLTF file contains an entire scene and can include animations, as well as objects.
+In this case, the files that are used contain one object (a horse or stork) and an
+animation that animates that object.  The horse and stork objects come with their
+colors already defined.
+If <i>dataFromFile</i> is the data loaded from
+the file, then the object is <i>dataFromFile.scene.children</i>[0], and
+the animation is <i>dataFromFile.animations</i>[0].
+You can look at the source code of this
+demo to see how the animation is programmed.</p>
+<p>You can use your mouse (or finger) to rotate the model, even when it is animating.</p>
+<p>(Note that this demo won't work if you are trying to load it from your local computer instead
+of from a web server.  This is because of web browser security policies that prevent the
+program from loading the models locally.
+See the documentation about
+<a href="https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally">running three.js examples locally</a>.)</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

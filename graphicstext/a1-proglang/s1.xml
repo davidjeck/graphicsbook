@@ -1,0 +1,521 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="The Java Programming Language" id="proglang.1">
+
+<p1>Java is taught as a first programming language in many college and high school
+computer science programs.  It is a large and complex language, with features that 
+make it suitable for large and complex programming projects.  Those features
+can make it seem a little verbose and overly strict, but they also make it possible
+for programming environments to provide excellent support for writing and debugging
+programs.  If you are going to write Java code, you should consider using a 
+full-featured programming environment such as <newword>Eclipse</newword> 
+(<a href="https://eclipse.org/">https://eclipse.org/</a>).  <localref href="gl1geom.6.2"/>
+explains how to set up Eclipse for programming with <word>JOGL</word>,
+the Java API for <word>OpenGL</word>.</p1>
+
+<p>This book comes with several "starter" programs for writing graphical
+Java programs, such as <sourceref href="java2d/EventsStarter.java"/> for Java Graphics2D
+and <sourceref href="jogl/JoglStarter.java"/> for JOGL.  Although this section
+doesn't tell you enough to let you write Java programs from scratch, it might have
+enough information to let you "fill in the blanks" in the starter programs and modify other
+sample programs that come with the book.  If you want to learn Java in more detail,
+you can consider my free on-line Java textbook, <a href="http://math.hws.edu/javanotes">http://math.hws.edu/javanotes</a>.</p>
+
+<p>Java has had several 2D graphics <word term="API">APIs</word>: AWT, Swing, and JavaFX.  Swing is
+built on top of the AWT, while JavaFX is a completely new API.  JavaFX is not used in this
+textbook, but you will see references here both to Swing and to the AWT.
+</p>
+
+<subsection title="Basic Language Structure" id="proglang.1.1">
+
+<p>Java is object-oriented.  A Java program is made up of classes, which can contain 
+variable definitions and method definitions.  ("Method" is the object-oriented term for
+function or subroutine.)   A class is defined in its own file,
+whose name must match the name of the class:  If the class is named "MyClass", then
+the name of the file must be <i>MyClass.java</i>.  Classes can also occur as nested classes
+within other classes; a nested class,
+of course, doesn't get its own file.  The basic syntax for defining a class is</p>
+
+<pre>public class MyClass {
+    .
+    .  // Variable, method, and nested class definitions.
+    .   
+}</pre>
+
+<np>There are variations on this syntax.  For example, to define a class as a subclass
+of an existing class, you need to say that the new class "extends" an the existing class:</np>
+
+<pre>public class MyClass extends ExistingClass { ...</pre>
+
+<np>A class in Java can only extend one class.  However, in addition to or instead of extending
+a class, a new class can also implement
+one or more "interfaces."  An interface in Java specifies some methods that must be
+defined in every class that implements the interface.  With all of these options, a class
+definition might look something like this:</np>
+
+<pre>public class MyGUI extends JPanel implements KeyListener, MouseListener { ...</pre>
+
+<np>In fact, a class exactly like this one might be used in a <word>GUI</word> program.</np>
+
+<p>A class can contain a <i>main</i>() method, and one of the classes that make up a program
+must contain such a method.  The <i>main</i>() method is where program execution begins.
+It has one parameter, of type <classname>String</classname><code>[]</code>, representing
+an array of command-line arguments. There is a confusing distinction in Java between
+<i>static</i> and <i>non-static</i> variables and methods, which we can mostly
+ignore here.  The <i>main</i>() method is <i>static</i>.   
+Often,  in a graphical program, <i>main</i> is the <b>only</b> 
+thing that is static, so the distinction will
+not be very important for us.  In a GUI program, the
+<i>main</i> method usually just creates a window and makes it visible on the screen;
+after that, the window takes care of itself.</p>
+
+<p>A non-static method definition in a class actually defines a method for each object
+that is created from that class.  Inside the method definition, the special variable
+<i>this</i> can be used to refer to the object of which the method is a part.  You might
+be familiar with the same special variable in JavaScript.  However,
+unlike in JavaScript, the use of <i>this</i> is optional in Java, so that a variable that is part of
+the same object might be referred to either as <i>x</i> or <i>this.x</i>, and a method
+could be called from within the same class as <i>doSomething</i>() or <i>this.doSomething</i>().</p>
+
+<p>Variables, methods and nested classes can be marked as <i>private</i>, <i>public</i>,
+or <i>protected</i>.  Private
+things can only be used in the class where they are defined. Public things can be
+accessed from anywhere.  Protected things can be accessed in the same class and in
+subclasses of that class.</p>
+
+<p>The programs in this book use a main class that defines the window where the
+graphical display will be seen. That class also contains the <i>main</i>() routine.  
+(This is not particularly good style, but
+it works well for small programs.)  In some cases, the program depends on other classes
+that I have written; the files for those classes should be in the same folder
+as the file that defines the main class.  The programs can then be compiled on the
+command line, working in that folder, with the command</p>
+
+<pre>javac  *.java</pre>
+
+<np>To run the program whose main class is <i>MyClass</i>, use</np>
+
+<pre>java  MyClass</pre>
+
+<np>However, programs that use JOGL require some extra options in these commands. What you need
+to know is explained in <localref href="gl1geom.6.2"/>.  (The Eclipse IDE has its own simple
+commands for running a program.)</np>
+
+<p>There are many standard classes that are available for use in programs.  A few of the
+standard classes, such as <classname>Math</classname> and <classname>System</classname>,
+are automatically available to any program.  Others have to be "imported" into a source
+code file before they can be used in that file.  A class can be part of a package, which is
+a collection of classes.  For example, class <classname>Graphics2D</classname> is defined in
+the package <i>java.awt</i>.  This class can be imported into a source code file by adding
+the line</p>
+
+<pre>import java.awt.Graphics2D;</pre>
+
+<np>to the beginning of the file, before the definition of the class.  
+Alternatively, all of the classes in package <i>java.awt</i>
+can be imported with</np>
+
+<pre>import java.awt.*;</pre>
+
+<np>It is possible to put your own classes into packages, but that adds some complications when
+compiling and using them.  My sample programs in this book are not defined in named packages.  Officially,
+they are said to be in the "default package."  Recent versions of Java also have "modules,"
+which are collections of packages.  Again, using modules complicates things, and they are not
+used in this textbook.</np>
+
+<break/>
+
+<p>Java is a strongly typed language.  Every variable has a type, and it can only hold values
+of that type.  Every variable must be declared, and the declaration specifies the type of the
+variable.  The declaration can include an initial value.  For example,</p>
+
+<pre>String name;  // Declares name as a variable whose value must be a String.
+int x = 17;   // x is a variable whose value must an int, with initial value 17.
+Graphics2D g; // g is a variable whose value is an object of type Graphics2D.</pre>
+
+<p>Java has eight "primitive" types, whose values are not objects:  <ptype>int</ptype>,
+<ptype>long</ptype>, <ptype>short</ptype>, <ptype>byte</ptype>, <ptype>double</ptype>,
+<ptype>float</ptype>, <ptype>char</ptype>, and <ptype>boolean</ptype>.  The first four
+are integer types with different numbers of bits.  The real number types are
+<ptype>double</ptype> and <ptype>float</ptype>.  A constant such as 3.7 is of type
+<ptype>double</ptype>.  To get a constant of type <ptype>float</ptype>, you 
+need to add an 'F': 3.7F.  (This comes up when programming in JOGL, where some methods
+require parameters of type <ptype>float</ptype>.)  Constant <ptype>char</ptype> values
+are enclosed in single quotes; for example, 'A' and&nbsp;'%'.  Double quotes are
+used for strings, which are not primitive values in Java.</p>
+
+<p>In addition to the eight primitive types, any class defines a type.  If the type of
+a variable is a class, then the possible values of the variable are objects belonging
+to that class.  An interface also defines a type, whose possible values are objects that
+implement the interface.  An object, unlike a primitive value, contains variables and methods.  For example,
+<classname>Point</classname> is a class.  An object of type <classname>Point</classname> 
+contains <ptype>int</ptype> variables <i>x</i> and <i>y</i>.  A <classname>String</classname> is an object,
+and it contains several methods for working with the string, including one
+named <i>length</i>() that returns its length and another named
+<i>charAt</i>(<i>i</i>) that returns the <i>i</i>-th character in the string.  Variables
+and methods in an object are always accessed using the "." period operator:  If
+<i>pt</i> is a variable of type <classname>Point</classname>, referring to an
+object of type <classname>Point</classname>, then
+<i>pt.x</i> and <i>pt.y</i> are names for the instance variables in that object.
+If <i>str</i> is a variable of type <i>String</i>, then 
+<i>str.length</i>() and <i>str.charAt</i>(<i>i</i>) are
+methods in the <classname>String</classname> object to which <i>str</i> refers.</p>
+
+<p>A method definition specifies the type of value that is returned by the
+method and a type for each of its parameters.  It is usually marked as being
+<i>public</i> or <i>private</i>.  Here is an example:</p>
+
+<pre>public int countChars( String str, char ch ) {
+    int count = 0;
+    for ( int i = 0; i &lt; str.length(); i++) {
+        if ( str.charAt(i) == ch )
+            count++;
+    }
+    return count;
+}</pre>
+
+<np>Here, <i>countChars</i> is the name of the method.  It takes two parameters of
+type <classname>String</classname> and <ptype>char</ptype>, and it returns a value of
+type <ptype>int</ptype>.  For a method that does not return a value, the return type 
+(<ptype>int</ptype> in the above example) is specified as <i>void</i>.</np>
+
+<p>A method in Java can be used throughout the class where it is defined, even if the
+definition comes after the point where it is used.  (This is in contrast to C, where
+functions must be declared before they are used, but similar to JavaScript.)  The same is 
+true for global variables, which are declared outside any method.  All programming code, such
+as assignment statements and control structures, must be inside method definitions.</p>
+
+<break/>
+
+<p>Java has the same set of basic control structures as C and JavaScript:
+<i>if</i> statements, <i>while</i> and <i>do<code>..</code>while</i> loops, 
+<i>for</i> loops, and <i>switch</i> statements all take essentially the same form in 
+the three languages.  Assignment statements are also the same.</p>
+
+<p>Similarly, the three languages have pretty much the same set of operators, including
+the basic arithmetic operators (<code>+</code>, <code>&minus;</code>, <code>*</code> and&nbsp;<code>/</code>),
+the increment (<code>++</code>) and decrement (<code>--</code>) operators, the
+logical operators (<code>||</code>, <code>&amp;&amp;</code>, and&nbsp;<code>!</code>),
+the ternary operator (<code>?:</code>), and the bitwise operators (such as <code>&amp;</code>
+and&nbsp;<code>|</code>).  A peculiarity of Java arithmetic, as in C, is that the
+division operator, <code>/</code>, when applied to integer operands produces an integer
+result.  So, 18/5 is 3 and 1/10 is&nbsp;0.</p>
+
+<p>The <code>+</code> operator can be used to concatenate strings, so that "Hello" + "World"
+has the value "HelloWorld".  If just one of the operands of <code>+</code> is a string,
+then the other operand is automatically converted into a string.</p>
+
+<p>Java's standard functions are defined in classes.  For example, the mathematical
+functions include <i>Math.sin</i>(<i>x</i>), <i>Math.cos</i>(<i>x</i>), <i>Math.sqrt</i>(<i>x</i>), 
+and <i>Math.pow</i>(<i>x,y</i>) for raising <i>x</i> to the power&nbsp;<i>y</i>.  <i>Math.random</i>()
+returns a random number in the range 0.0 to 1.0, including 0.0 but not including 1.0.
+The method <i>System.out.println</i>(<i>str</i>) outputs a string to the command line.  In graphical programs,
+<i>System.out.println</i> is useful mainly for debugging. To output more than one item, use string
+concatenation:</p>
+
+<pre>System.out.println("The values are x = " + x + " and y = " + y);</pre>
+
+<np>There is also a formatted output method, <i>System.out.printf</i>, which is
+similar to C's <i>printf</i> function.</np>
+
+
+</subsection>
+
+
+
+<subsection title="Objects and Data Structures" id="proglang.1.2">
+
+
+<p>In addition to the primitive types, Java has "object types" that represent values
+that are objects.  A variable of object type
+doesn't hold an object; it can only hold a pointer to an object.  (Sometimes it's
+said that Java doen't use pointers, but it's more correct to say that it forces you to
+use them.)  The name of a class or of an interface is an object type.
+Objects are created from classes using the <b>new</b> operator.  For example,</p>
+
+<pre>Point pt;  // Declare a variable of type Point.
+pt = new Point( 100, 200 );  // Create an object of type Point.</pre>
+
+<np>Here, the class is <classname>Point</classname>, which also acts as a type that can
+be used to create variables.  A variable of type <classname>Point</classname> can refer
+to an object belonging to the class <classname>Point</classname> or to any subclass
+of that class.  The expression <i>new&nbsp;Point</i>(100,200) in the assignment statement
+calls a special kind of routine in the <classname>Point</classname> class that 
+is known as a <newword>constructor</newword>.  The purpose of
+a constructor is to initialize an object.  In this case, the parameters to the constructor,
+100 and 200, become the values of the variables <i>pt.x</i> and <i>pt.y</i> in the new object.
+The effect of the above code is that the value of <i>pt</i> is a pointer to the newly 
+created object.  We say that <i>pt</i> "refers" to that object.</np>
+
+<p>Instead of referring
+to an object, <i>pt</i> could have the special value <i>null</i>. When the value of a 
+variable is <i>null</i>, the variable does not refer to any object.  If the value of
+<i>pt</i> is <i>null</i>, then the variables <i>pt.x</i> and <i>pt.y</i> don't exist,
+and an attempt to use them is an error.  
+The error is called a <classname>NullPointerException</classname>.</p>
+
+<p><classname>Strings</classname>, by the way, are special objects.  They are not not created
+with the <i>new</i> operator.  Instead, a string is created as a literal value, enclosed
+in double quotes. For example</p>
+
+<pre>String greeting = "Hello World!";</pre>
+
+<p>Arrays are also special objects.  Any type in Java defines an array type.  An array
+type is an object type.  From
+the type <ptype>int</ptype>, for example, we get the array type <ptype>int</ptype><code>[]</code>.
+From <classname>String</classname> and <classname>Point</classname>, we get the types
+<classname>String</classname><code>[]</code> and <classname>Point</classname><code>[]</code>.
+The value of a variable of type <ptype>int</ptype><code>[]</code> is an array of 
+<ptype>ints</ptype> (or the value can be <i>null</i>).  
+The value of a variable of type <classname>Point</classname><code>[]</code>
+is an array of <classname>Points</classname>.  Arrays can be created with a version of the
+<i>new</i> operator:</p>
+
+<pre>int[] intList;  // Declare a variable that can refer to any array of ints.
+intList = new int[100];  // Create an array that can hold 100 ints.</pre>
+
+<np>An array has a fixed length that is set at the time it is created and cannot
+be changed.  If <i>intList</i> refers to an array, then the length of that array
+is given by the read-only variable <i>intList.length</i>.  The elements of the array
+are <i>intList</i>[0], <i>intList</i>[1], and so on.  An attempt to use <i>intList</i>[<i>i</i>]
+where <i>i</i> is outside the range from 0 to <i>intList.length</i>&nbsp;&minus;&nbsp;1 generates
+an error of type <classname>ArrayIndexOutOfBoundsException</classname>.</np>
+
+<p>The initial value for
+array elements is "binary zero"; that is, 0 for numeric values, <i>false</i> for
+<ptype>boolean</ptype>, and <i>null</i> for objects.</p>
+
+<p>An array can be created and initialized to hold arbitrary values at the time it is created
+using the syntax</p>
+
+<pre>intList = new int[] {2, 3, 5, 7, 11, 13, 15, 17, 19};</pre>
+
+<np>This version of the <i>new</i> operator creates an array of <ptype>ints</ptype> of
+length nine that initially holds the nine specified values.  If the initialization of an array is
+done as part of a variable declaration, then only the list of values, enclosed between {&nbsp;and&nbsp;},
+is required:</np>
+
+<pre>String[] commands = { "New", "Open", "Close", "Save", "Save As" };</pre>
+
+<break/>
+
+<p>Java comes with several standard classes that define common data structures, including
+linked lists, stacks, queues, trees, and hash tables, which are defined by
+classes in the package <i>java.util</i>.  The classes define "generic" or "parameterized"
+types that will work for a variety of element types.  For example, an object of type
+<classname>LinkedList</classname>&lt;<classname>String</classname>&gt; is a list of items of
+type <classname>String</classname>.  Unfortunately, it is not possible to use these classes with
+the primitive types;. There is no "linked list of <ptype>int</ptype>".  (However, you can have
+<classname>LinkedList</classname>&lt;<classname>Integer</classname>&gt;, where an object of type
+<classname>Integer</classname> is a "wrapper" for a primitive <ptype>int</ptype> value.)</p>
+
+<p>Perhaps the most commonly used of the generic data structures
+is the <classname>ArrayList</classname>.  Like an array, an <classname>ArrayList</classname>
+contains a numbered sequence of items.  However, an <classname>ArrayList</classname> can grow
+and shrink.  For example, to create an <classname>ArrayList</classname> that can hold
+objects of type <classname>Point</classname>:</p>
+
+<pre>ArrayList&lt;Point&gt;  pointList;
+pointList = new ArrayList&lt;Point&gt;();</pre>
+
+<np>This creates an initially empty list.  The method <i>pointList.add</i>(<i>pt</i>) can
+be used to add a <classname>Point</classname> to the end of the list, increasing its length
+by one.  The value of <i>pointList.size</i>() is the number of items currently in the list.
+The method <i>pointList.get</i>(<i>i</i>) returns the <i>i</i>-th element of the
+list, and <i>pointList.set</i>(<i>i,pt</i>) replaces the <i>i</i>-th element with <i>pt</i>.
+Similarly, <i>pointList.remove</i>(<i>i</i>)
+removes the <i>i</i>-th element, decreasing the length of the list by one.
+For all of these methods, an error occurs if <i>i</i> is not in the range from 0 to
+<i>pointList.size</i>()&nbsp;&minus;1.</np>
+
+
+<p>It is also possible to build linked data structures directly, remembering that
+the value of a variable whose type is given by a class is either <i>null</i> or is
+a pointer to an object.  For example, a linked list of integer values can be
+created using objects defined by the simple class</p>
+
+<pre>class ListNode {
+    int item;       // One of the integers in the list
+    ListNode next;  // Pointer to next node in list, or null for end-of-list.
+}</pre>
+
+<p>A more useful data structure for this course is a <word>scene graph</word>, like the 
+ones discussed in <localref href="graphics2d.4.2"/> and implemented in the sample
+program <sourceref href="java2d/SceneGraphAPI2D.java"/>.  In that <word>API</word>,
+a node in a scene graph is represented by an object belonging to the class
+<classname>SceneGraphNode</classname> or to a subclass of that class.  For example,
+a <classname>CompoundObject</classname> represents a graphical object made up of
+subobjects.  It needs to store pointers to all of its subobjects.  They can
+conveniently be stored in an <classname>ArrayList</classname>.  Then drawing
+a <classname>CompoundObject</classname> just means drawing its subobjects.
+The class can be defined as follows:</p>
+
+<pre>class CompoundObject extends SceneGraphNode {
+    ArrayList&lt;SceneGraphNode&gt; subobjects = new ArrayList&lt;SceneGraphNode&gt;();
+    CompoundObject add(SceneGraphNode node) {
+        subobjects.add(node);
+        return this;
+    }
+    void doDraw(Graphics2D g) {
+        for (SceneGraphNode node : subobjects)
+           node.draw(g);
+    }
+}</pre>
+
+<np>(The <i>for</i> loop in this class is one that is specific to Java.  It iterates
+automatically through all of the objects in the list.)</np>
+
+</subsection>
+
+
+
+<subsection title="Windows and Events" id="proglang.1.3">
+
+<p>Java comes with a set of standard classes for working with windows
+and events.  I will mention some of the most common.  I will try to tell you
+enough to understand and work with the sample programs in this book.  Writing programs from
+scratch will require more in-depth knowledge.  All of the classes
+that I discuss are part of the Swing GUI API, and are contained
+in the packages <i>java.awt</i>, <i>javax.swing</i>,
+and <i>java.awt.event</i>. Many of my programs begin with the following
+<i>import</i> directives to make the classes that they contain available:</p>
+
+<pre>import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;</pre>
+
+<p>A window can be represented by an object of class <classname>JFrame</classname>.
+A JFrame can hold a menu bar and a large content area known as its "content pane."
+The content pane often belongs to a subclass of <classname>JPanel</classname>.
+A <classname>JPanel</classname> can be used in two ways:  as a drawing surface or 
+as a container for other components such as buttons, text input boxes, and nested
+panels.</p>
+
+<p>When a panel is to be used as a drawing surface, it is defined by a subclass that
+includes a <i>paintComponent</i>() method.  The <i>paintComponent</i> method is
+called when the panel first appears on the screen and when it needs to be
+redrawn.  Its task is to completely redraw the panel.
+It has a parameter of type <i>Graphics</i>, which is the graphics
+context that is used to do the drawing.  It takes the form</p>
+
+<pre>public void paintComponent(Graphics g) { ...</pre>
+
+<np>The <i>paintComponent</i> method is discussed further in <localref href="graphics2d.5"/>.
+In general, <b>all</b> drawing should be done in this method, and <i>paintComponent</i>
+should only be called by the system.  When redrawing is necessary,
+a call to <i>paintComponent</i> can be triggered by calling the panel's <i>repaint</i>()
+method.  (For OpenGL programming in <localref href="gl1geom"/> and <localref href="gl1light"/>,
+I use a <classname>GLJPanel</classname>, which is a subclass of <classname>JPanel</classname>.
+In that case, the drawing is done in a <i>display</i>() method, instead of 
+in <i>paintComponent</i>, but you can still call
+<i>repaint</i>() to trigger a redraw.  See <localref href="gl1geom.6.2"/>.)</np>
+
+<p>When a panel is to be used as a container for other components, those components
+will usually be created and added to the panel in a constructor, a special routine
+that is called to initialize an object when the object is created by the <i>new</i>
+operator.  A constructor routine can be recognized by the fact that it has the same 
+name as the class that contains it, and it has 
+no return type.</p>
+
+<p>The sizes and positions of the components in a panel will generally be set by
+a "layout manager," which is an object that implements some policy for laying out
+the components in a container.  For example, a <classname>BorderLayout</classname>
+is a layout manager that puts one large component in the center of the panel, with
+space for up to four additional components on the north, south, east, and west
+edges of the panel.  And a <i>GridLayout</i> lays out components in rows and 
+columns, with all components having the same size.  In addition to nested
+panels, possible component types include typical interface components such as
+<classname>JButton</classname>, <classname>JCheckBox</classname>, and
+<classname>JRadioButton</classname>.  You will see examples of all of these
+things in the sample programs.</p>
+
+<break/>
+
+<p>A GUI program must be able to respond to <b>events</b>, including low-level events
+such as those generated when the user manipulates a mouse or keyboard, and high level events
+such as those generated when the user selects an item from a menu or clicks on a
+button.  To respond to events, a program defines event-handling methods, which
+will be called when the event occurs.  In Java, an object that includes event-handling
+methods is said to "listen" for those events.  For example, the basic mouse-event
+handlers are specified by an interface named <classname>MouseListener</classname>.
+An object that implements this interface can respond to mouse events.  It
+must define methods such as <i>mousePressed</i>(), which will be called when the 
+user presses a button on the mouse.  <classname>MouseListener</classname> defines
+five methods in all.  A class that implements the interface would take the form</p>
+
+<pre>class MouseHandler implements MouseListerner {
+    public void mousePressed(MouseEvent evt) {
+        .
+        .  // respond when the user presses a mouse button
+        .
+    }
+    public void mouseClicked(MouseEvent evt) { }
+    public void mouseReleased(MouseEvent evt) { }
+    public void mouseEntered(MouseEvent evt) { }
+    public void mouseExited(MouseEvent evt) { }
+}</pre>
+
+<np>The <classname>MouseEvent</classname> parameter in each of these methods is an object that will contain
+information about the event.  For example, 
+<i>evt.getX</i>() and <i>evt.getY</i>() can be called in the event-handler method
+to find the <i>x</i> and <i>y</i> coordinates of the mouse.</np>
+
+<p>An event is usually associated with some component, called the "target" of the event.  
+For example, a mouse press event is associated with the component that contained the mouse
+when the user pressed the mouse button.  A button click event is associated with the button
+that was clicked.  To receive events from a component, a program must register an
+event-listening object with that component.  For example, if you want to respond
+to mouse clicks on a <classname>JPanel</classname> named <i>panel</i>, you need to
+create a <classname>MouseListener</classname> object and register it with the panel:</p>
+
+<pre>MouseHandler handler = new MouseHandler(); // create the listener
+panel.addMouseListener(handler);  // register it with the panel</pre>
+
+<np>In many cases, I create a class, often a nested class, to define an event 
+listener that I need.  However, any class, can implement an interface, and sometimes
+I let my main class implement the listener interface:</np>
+
+<pre>public class MyPanel extends JPanel implements MouseListener { ...</pre>
+
+<np>Inside such a class, the panel and the listener are the same object, and the special
+variable <i>this</i> refers to that object.  So, to register the panel to listen for
+mouse events on itself, I would say</np>
+
+<pre>this.addMouseListener( this );</pre>
+
+<np>This statement can be shortened to simply <i>addMouseListener(this)</i>.</np>
+
+<p>Other event types work similarly to mouse event types.  You need an object that
+implements a listener interface for events of that type, and you need to register
+that object as a listener with the component that will be the target of the events.</p>
+
+<p>The <classname>MouseMotionListener</classname> interface defines methods that
+handle events that are generated when the user moves or drags the mouse. It is separate
+from the <classname>MouseListener</classname> interface for the sake of efficiency.
+Responding to a mouse-drag action usually requires an object that acts both as a mouse 
+listener and a mouse motion listener.</p>
+
+<p>The <classname>KeyListener</classname> interface is used for handling keyboard events.
+An event is generated when the user presses a key and when the user releases a key on
+the keyboard.  Another kind of event is generated when the user types a character.
+Typing a character such as upper case 'A' would generate several key-pressed and
+key-released events as well as a character-typed event.</p>
+
+<p>The <classname>ActionListener</classname> interface is used to respond to a variety
+of user actions.  An <classname>ActionEvent</classname> is generated, for example, when the user
+clicks a button, selects a command from a menu, or changes the setting of a checkbox.
+It is also used in one context where the event doesn't come from the user:
+A <classname>Timer</classname> is an object that can generate a sequence of <classname>ActionEvents</classname>
+at regularly spaced intervals.  An <classname>ActionListener</classname> can respond to those
+events to implement an animation.  See the sample program
+<sourceref href="java2d/AnimationStarter.java"/> to see how its done.</p>
+
+<p>Finally, I will note that <word>JOGL</word> uses an event listener of type
+<classname>GLEventListener</classname> for working with OpenGL.  Its use
+is explained in <localref href="gl1geom.6.2"/>.</p>
+
+</subsection>
+
+
+</section>

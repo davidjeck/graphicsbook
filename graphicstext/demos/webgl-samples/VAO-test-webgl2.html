@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+
+<!--
+   This program uses Vertex Array Objects (VAO) to hold the buffer and vertex pointer
+   settings for the various objects that are drawn.  This page requires WebGL 2.0.
+   The program lets the use choose among several different 3D objects to view,  Each
+   model has its own VAO that organizes the buffers and vertex pointer settings for
+   that object.
+-->
+
+<head>
+<title>VAO test</title>
+<style>
+    body {
+        background-color: #DDDDDD;
+    }
+    canvas {
+        display: block;
+    }
+    label {
+        margin-left: 30px;
+    }
+</style>
+
+
+
+<!--
+    Shader programs (written in GLSL ES 1.00, which works with WebGL 2.0).
+    The shaders implement very simple lighting: diffuse color only, with
+    a single light at the position of the viewer.  The base color of
+    the objects is yellow.
+-->
+
+<script type="x-shader/x-vertex" id="vshader">
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec4 objectCoords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * objectCoords;
+        gl_Position = projection * eyeCoords;
+        v_normal = normalize(a_normal);
+        v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    uniform mat3 normalMatrix;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec3 N = normalize( normalMatrix*v_normal );
+        vec3 L = normalize( -v_eyeCoords);
+        float diffuseFactor = dot(N,L);
+        gl_FragColor = vec4( diffuseFactor, diffuseFactor, 0.0, 1.0 );
+    }
+</script>
+
+<!-- Regular JavaScript scripts -->
+
+<script src="trackball-rotator.js"></script>
+<script src="gl-matrix-min.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+<script src="teapot-model-IFS.js"></script>
+
+<script>
+
+"use strict";
+
+let gl;      // The webgl 2.0 context.
+let canvas;  // The canvas used by gl.
+
+/* Variables for drawing one of the objects. */
+
+let prog; // The main shader program, for the 3D on-screen image
+let a_coords_loc;  // Locations of attributes in the main shader program
+let a_normal_loc; 
+let a_texCoords_loc; 
+
+let u_projection;  // Locations of uniforms in the main shader program
+let u_modelview;
+let u_normalMatrix;
+
+const projection = mat4.create();        // projection matrix (for main shader program)
+const normalMatrix = mat3.create();      // normal transform matrix
+const textureTransform = mat3.create();  // texture transform matrix
+let modelview;                           // will come from rotator
+
+let rotator;  // A TrackballRotator object that lets the user rotate the view by mouse.
+
+
+/* Data for the various objects that can be viewed. */
+
+const objectVAOs = [];          // Vertex Array Object IDs, one for each model.
+                                // Each VAO encapsulates all the buffers and vertex pointer settings
+                                // needed for one model.
+
+const objectVertexCounts = [];  // An integer for each model, giving the size of the element buffer
+                                // for that object.  For use in gl.drawElements().
+
+
+/* Draw the scene, showing the object currently selected by the user.  */
+function draw() {
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    modelview = rotator.getViewMatrix();  // Use data from the rotator to set up the view
+    gl.uniformMatrix4fv(u_modelview, false, modelview );
+    mat3.normalFromMat4(normalMatrix, modelview);
+    gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+    
+    let objectNum = Number(document.getElementById("object").value); // get currently selected model number
+    drawModel(objectNum); 
+}
+
+/**
+ *  Draw an object representing as an IFS model, using the data structure from
+ *  basic-objects-IFS.js.  The parameter will be the currently selected model
+ *  number.  The data and settings for that model are created if this is the
+ *  first time that the model has been drawn.  The data is stored in VBO buffers,
+ *  and the data and settings for the model are organized by a vertex array
+ *  object (VAO).  The ID for the VAO is saved in an array.  Subsequent
+ *  renderings of the object simply bind the VAO for that object to restore
+ *  all of the settings.
+ */
+function drawModel(index) {
+    if (objectVAOs[index] !== undefined) {
+           // Data and settings were created previously, so it is only
+           // necessary to restore them by binding the VAO for this model.
+        gl.bindVertexArray(objectVAOs[index]);
+    }
+    else {
+           // This is the first time this model has been drawn.  Create the
+           // data and settings for the model and a VAO to store them.
+        console.log("Creating object number ", index);
+        let modelData;
+        switch (index) {  // Create the data needed for drawing this object.
+            case 0:  modelData = cube(); break;
+            case 1:  modelData = uvSphere(0.7,64,32); break;
+            case 2:  modelData = uvCylinder(); break;
+            case 3:  modelData = uvCone(); break;
+            case 4:  modelData = uvTorus(0.65,0.2,64,24); break;
+            case 5:
+                for (let i = 0; i < teapotModel.vertexPositions.length; i++) {
+                    teapotModel.vertexPositions[i] *= 0.05; // scale teapot model to a size that matches other objects
+                }
+                modelData = teapotModel;
+                break;
+        }
+        objectVAOs[index] = gl.createVertexArray();
+        objectVertexCounts[index] = modelData.indices.length;
+        gl.bindVertexArray(objectVAOs[index]);
+        let coordsBuffer = gl.createBuffer();
+        let normalBuffer = gl.createBuffer();
+        let indexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, coordsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexPositions, gl.STATIC_DRAW);
+        gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexNormals, gl.STATIC_DRAW);
+        gl.vertexAttribPointer(a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, modelData.indices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer); 
+        gl.enableVertexAttribArray(a_coords_loc);
+        gl.enableVertexAttribArray(a_normal_loc);
+    }
+    // In any case, the VAO for the current object is now bound, so just draw it.
+    gl.drawElements(gl.TRIANGLES, objectVertexCounts[index], gl.UNSIGNED_SHORT, 0);
+}
+
+
+/* Draws a set of disks, using color and position data form diskColors and diskCenters.
+ * This draws the disks to the texture and is called from draw();
+ * Note that the goal here is to draw a "seamless" texture, so that a disk
+ * that hangs off one side of the image will have to extend onto the other side.
+ * The coordinate system has x and y ranging from -1 to 1.
+ */
+function drawDisks() {
+    function disk(i, extraTranslateX, extraTranslateY) {
+        gl.uniform4fv(u_color_texture, diskColors[i]);
+        gl.uniform2f(u_translation_texture, diskCenters[i][0] + extraTranslateX, diskCenters[i][1] + extraTranslateY);
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 64);
+        gl.uniform4f(u_color_texture, 0, 0, 0, 1);
+        gl.drawArrays(gl.LINE_LOOP, 0, 64);
+    }
+    var r = DISK_DIAMETER/2;  // disk radius
+    for (let i = 0; i < DISK_COUNT; i++) {
+        disk(i,0,0);  // draw the disk with no extra translation (in its usual position)
+        if (diskCenters[i][0] < -1 + r) { // disk hangs off left edge, draw it again on the right side
+            disk(i,2,0);
+            disk(i,2,2);    // in case it also hangs off the bottom (in that case, we need three copies)
+            disk(i,2,-2);   // in case it also hangs off the top
+        }
+        if (diskCenters[i][0] > 1 - r) { // disk hangs off right edge, draw it again on the left side
+            disk(i,-2,0);
+            disk(i,-2,2);    // in case it also hangs off the bottom
+            disk(i,-2,-2);  // in case it also hangs off the top
+        }
+        if (diskCenters[i][1] < -1 + r) { // hangs off the bottom
+            disk(i,0,2);
+        }
+        if (diskCenters[i][1] > 1 - r) { // hangs off the top
+            disk(i,0,-2);
+        }
+    }
+}
+
+
+/* Initialize the WebGL context.  Called from init().   */
+function initGL() {
+    
+    // Initialize data for the scene.  Get the locations of
+    // attributes and uniforms, and set up the projection matrix
+    // uniform variablee, which never changes.
+
+    prog = createProgram(gl,"vshader","fshader");
+    gl.useProgram(prog);
+    
+    gl.clearColor(0,0,0,1);
+    gl.enable(gl.DEPTH_TEST);
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    a_texCoords_loc =  gl.getAttribLocation(prog, "a_texCoords");
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix = gl.getUniformLocation(prog, "normalMatrix"); 
+    
+    mat4.perspective(projection, Math.PI/10, canvas.width/canvas.height, 1, 10);
+    gl.uniformMatrix4fv(u_projection, false, projection);
+     
+}
+
+
+//--------------------------------------------------------------------------------
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are the id attributes for <script>
+ * elementst that contain the source code for the vertex and fragment
+ * shaders.
+ */
+function createProgram(gl, vertexShaderID, fragmentShaderID) {
+    function getTextContent( elementID ) {
+            // This nested function retrieves the text content of an
+            // element on the web page.  It is used here to get the shader
+            // source code from the script elements that contain it.
+        let element = document.getElementById(elementID);
+        let node = element.firstChild;
+        let str = "";
+        while (node) {
+            if (node.nodeType === 3) // this is a text node
+                str += node.textContent;
+            node = node.nextSibling;
+        }
+        return str;
+    }
+    let vertexShaderSource, fragmentShaderSource;
+    try {
+        vertexShaderSource = getTextContent( vertexShaderID );
+        fragmentShaderSource = getTextContent( fragmentShaderID );
+    }
+    catch (e) {
+        throw new Error("Could not get shader source code from script elements.");
+    }
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vertexShaderSource);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error( "Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl2");
+        if ( ! gl ) {
+            throw new Error();
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL2 graphics context.  This page requires WebGL 2.0.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        console.error(e);
+        return;
+    }
+    document.getElementById("object").value = "5";
+    document.getElementById("object").onchange = draw;
+    rotator = new TrackballRotator(canvas, draw, 5, [2,2,3]);
+    draw();
+}
+
+
+window.onload = init;  // Arrange for init to be called when the page has loaded.
+
+</script>
+</head>
+<body>
+
+<h2>WebGL 2.0 VAO Test</h2>
+
+
+<p id=message>Drag your mouse on the object to rotate it.</p>
+
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL 2.0</h3><hr></noscript>
+
+<p>
+<label><b>Object:</b> <select id="object">
+    <option value="0">Cube</option>
+    <option value="1">Sphere</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Torus</option>
+    <option value="5">Teapot</option>
+</select></label>
+</p>
+
+<div id="canvas-holder">
+   <canvas width=600 height=600 id="webglcanvas"></canvas>
+</div>
+
+
+</body>
+</html>
+

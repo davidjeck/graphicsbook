@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<!--
+   This web page shows how to do a simple animation using 2D canvas graphics.
+   It also defines functions applyWindowtoViewportTransformation, for setting
+   up a coordinate system on the canvas, and addGraphicsContextExtras, for adding
+   some extra drawing functions to a graphics context, such as functions for drawing
+   lines and ovals.  Use this page as a basis for experimenting with animation.
+-->
+<head>
+<meta charset="UTF-8">
+<title>Canvas Animation Starter</title>
+<style>
+    /* This style section is here to make the canvas more obvious on the
+       page.  It is white on a light gray page background, with a thin
+       black border. */
+    body {
+        background-color: #DDDDDD;
+    }
+    canvas {
+        background-color: white;
+        display: block;
+    }
+    #canvasholder {
+        border:2px solid black;
+        float: left; /* This makes the border exactly fit the canvas. */
+    }
+</style>
+<script>
+
+    "use strict";  // gives improved error-checking in scripts.
+
+    let canvas;    // The canvas element on which we will draw.
+    let graphics;  // A 2D graphics context for drawing on the canvas.
+    let pixelSize; // The size of a pixel in the coordinate system; set up by
+                   //    applyWindowToViewportTransform function when it is called.
+    let startTime; // Records time when animation started.
+    
+    let frameNumber;  // This will be number of times draw() has been called,
+                      // starting from 0 in the first frame.
+    
+    let elapsedTimeMillis;  // This will be the time since the animation started;
+                            // will be zero in the first frame.
+    
+    /**
+     *  The draw() function is called for each frame of the animation.
+     *  At the start, clear the canvas and save a copy of the state;
+     *  restore the state at the end.  This function can use the
+     *  global variables frameNumber and elapsedTimeMillis to draw
+     *  a different image each time it is drawn.  It should be called about
+     *  60 times per second.
+     */
+    function draw() {
+    
+        graphics.clearRect(0,0,800,600);  // Clear the canvas, so it shows its background color.
+        graphics.save();  // Push graphics context state onto a stack.
+        
+        /* Here, I set up a new coordinate system on the drawing area, by calling
+         * the applyLimits() method that is defined below.  Without this call, I
+         * would be using regular pixel coordinates.  This function is defined below.
+         * It sets the value of the global variable pixelSize, which I need for
+         * line widths in the transformed coordinate system.
+         */
+        
+        applyWindowToViewportTransformation(-5,5,-5,5,true);
+        
+        /* Finish by drawing the content of the current frame, using frameNumber
+         * and/or elapsedTimeMillis in the drawing so that the image will change
+         * from frame to frame.  Here, a simple hierarchical scene is drawn as
+         * an example.
+         */
+         
+        graphics.rotate(frameNumber * 0.001); // makes the whole picture rotate slowly
+            // (NOTE:  In canvas graphics, for a transformation to affect a path, the
+            // transform must be in effect before the path is created.  The transform is
+            // applied to points as they are added to the path.)
+
+        graphics.beginPath() ; // Will the outline of a hexagon, with spokes from center to vetices.
+        graphics.moveTo(3,0);
+        for (let i = 1; i < 6; i++) {
+            let angle = (2*Math.PI/6) * i;
+            graphics.lineTo( 3*Math.cos(angle), 3*Math.sin(angle) );
+        }
+        graphics.closePath();
+        for (let i = 0; i < 6; i++) {
+            let angle = (2*Math.PI/6) * i;
+            graphics.moveTo(0,0);
+            graphics.lineTo( 3*Math.cos(angle), 3*Math.sin(angle) );
+        }
+        
+        graphics.strokeStyle = "blue";
+        graphics.lineWidth = 4*pixelSize;
+        graphics.stroke();
+        
+        // Now, draw a quickly rotating square at each vertex of the hexaon.
+        
+        graphics.strokeStyle = "red";
+        graphics.fillStyle = "red";
+        graphics.lineWidth = 2*pixelSize;
+        for (let i = 0; i < 6; i++) {
+            graphics.save();  // save state, so transform only affects this one square.
+            let angle = (2*Math.PI/6) * i;
+               // (NOTE: Remember that transforms are applied in the reverse of their order in the code!)
+            graphics.rotate(angle);  // rotate the translated square onto the i-th vertex of the hexagon.
+            graphics.translate(3,0); // translate the quickly rotating square to (3,0)
+            graphics.rotate( frameNumber*0.02 );   // make the square rotate quickly about its center.
+            graphics.globalAlpha = 0.4; // translucent drawing with 40% opacity
+            graphics.fillRect( -0.5, -0.5, 1, 1 );  // draw a 1-by-1 square, centered at (0,0).
+            graphics.globalAlpha = 1;
+            graphics.strokeRect( -0.5, -0.5, 1, 1 );  // draw a 1-by-1 square, centered at (0,0).
+            graphics.restore();
+        }        
+        
+        graphics.restore();  // Pop the saved graphics context state.
+                             // (Otherwise state would carry over to next frame.)
+        
+    } // end of draw()
+    
+    
+    /**
+     * Sets up a transformation in the graphics context so that the canvas will
+     * show x-values in the range from left to right, and y-values in the range
+     * from bottom to top.  If preserveAspect is true, then one of the ranges
+     * will be increased, if necessary, to account for the aspect ratio of the
+     * canvas.  This function sets the global variable pixelsize to be the
+     * size of a pixel in the new coordinate system.  (If preseverAspect is
+     * true, pixelSize is the maximum of its horizontal and vertical sizes.)
+     */
+    function applyWindowToViewportTransformation(left,right,bottom,top,preserveAspect) {
+        let displayAspect, windowAspect;
+        let excess;
+        let pixelwidth, pixelheight;
+        if (preserveAspect) {
+            // Adjust the limits to match the aspect ratio of the drawing area.
+            displayAspect = Math.abs(canvas.height / canvas.width);
+            windowAspect = Math.abs(( top-bottom ) / ( right-left ));
+            if (displayAspect > windowAspect) {
+                // Expand the viewport vertically.
+                excess = (top-bottom) * (displayAspect/windowAspect - 1);
+                top = top + excess/2;
+                bottom = bottom - excess/2;
+            }
+            else if (displayAspect < windowAspect) {
+                // Expand the viewport vertically.
+                excess = (right-left) * (windowAspect/displayAspect - 1);
+                right = right + excess/2;
+                left = left - excess/2;
+            }
+        }
+        graphics.scale( canvas.width / (right-left), canvas.height / (bottom-top) );
+        graphics.translate( -left, -top );
+        pixelwidth =  Math.abs(( right - left ) / canvas.width);
+        pixelheight = Math.abs(( bottom - top ) / canvas.height);
+        pixelSize = Math.max(pixelwidth,pixelheight);
+    }  // end of applyWindowToViewportTransformation()
+
+
+    /**
+     * This function can be called to add a collection of extra drawing function to
+     * a graphics context, to make it easier to draw basic shapes with that context.
+     * The parameter, graphics, must be a canvas 2d graphics context.
+     *
+     * The following new functions are added to the graphics context:
+     *
+     *    graphics.strokeLine(x1,y1,x2,y2) -- stroke the line from (x1,y1) to (x2,y2).
+     *    graphics.fillCircle(x,y,r) -- fill the circle with center (x,y) and radius r.
+     *    graphics.strokeCircle(x,y,r) -- stroke the circle.
+     *    graphics.fillOval(x,y,r1,r2) -- fill oval with center (x,y) and radii r1 and r2.
+     *    graphics.stokeOval(x,y,r1,r2) -- stroke the oval
+     *    graphics.fillPoly(x1,y1,x2,y2,...) -- fill polygon with vertices (x1,y1), (x2,y2), ...
+     *    graphics.strokePoly(x1,y1,x2,y2,...) -- stroke the polygon.
+     *    graphics.getRGB(x,y) -- returns the color components of pixel at (x,y) as an array of
+     *         four integers in the range 0 to 255, in the order red, green, blue, alpha.
+     *
+     * (Note that "this" in a function that is called as a member of an object refers to that
+     * object.  Here, this will refer to the graphics context.)
+     */
+    function addGraphicsContextExtras(graphics) {
+        graphics.strokeLine = function(x1,y1,x2,y2) {
+           this.beginPath();
+           this.moveTo(x1,y1);
+           this.lineTo(x2,y2);
+           this.stroke();
+        };
+        graphics.fillCircle = function(x,y,r) {
+           this.beginPath();
+           this.arc(x,y,r,0,2*Math.PI,false);
+           this.fill();
+        };
+        graphics.strokeCircle = function(x,y,radius) {
+           this.beginPath();
+           this.arc(x,y,radius,0,2*Math.PI,false);
+           this.stroke();
+        };
+        graphics.fillPoly = function() { 
+            if (arguments.length < 6)
+               return;
+            this.beginPath();
+            this.moveTo(arguments[0],arguments[1]);
+            for (let i = 2; i+1 < arguments.length; i = i + 2) { 
+               this.lineTo(arguments[i],arguments[i+1]);
+            }
+            this.closePath();
+            this.fill();
+        };
+        graphics.strokePoly = function() { 
+            if (arguments.length < 4)
+               return;
+            this.beginPath();
+            this.moveTo(arguments[0],arguments[1]);
+            for (let i = 2; i+1 < arguments.length; i = i + 2) { 
+               this.lineTo(arguments[i],arguments[i+1]);
+            }
+            this.closePath();
+            this.stroke();
+        };
+        graphics.fillOval = function(x,y,horizontalRadius,verticalRadius) {
+           this.save();
+           this.translate(x,y);
+           this.scale(horizontalRadius,verticalRadius);
+           this.beginPath();
+           this.arc(0,0,1,0,2*Math.PI,false);
+           this.restore();
+           this.fill();
+        };
+        graphics.strokeOval = function(x,y,horizontalRadius,verticalRadius) {
+           this.save();
+           this.translate(x,y);
+           this.scale(horizontalRadius,verticalRadius);
+           this.beginPath();
+           this.arc(0,0,1,0,2*Math.PI,false);
+           this.restore();
+           this.stroke();
+        };
+        graphics.getRGB = function(x,y) {
+            let color = this.getImageData(x,y,1,1);
+            return color.data;
+        };
+    }    // end of addGraphicsContextExtras()
+
+    /**
+     *  Draw one frame of the animation, and call requestAnimationFrame() to arrange
+     *  for the function to be called again.
+     */
+    function doFrame() {
+        frameNumber++;
+        elapsedTimeMillis = Date.now() - startTime;
+           // YOU CAN ADD UPDATE OTHER DATA FOR THE FRAME HERE.
+        draw();
+        requestAnimationFrame(doFrame);
+    }
+    
+    /**
+     * The init() funciton is called after the page has been
+     * loaded.  It initializes the canvas and graphics variables.
+     * It calles addGraphicsContextExtras(graphics) to add the extra
+     * drawing functions to the graphics context.  It calls draw() to
+     * draw the first frame of the animation, and then it starts the
+     * animation running.
+     */
+    function init() {
+        try {
+            canvas = document.getElementById("canvas");
+            graphics = canvas.getContext("2d");
+        } catch(e) {
+            document.getElementById("canvasholder").innerHTML =
+               "Canvas graphics is not supported.<br>" +
+               "An error occurred while initializing graphics.";
+            return;
+        }
+        addGraphicsContextExtras(graphics);
+        frameNumber = 0;
+        elapsedTimeMillis = 0;
+        startTime = Date.now();  // current time, in milliseconds.
+        draw();  // Call draw() to draw on the canvas.
+        requestAnimationFrame(doFrame);  // Start the animation 
+    }
+    
+    window.onload = init;  // function init() will be called when the page has loaded.
+    
+</script>
+</head>
+<body>
+
+<h2>Canvas Animation Starter</h2>
+
+<noscript>
+    <!-- This message will be shown in the page if JavaScript is not available. -->
+<p>JavaScript is required to use this page.</p>
+</noscript>
+
+<div id="canvasholder">
+<canvas id="canvas" width="800" height="600">
+    <!-- This message is shown on the page if the browser doesn't support the canvas element. -->
+Canvas not supported.
+</canvas>
+</div>
+
+</body>
+</html>

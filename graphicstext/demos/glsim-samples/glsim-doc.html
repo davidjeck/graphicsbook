@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>glsim.js Documentation</title>
+<style>
+html, body {
+	margin: 0;
+	padding: 0;
+}
+body {
+   background-color:gray;
+}
+#content {
+   background-color: #EEEEEE;
+   color: black;
+   max-width: 800px;
+   margin: 0 auto;
+   padding: 12px;
+   border: thin solid black;
+}
+div.section {
+   margin-top: 1cm;
+   border-top: 2px solid #006688;
+}
+a:link {
+   color: #0000AA;
+   text-decoration: underline;
+}
+a:visited {
+   color: #553377;
+   text-decoration: underline;
+}
+a:active {
+   color: #CC2222;
+   text-decoration: underline;
+}
+a:hover {
+   color: #6666FF;
+   text-decoration: underline;
+   cursor: pointer;
+}
+a {
+   white-space: pre;
+}
+pre {
+   margin-left: 75px;
+}
+code {
+   font-weight: bold;
+   color: #700000;
+}
+p {
+   text-indent: 30px;
+}
+p.np {
+   text-indent: 0px;
+}
+h2, h3 {
+   color: #006688;
+}
+h2 {
+   border-bottom: thick double #006688;
+   padding-bottom: 3px;
+}
+</style>
+<body>
+<div id="content">
+
+<h2>Some Documentation for <i>glsim.js</i></h2>
+
+<p><a href="glsim.js"><i>glsim.js</i></a> is an open-source JavaScript library, written by
+<a href="http://math.hws.edu/eck/index.html">David Eck</a>,
+that implements a subset of OpenGL&nbsp;1.1
+by translating OpenGL function calls into WebGL&nbsp;1.0.  Note in particular
+that it requires WebGL support.  The subset of OpenGL includes the part of the
+API that is discussed in Chapters 3 and 4 of the on-line computer graphics
+textbook at <a href="http://math.hws.edu/graphicsbook">http://math.hws.edu/graphicsbook</a>
+(except for display lists).  The purpose of <i>glsim.js</i> is simply to support that textbook.
+It is not in any way meant as a serious implementation of OpenGL!  It is also by no
+means fully tested, and it is rather inefficient.  However, it does work in the simple applications
+for which I have used it, and it might be useful for basic experimentation and practice with
+OpenGL&nbsp;1.1, with the goal of learning something about 3D graphics concepts,
+without the hassle of setting up an OpenGL development environment for
+a language like C or Java.</p>
+
+<p>Sample programs using glsim.js can be found in
+<a href="http://math.hws.edu/graphicsbook/source/glsim/">http://math.hws.edu/graphicsbook/source/glsim/</a>.
+It is also used for some of the live demos in the book, which can be found in
+<a href="http://math.hws.edu/graphicsbook/demos/c3/">http://math.hws.edu/graphicsbook/demos/c3/</a> and
+<a href="http://math.hws.edu/graphicsbook/demos/c4/">http://math.hws.edu/graphicsbook/demos/c4/</a>.</p>
+
+<p>Some of the code in <i>glsim.js</i> is taken from the popular JavaScript matrix and vector math
+library <i>glmatrix</i>, written by Brandon Jones and Colin MacKenzie IV,
+which can be obtained from <a href="http://glmatrix.net">http://glmatrix.net</a>.</p>
+
+<p>glsim.js defines many functions and constants in the global namespace, including all
+OpenGL functions and constants that it implements, as well as several utility functions
+with names that begin with "glsim."  It defines a class named <i>GLSim</i> to represent
+OpenGL graphics contexts, but that class will not usually be referenced directly in code that
+uses <i>glsim.js</i>.  There is also a class named <i>Camera</i> representing a camera abstraction
+that can be used as an aid for setting up viewing and projection in OpenGL.</p>
+
+<div class="section">
+
+<h3>Creating the OpenGL Graphics Context</h3>
+
+<p>Since glsim is based on WebGL, you need a &lt;canvas&gt; element to draw on.
+To set up a canvas for OpenGL drawing, call
+</p>
+
+<pre>glsimUse(canvas);</pre>
+
+<p class="np">The parameter can be either a string giving the <i>id</i> of a &lt;canvas&gt; element
+or the DOM object corresponding to a &lt;canvas&gt; element (generally obtained
+using <i>document.getElementById</i>).</p>
+
+<p>The function call <i>glsimUse</i>(<i>canvas</i>) sets the canvas to be the current
+(simulated!) OpenGL context.  All OpenGL functions apply to the current context and will throw an
+exception if no such context has been established.  It is possible to have multiple
+canvasses, each with its own OpenGL context.  <i>glsimUse</i>() can be used to switch
+among contexts.  If a context has already been created for a canvas when
+<i>glsimUse</i>(<i>canvas</i>) is called, then it simply uses the existing context
+for the canvas.  Any state from previous uses of the context is retained.
+That is, <i>glsimUse</i>() can be used to switch among several exiting OpenGL contexts
+at any time.</p>
+
+<p>An OpenGL context is represented by an object of type <i>GLSim</i>.  You can
+also create the context directly, by calling the <i>GLSim</i> constructor; <i>glsimUse</i>
+is simply a convenience for creating and managing the contexts.</p>
+
+<p>The function <i>glsimUse</i> can take a second parameter, to control options for
+the WebGL drawing context that is actually used on the canvas.  If the second
+parameter is omitted, then default options for glsim will produce a color buffer with
+<b>no</b> alpha component (RGB colors rather than RGBA).  This is generally desirable,
+since alpha transparency in the color buffer allows the background of the canvas
+on the web page to show through the canvas (but it is not the same default as in the
+GLSim constructor).  To get an RGBA color buffer, you can
+pass <i>null</i> as the second parameter to <i>glsimUse</i> when creating a new drawing context.
+Furthermore the default options allow WebGL to discard the WebGL color buffer between
+drawing operations.  Note that this is not correct behavior for OpenGL, but the correct
+OpenGL behavior is inefficient in WebGL and is not needed as long as all drawing is
+done in a function that completely redraws the image (as is the case for all of my examples).
+To preserve the color buffer between drawing operations, you can pass 
+<i style="white-space: pre">{ preserveDrawingBuffer: true }</i> as the second parameter
+to <i>glsimUse</i>(), or pass
+<i style="white-space: pre">{ alpha:false, preserveDrawingBuffer: true }</i>
+as the second parameter to get an RGB color buffer.
+</p>
+
+
+<p>Note that the second parameter to <i>glsimUse</i>() applies only when a
+a new OpenGL context is created, not when it
+merely switches to one that already exists.  (The second parameter can actually be
+any object that represents a valid set of WebGL options; it is simply passed to
+the call to <i>getContext</i>() that creates the WebGL context.)</p>
+
+</div>
+
+<div class="section">
+
+<h3>Other "glsim" Functions</h3>
+
+
+<p>The functions <i>glsimTexImage</i>(<i>image</i>) and <i>glsimCopyTexImage(x,y,width,height)</i>
+are defined as simple abbreviations for</p>
+
+<pre>glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,0,0,0,GL_RGBA,GL_UNSIGNED_BYTE,image);</pre>
+<p class="np">and</p>
+<pre>glCopyTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,x,y,width,height,0);</pre>
+
+<p class="np">since the parameters are so hard to get right.  (Note that the width and the
+height in glTexImage2D are ignored.)  The function</p>
+
+<pre>glsimLoadImage(imageURL,callback);</pre>
+
+<p class="np">will load an image from the specified imageURL asynchronously.  The imageURL
+parameter must be a string.  The callback parameter, if present, must be a function.  When
+the image has been loaded, the callback function will be called with two parameters:
+the <i>Image</i> object containing the loaded image and the imageURL that was the first
+parameter to <i>glLoadImage</i>.  A typical use would be to install the image as a texture
+and enable texturing in the callback.  For example,</p>
+
+<pre>
+glsimLoadImage("myTextureImage.jpg", function(image) {
+    glsimTexImage(image);
+    glEnable(GL_TEXTURE_2D);
+    display(); // Redraw the image, with the texture.
+});
+</pre>
+
+<p>If an error occurs while loading the function, a message is printed to the console, and the
+callback function is not called, but otherwise the error is ignored.</p>
+
+<p>The current OpenGL context, which is a GLSim object, is available as
+<i>GLSim.currentContext</i>.  The corresponding WebGL context is available
+as <i>GLSim.currentContext.gl</i>.  When <i>glsim.js</i> detects an error, it calls
+the function GLSim.error(message), where the parameter is an error message.
+This function could be changed to customize error handling. The default function
+throws the error message as an exception and prints the message and a stack trace
+to the console.</p>
+
+</div>
+
+
+<div class="section">
+
+<h3>OpenGL Functions</h3>
+
+<p>This is a list of OpenGL functions that are supported by <i>glsim.js</i>.
+They should work in the same way as the real OpenGL functions, except as noted.
+These functions are defined as global identifiers in <i>glsim.js</i>.  Any constants
+that they use are also defined globally, but do not necessarily have the same value
+as they do in OpenGL.  All of these functions will throw an exception if they
+are called when there is no current OpenGL context.</p>
+
+<p><code>glEnable(param)/glDisable(param)</code> &mdash; The parameter can be one of the
+following constants:
+GL_DEPTH_TEST,
+    GL_COLOR_MATERIAL,
+    GL_BLEND,
+    GL_LIGHT0 through GL_LIGHT7,
+    GL_LIGHTING,
+    GL_NORMALIZE,
+    GL_POINT_SMOOTH,
+    GL_POLYGON_OFFSET_FILL,
+    GL_TEXTURE_2D.
+Note that only four lights are supported by default; to enable additional lights, set
+<i>GLSim.lightCount</i> equal to the number of lights <b>before</b> calling <i>glsimUse</i>().
+(I found that trying to have eight
+lights seemed to require more data in the WebGL shader programs than they could handle on some computers -- specifically
+my old desktop -- leading to hard-to-diagnose errors.)</p>
+
+<p><code>glEnableClientState(param)/glDisableClientState(param)</code> &mdash; The parameter can
+be one of the following constants:  GL_VERTEX_ARRAY, GL_COLOR_ARRAY, GL_NORMAL_ARRAY.</p>
+
+<p><code>glPushAttrib(mask)</code> and <code>glPopAttrib()</code> &mdash;  The <i>mask</i>
+can contain only the following constants, OR'ed together:  GL_CURRENT_BIT, GL_ENABLE_BIT,
+GL_LIGHTING_BIT, GL_VIEWPORT_BIT.  And of course, only values that are used by glsim are
+saved and restored.</p>
+
+<p><code>glGetIntegerv(item,array)</code> &mdash; The supported values of item are GL_VIEWPORT,
+GL_LIGHT_MODEL_TWO_SIDE, and GL_LIGHT_MODEL_LOCAL_VIEWER.  The second parameter must be an array,
+of sufficient size to hold the value.</p>
+
+<p><code>glGetFLOATv(item,array)</code> &mdash; The supported values of item are GL_POINT_SIZE,
+GL_LINE_WIDTH, GL_CURRENT_COLOR, GL_CURRENT_NORMAL, GL_CURRENT_TEXTURE_COORDS, GL_LIGHT_MODEL_AMBIENT,
+GL_MODELVIEW_MATRIX, GL_PROJECTION_MATRIX, and GL_TEXTURE_MATRIX.   The second parameter must be an array,
+of sufficient size to hold the value.</p>
+
+<p><code>glIsEnabled(item)</code> &mdash; The supported values of item the same as the supported
+parameters for glEnable/glDisable.</p>
+
+<p><code>glGetMaterialfv(face, property, array)</code> &mdash; All parameter are supported.
+The second parameter must be an array, of sufficient size to hold the value.</p>
+
+<p><code>glGetLightfv(light, property, array)</code> &mdash; The supported values of property are those for
+which glLightfv are defines: GL_POSITION, GL_AMBIENT, GL_DIFFUSE, and GL_SPECULAR.  The second parameter must be an array,
+of sufficient size to hold the value.</p>
+
+<p><code>glViewport(x,y,width,height)</code></p>
+
+<p><code>glClearColor(r,g,b,a)</code></p>
+
+<p><code>glClear(buffers)</code> &mdash; The parameter can be GL_COLOR_BUFFER_BIT, or
+GL_DEPTH_BUFFER_BIT, or those two constants OR'ed together.</p>
+
+<p><code>glLineWidth(size)</code></p>
+
+<p><code>glPointSize(size)</code> </p>
+
+<p><code>glBegin(primitive)/glEnd()</code> &mdash; The primitive can be any of the ten
+OpenGL 1.1 primitives:  GL_POINTS, GL_LINES, GL_LINE_STRIP, GL_LINE_LOOP, GL_TRIANGLES,
+GL_TRIANGLE_FAN, GL_TRIANGLE_STRIP, GL_QUADS, GL_QUAD_STRIP, GL_POLYGON.</p>
+
+<p><code>glColor*</code> &mdash; The suffixes 3f, 4f, 3d, 4d, 3ub, 4ub,
+3fv, 4fv, 3dv, 4dv, 3ubv, and 4ubv are supported (but no distinction is made between
+the f and the d versions).  The v versions can take an ordinary JavaScript array or
+a typed array as parameter.</p>
+
+<p><code>glVertex*</code> &mdash; The suffixes 2i, 3i, 2f, 3f, 2d, 3d,
+2iv, 3iv, 2fv, 3fv, 2dv, and 3dv are supported, but no real distinction is made among
+the various numeric types.  The v versions can take an ordinary JavaScript array or
+a typed array as parameter.  Note that the 4-coordinate versions of glVertex* are
+<b>not</b> available.</p>
+
+<p><code>glNormal*</code> &mdash; The suffixes 3f, 3d, 3fv, and 3dv are supported, but
+no distinction is made between the f and d versions.  The v versions can take an ordinary
+JavaScript array or a typed array as parameter. </p>
+
+<p><code>glTexCoord*</code> &mdash; The suffixes 2f, 2d, 2i, 2fv, 2dv, and 2iv are supported,
+but no distinction is made between the f, d, and i versions.  The v versions can take
+an ordinary JavaScript array or a typed array as parameter.  Note that only the 2-coordinate
+versions of glTexCoord* are supported (and only 2D textures are supported).</p>
+
+<p><code>glRect*</code> &mdash; The suffixes i, f, and d are supported, but they are all
+really the same function.</p>
+
+<p><code>glMaterialfv(side,property,value)</code> &mdash; The side can be GL_FRONT, GL_BACK,
+or GL_FRONT_AND_BACK.  The property can be GL_AMBIENT_AND_DIFFUSE, GL_AMBIENT, GL_DIFFUSE,
+GL_SPECULAR, or GL_EMISSION.  The value can be an ordinary JavaScript or typed array of
+3 or 4 numbers.  (In OpenGL, 4 numbers are required.)</p>
+
+<p><code>glMaterialf(side,property,value)</code> &mdash; The side can be GL_FRONT, GL_BACK,
+or GL_FRONT_AND_BACK.  The property must be GL_SHININESS.  The value is a number, which should
+be in the range 0 to 128.  (You can use the name glMateriali instead of glMaterialf, but
+it's the same function.)</p>
+
+<p><code>glColorMaterial(side,property)</code> &mdash; The parameter take the
+same values as for glMaterialfv.</p>
+
+<p><code>glLightfv(light,property,value)</code> &mdash; The first parameter should be
+one of the constants GL_LIGHT0, GL_LIGHT1, GL_LIGHT2, or GL_LIGHT3 (unless you have changed
+the number of lights, as discussed above under glEnable). The second parameter
+must be one of GL_POSITION, GL_AMBIENT, GL_DIFFUSE, or GL_SPECULAR.  (Note that not
+all OpenGL lighting properties are defined; there are no spotlights or attenuation.)
+The third parameter must be a JavaScript or typed array of 3 or 4 numbers.  (In OpengGL,
+4 numbers are required.)</p>
+
+<p><code>glLightModelfv(property, value)</code> &mdash; The property must be
+GL_LIGHT_MODEL_AMBIENT, and the value must be a JavaScript or typed array of 3 or 4 numbers.
+(In OpenGL, 4 numbers are required).</p>
+
+<p><code>glLightModeli(property,value)</code> &mdash; The property must be
+GL_LIGHT_MODEL_TWO_SIDE or GL_LIGHT_MODEL_LOCAL_VIEWER.  The value is treated as
+a boolean.  (Can also use glLightModelf.)</p>
+
+<p><code>glTexImage2D(target,level,internalFormat,width,height,border,format,type,image)</code> &mdash;
+The target must be <i>GL_TEXTURE_2D</i>.  The level must be a non-negative integer. The internalFormat
+and format must be <i>GL_RGBA</i>.  The type must be <i>GL_UNSIGNED_INT</i>.  The image
+must be an <i>Image</i> object (or an <i>HTMLImageElement</i>).  The width, height, and border
+are ignored.  (Consider using <i>glsimTexImage(image)</i>, which is described earlier on this page, instead.)</p>
+
+<p><code>glCopyTexImage2D(target,level,internalFormat,x,y,width,height,border)</code> &mdash;
+The target must be <i>GL_TEXTURE_2D</i>.  The level must be a non-negative integer. The internalFormat
+must be <i>GL_RGBA</i>. The border parameter must be 0 if present.  The values of x, y, width, and
+height must be integers.  (Consider using <i>glsimCopyTexImage</i>(x,y,width,height) instead.)</p>
+
+<p><code>glTexParameteri(target,pname,value)</code> The target must be <i>GL_TEXTURE_2D</i>.
+The pname can be <i>GL_TEXTURE_WRAP_S</i> or <i>GL_TEXTURE_WRAP_T</i> (with value
+<i>GL_CLAMP</i> or <i>GL_REPEAT</i>); <i>GL_TEXTURE_MAG_FILTER</i> (with value
+<i>GL_NEAREST</i> or <i>GL_LINEAR</i>); <i>GL_TEXTURE_MIN_FILTER</i> (with value
+<i>GL_NEAREST</i>, <i>GL_LINEAR</i>, <i>GL_LINEAR_MIPMAP_LINEAR</i>, <i>GL_NEAREST_MIPMAP_LINEAR</i>,
+<i>GL_LINEAR_MIPMAP_NEAREST</i>, or <i>GL_NEAREST_MIPMAP_NEAREST</i>).</p>
+
+<p><code>glGenTextures(count,array)</code> &mdash; The first parameter must be a positive integer,
+and the second must be an array.  The generated texture ID's are stored in the array.</p>
+
+<p><code>glCreateTexture()</code> &mdash; This is not a standard OpenGL function (though it is in WebGL).
+It generates one textureID, as by a call to glGenTextures, and it returns that texture ID.</p>
+
+<p><code>glBindTexture(texureID)</code> &mdash; The textureID must be an integer ID returned by
+glGenTextures or glCreateTexture.  Initially, a default texture object is bound. 
+If <i>glBindTexture</i> is called with no parameter (or any value that evaluates to false as
+a boolean), then the default initial texture object is rebound.</p>
+
+<p><code>glMatrixMode(mode)</code> &mdash; The parameter must be
+GL_PROJECTION, GL_MODELVIEW, or GL_TEXTURE.</p>
+
+<p><code>glLoadIdentity()</code></p>
+
+<p><code>glPushMatrix()</code></p>
+
+<p><code>glPopMatrix()</code></p>
+
+<p><code>glTranslatef(dx,dy,dz)/glTranslated(dx,dy,dz)</code> &mdash; These are actually the same function.</p>
+
+<p><code>glScalef(sx,sy,sz)/glScaled(sx,sy,sz)</code> &mdash; These are actually the same function.</p>
+
+<p><code>glRotatef(degrees,x,y,z)/glRotated(degrees,x,y,z)</code> &mdash; These are actually the same function.</p>
+
+<p><code>glOrtho(xmin,xmax,ymin,ymax,near,far)</code></p>
+
+<p><code>glFrustum(left,right,bottom,top,near,far)</code></p>
+
+<p><code>gluPerspective(fovy,aspect,near,far)</code> &mdash; Note that this
+is a function from the GLU library rather than an OpenGL function.</p>
+
+<p><code>gluLookAt(eyeX,eyeY,eyeZ,refX,refY,refZ,upX,upY,upZ)</code> &mdash; Note that this
+is a function from the GLU library rather than an OpenGL function.</p>
+
+<p><code>glVertexPointer(coordsPerVertex,dataType,stride,vertexArray)</code> &mdash;
+coordsPerVertex can be 2 or 3 (4 is not supported).  The dataType must be GL_INT,
+GL_FLOAT, or GL_DOUBLE, but the actual value is ignored.  The stride <b>must</b>
+be zero.  The vertexArray can be a JavaScript array of numbers or a typed array.
+</p>
+
+<p><code>glColorPointer(componentsPerColor,dataType,stride,colorArray)</code> &mdash;
+componentsPerColor can be 3 or 4.  The dataType can be GL_FLOAT, GL_DOUBLE, or
+GL_UNSIGNED_BYTE.  For GL_UNSIGNED_BYTE, color values are divided by 255, then
+treated as floats.  The other two parameters are as for <i>glVertexPointer</i>.</p>
+
+<p><code>glNormalPointer(dataType,stride,normalArray)</code> &mdash; The parameters
+are as for the same parameters in <i>glVertexPointer</i>.</p>
+
+<p><code>glTexCoordPointer(size,dataType,stride,texCoordArray)</code> &mdash; The first
+parameter, size, must be 2.  The remaining parameters
+are as for the parameters in <i>glVertexPointer</i>.</p>
+
+<p><code>glDrawArrays(primitive,start,count)</code> &mdash; The primitive can be
+any of the ten primitive types, as for <i>glBegin</i>.  Note that <i>GL_QUADS</i>
+is inefficient, since it has to be converted to <i>GL_TRIANGLES</i>, and that requires
+rebuilding the vertex arrays.</p>
+
+<p><code>glDrawElements(primitive,vertexCount,indexType,indexArray)</code> &mdash;
+The primitive can be any of the ten primitive types, with the same comment about
+GL_QUADS as for <i>glDrawArrays</i>.  The indexType can be
+GL_UNSIGNED_INT, GL_UNSIGNED_BYTE, or GL_UNSIGNED_SHORT, but the values are always
+converted to 16-bit integers.  The indexArray can be a JavaScript array of integers
+or a typed array of integers.</p>
+
+<p><code>glPolygonOffset(units,value)</code></p>
+
+<p><code>glFlush()</code> &mdash; This is defined, but calling it shouldn't be necessary.</p>
+
+<p><code>glDepthMask(enableWriteToDepthBuffer)</code> &mdash; The parameter is treated
+as a boolean value.</p>
+
+<p><code>glFrontFace(face)</code> &mdash; The parameter must be GL_CW or GL_CCW.</p>
+
+<p><code>glBlendFunc(a,b)</code> &mdash; The parameters are passed to WebGL without checking
+them for validity, but really only glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA) should be
+called (and none of the other constants that could be used as parameters in OpenGL are defined in glsim.js).</p>
+</div>
+
+<div class="section">
+
+<h3>The Camera</h3>
+
+<p>The <i>Camera</i> class that is defined by <i>glsim.js</i> is designed to take over
+the job of setting up the OpenGL projection and viewing transforms.  It can,
+optionally, be used to rotate the view, like a trackball.</p>
+
+<p>To use a camera, you need a global variable to refer to it.  I assume that
+that variable is named <i>camera</i>.  The camera is created by a constructor
+without parameters:
+</p>
+
+<pre>camera = new Camera();</pre>
+
+<np>To use the camera, call the function</np>
+
+<p><code>camera.apply()</code> &mdash; Sets the projection and viewing transform
+for the current OpenGL context, according to the configuration of the camera.
+This completely replaces the current projection and modelview transforms.
+It would ordinarily be called at the start of the display function.</p>
+
+<p class="np">The camera can be configured with the following functions:</p>
+
+<p><code>camera.lookAt(eyeX,eyeY,eyeZ,refX,refY,refZ,upX,upY,upZ)</code> &mdash; sets up
+the viewing transform.  The viewing transform will be set up by calling <i>gluLookAt</i>
+with the same parameters, when <i>camera.apply</i>() is called.  The default
+configuration has the eye at (0,0,30), the ref point at (0,0,0), and the up vector
+as (0,1,0).  If you call the function with fewer than 9 parameters, the up vector
+is set to (0,1,0).  If you call it with fewer than 6 parameters, the ref point
+is set to (0,0,0).  The first three parameters are mandatory.</p>
+
+<p><code>camera.setLimits(xmin,xmax,ymin,ymax,zmin,zmax)</code> &mdash;
+Set the limits of the view volume.  The limits are set with respect to the
+viewing coordinates.  That is, the view center is assumed to be at the point
+(0,0) in the plane of the screen.  The view up vector (more precisely, its projection
+onto the screen) points upwards on the screen.  The z-axis is perpendicular to the
+screen, with the positive direction of the z-axis pointing out of the screen.
+In this coordinate system, xmin and xmax give the horizontal limits on the screen,
+ymin and ymax give the vertical limits on the screen, and zmin and zmax give
+the limits of the view volume along the z-axis.  (Note that this is NOT exactly
+the same as the parameters in either glOrtho or glFrustum!  Most important to 
+note is that zmin and zmax are given with reference to the view center, not the
+eye.  They are not the same as the near and far parameters in glOrtho or glFrustum.)
+Note that xmin/xmax or ymin/ymax might be adjusted to match the aspect
+ratio of the viewport. The default limits are <span style="white-space:pre">(-5,5,-5,5,-10,10)</span>.</p>
+
+<p><code>camera.setScale(s)</code> &mdash; Shorthand for <span style="white-space:pre">camera.setLimits(-s,s,-s,s,-2*s,2*s);</span></p>
+
+<p><code>camera.setPreserveAspect(preserve)</code> &mdash; The parameter is a boolean which
+says whether or not to respect the aspect ratio of the viewport.  The default is true.
+If the value is true, then the requested limits will be adjusted, if necessary, to match
+the aspect ratio of the viewport.</p>
+
+<p><code>camera.setOrthographic(ortho)</code> &mdash; The parameter is a boolean which says
+whether the projection should be a perspective or an orthographic projection.  The default
+is perspective.</p>
+
+<p class='np'>To use the trackball rotation feature, just call the function</p>
+
+<p><code>camera.installTrackball(displayFunction)</code> &mdash; This installs a mouse
+listener on the canvas that is used by the current OpenGL context.  (So, it must be called
+after creating the context with <i>glsimUse</i>.)  When the user drags the mouse on the
+canvas, the listener responds by modifying the camera's viewpoint in a way that simulates
+rotating the scene about the point (0,0,0).  Note that only rotation about the origin
+is supported.  The parameter is a function that will be called each time the view is
+modified. Presumably, it will be a function that redraws the entire scene and that includes
+a call to <i>camera.apply</i>().</p>
+
+
+</div>
+
+</div>
+</body>
+</head>

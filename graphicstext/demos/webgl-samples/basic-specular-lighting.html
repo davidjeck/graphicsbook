@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Basic Specular Lighting WebGL</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+    }
+</style>
+
+<!--
+    Shows objects using simple lighting, with diffuse and
+    specular color and a single white light.
+-->
+
+
+<script src="gl-matrix-min.js"></script>
+<script src="trackball-rotator.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+<script>
+
+"use strict";
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    uniform mat3 normalMatrix;
+    uniform vec4 lightPosition;
+    uniform vec4 diffuseColor;
+    uniform vec3 specularColor;
+    uniform float specularExponent;
+    varying vec4 v_color;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        vec3 N, L, R, V;  // vectors for lighting equation
+        N = normalize( normalMatrix*a_normal );
+        if ( lightPosition.w == 0.0 ) {
+            L = normalize( lightPosition.xyz );
+        }
+        else {
+            L = normalize( lightPosition.xyz/lightPosition.w - eyeCoords.xyz );
+        }
+        R = -reflect(L,N);
+        V = normalize( -eyeCoords.xyz);  // (Assumes a perspective projection.)
+        if ( dot(L,N) <= 0.0 ) {
+            v_color = vec4(0,0,0,1);
+        }
+        else {
+            vec3 color = 0.8*dot(L,N) * diffuseColor.rgb;  // 0.8 is diffuse intensity of light
+            if (dot(R,V) > 0.0) {
+                color += 0.4*pow(dot(R,V),specularExponent) * specularColor; // 0.4 is specular intensity of light
+            }
+            v_color = vec4(color, diffuseColor.a);
+        }
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec4 v_color;
+    void main() {
+        gl_FragColor = v_color;
+    }`;
+
+
+let gl;   // The webgl context.
+
+let a_coords_loc;       // Location of the a_coords attribute variable in the shader program.
+let a_coords_buffer;    // Buffer to hold the values for a_coords.
+let a_normal_loc;       // Location of a_normal attribute.
+let a_normal_buffer;    // Buffer for a_normal.
+let index_buffer;       // Buffer to hold vetex indices from model.
+
+let u_diffuseColor;     // Locations of uniform variables in the shader program
+let u_specularColor;
+let u_specularExponent;
+let u_lightPosition;
+let u_modelview;
+let u_projection;
+let u_normalMatrix;    
+
+const projection = mat4.create();    // projection matrix
+let modelview;                       // modelview matrix; value comes from rotator
+const normalMatrix = mat3.create();  // matrix, derived from modelview matrix, for transforming normal vectors
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+const colors = [  // RGB color arrays for diffuse and specular color values, selected by popup menu
+    [1,1,1], [1,0,0], [0,1,0], [0,0,1], [0,1,1], [1,0,1], [1,1,0], [0,0,0], [0.5,0.5,0.5]
+];
+
+const lightPositions = [  // values for light position, selected by popup menu
+    [0,0,0,1], [0,0,1,0], [0,1,0,0], [0,0,-10,1], [2,3,5,0]
+];
+
+const objects = [  // Objects for display, selected by popup menu
+    cube(5),
+    uvTorus(3,1,64,32),
+    uvCylinder(1.5,5.5),
+    uvCone(2.5,5.5),
+    uvSphere(3),
+    uvSphere(3,12,6)
+];
+
+let currentModelNumber;  // contains data for the current object
+
+
+function draw() { 
+    gl.clearColor(0.15,0.15,0.3,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    mat4.perspective(projection,Math.PI/5,1,10,20);
+    
+    modelview = rotator.getViewMatrix();
+    
+    if (currentModelNumber > 1) {
+        mat4.rotateX(modelview,modelview,-Math.PI/2);
+    }
+    
+    
+    /* Get the matrix for transforming normal vectors from the modelview matrix,
+       and send matrices to the shader program*/
+    
+    mat3.normalFromMat4(normalMatrix, modelview);
+    
+    gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+    gl.uniformMatrix4fv(u_modelview, false, modelview );
+    gl.uniformMatrix4fv(u_projection, false, projection );
+    
+    /* Draw the model.  The data for the model was set up in installModel() */
+   
+    gl.drawElements(gl.TRIANGLES, objects[currentModelNumber].indices.length, gl.UNSIGNED_SHORT, 0);
+
+}
+
+
+/* Called when the user changes the selection in the model-selection pop-up.
+ * The data for the model are copied into the appropriate buffers, and the
+ * scene is redrawn.
+ */
+function installModel(modelData) {
+     gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+     gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexPositions, gl.STATIC_DRAW);
+     gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+     gl.enableVertexAttribArray(a_coords_loc);
+     gl.bindBuffer(gl.ARRAY_BUFFER, a_normal_buffer);
+     gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexNormals, gl.STATIC_DRAW);
+     gl.vertexAttribPointer(a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+     gl.enableVertexAttribArray(a_normal_loc);
+     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,index_buffer);
+     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, modelData.indices, gl.STATIC_DRAW);
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    u_lightPosition=  gl.getUniformLocation(prog, "lightPosition");
+    u_diffuseColor =  gl.getUniformLocation(prog, "diffuseColor");
+    u_specularColor =  gl.getUniformLocation(prog, "specularColor");
+    u_specularExponent = gl.getUniformLocation(prog, "specularExponent");
+    a_coords_buffer = gl.createBuffer();
+    a_normal_buffer = gl.createBuffer();
+    index_buffer = gl.createBuffer();
+    gl.enable(gl.DEPTH_TEST);
+    gl.uniform3f(u_specularColor, 0.5, 0.5, 0.5);
+    gl.uniform4f(u_diffuseColor, 1, 1, 1, 1);
+    gl.uniform1f(u_specularExponent, 10);
+    gl.uniform4f(u_lightPosition, 0, 0, 0, 1);
+}
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("object").value = "1";
+    document.getElementById("light").value = "0";
+    document.getElementById("diffuse").value = "0";
+    document.getElementById("specular").value = "8";
+    document.getElementById("exponent").value = "10";
+    document.getElementById("object").onchange = function() {
+        let val = Number(this.value);
+        currentModelNumber = val;
+        installModel(objects[val]); 
+        draw();
+    };
+    document.getElementById("light").onchange = function() {
+        let val = Number(this.value);
+        gl.uniform4fv(u_lightPosition, lightPositions[val]);
+        draw();
+    };
+    document.getElementById("diffuse").onchange = function() {
+        let val = Number(this.value);
+        let c = colors[val];
+        gl.uniform4f(u_diffuseColor, c[0], c[1], c[2], 1);
+        draw();
+        console.log("Diffuse: " + c);
+    };
+    document.getElementById("specular").onchange = function() {
+        let val = Number(this.value);
+        gl.uniform3fv(u_specularColor, colors[val]);
+        draw();
+        console.log("Specular: " + colors[val]);
+    };
+    document.getElementById("exponent").onchange = function() {
+        let val = Number(this.value);
+        gl.uniform1f(u_specularExponent, val);
+        draw();
+    };
+    document.getElementById("reset").onclick = function() {
+        rotator.setView(15);
+        draw();
+    };
+    installModel(objects[1]);
+    currentModelNumber = 1;
+    rotator = new TrackballRotator(canvas, draw, 15);
+    draw();
+}
+
+
+window.onload = init;
+
+</script>
+</head>
+<body>
+
+<h2>Basic Diffuse and Specular Lighting</h2>
+
+<p id=message>Drag your mouse, or finger on touchscreen, on the object to rotate it.
+  <button id="reset">Reset Rotation</button></p>
+
+<p style="width:600px; text-align: center;">
+<label><b>Object:</b> <select id="object">
+    <option value="0">Cube</option>
+    <option value="1">Torus</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Sphere</option>
+    <option value="5">Rough Sphere</option>
+</select></label><br>
+<label><b>Light Position:</b> <select id="light">
+    <option value="0">[0,0,0,1] (Viewpoint light)</option>
+    <option value="1">[0,0,1,0] (Directional, into screen)</option>
+    <option value="2">[0,1,0,0] (Directional, from above)</option>
+    <option value="3">[0,0,-10,1] (On z-axis, close to object)</option>
+    <option value="4">[2,3,5,0] (Directional from upper right)</option>
+</select></label><br>
+<label><b>Diffuse Color:</b> <select id="diffuse">
+    <option value="0">White</option>
+    <option value="1">Red</option>
+    <option value="2">Green</option>
+    <option value="3">Blue</option>
+    <option value="4">Cyan</option>
+    <option value="5">Magenta</option>
+    <option value="6">Yellow</option>
+    <option value="7">Black</option>
+</select></label><br>
+<label><b>Specular Color:</b> <select id="specular">
+    <option value="0">White</option>
+    <option value="1">Red</option>
+    <option value="2">Green</option>
+    <option value="3">Blue</option>
+    <option value="4">Cyan</option>
+    <option value="5">Magenta</option>
+    <option value="6">Yellow</option>
+    <option value="8">Gray</option>
+    <option value="7">Black</option>
+</select></label>
+<label><b>Specular Exponent:</b> <select id="exponent">
+    <option>0</option>
+    <option>1</option>
+    <option>2</option>
+    <option>5</option>
+    <option>10</option>
+    <option>20</option>
+    <option>50</option>
+    <option>100</option>
+</select></label>
+</p>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<div id="canvas-holder">
+   <canvas width=600 height=600 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+
+</body>
+</html>
+

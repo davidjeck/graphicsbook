@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Path Tracing" id="advanced.2">
+
+<p1>We have seen how ray tracing can be extended to approximate a variety of
+effects that are not handled by the basic algorithm.  We look next at an
+algorithm that accounts for all those effects and more in a fairly
+straightforward and unified way: <newword>path tracing</newword>.   Like ray tracing,
+path tracing computes colors for points in an image by tracing the
+paths of light rays backwards from the viewer through points on the
+image and into the scene.  But in path tracing, the idea is to 
+account for <b>all</b> possible paths that the light could have
+followed.  Of course, that is not literally possible, but following a
+large number of paths can give a good approximation&mdash;one that
+gets better as the number of paths is increased  ("Forward path tracing," where
+paths of light rays emitted from light sources are traced forward in time, is
+also sometimes used.)</p1>
+
+<subsection title="BSDF's" id="advanced.2.1">
+
+<p>In order to model a wide variety of physical phenomena, path tracing
+uses a generalization of the idea of <word>material</word> property.
+In OpenGL, a material is a combination of <word term="ambient color">ambient</word>, 
+<word term="diffuse color">diffuse</word>, <word term="specular color">specular</word>, 
+and <word term="emission color">emission</word> colors, plus <word>shininess</word>.
+These properties, except for emission color, model how the surface interacts with
+light.  Material properties can vary from point to point on a surface; that's an
+example of a <word>texture</word>.</p>
+
+<p>OpenGL material is only a rough approximation of reality.  In path tracing, a more general
+notion is used that is capable of more accurately representing the properties of
+almost any real physical surface or volume.  The replacement for materials
+is call a <newword>BSDF</newword>, or Bidirectional Scattering Distribution
+Function.</p>
+
+<p>Think about how light that arrives at some point can be affected by the
+physical properties of whatever substance exists at that point.  Some of the
+light might be absorbed.  Some might pass through the point without
+being affected at all.  And some might be "scattered," that is,
+sent off in another direction.  In fact, we consider passing through the point
+as a special case of scattering.  A BSDF describes how light is scattered
+from each point on a surface or in a volume.</p>
+
+<p>Think of a single ray, or photon, of light that arrives at some point.  What happens to it can
+depend on the direction from which it arrives.  In general, assuming that it is not absorbed, the light is more 
+likely to be scattered in some directions than in others.  (As in specular reflection,
+for example.)  The BSDF at the 
+point gives the probability that the ray will leave the point heading in a 
+given direction.  It is a "bidirectional" function because the answer is
+a function of two directions, the direction from which the light arrives and
+the outgoing direction that you are asking about.  (It is a "distribution function" in
+the sense of the mathematical theory of continuous probability distributions,
+but you don't need to understand that to get the general idea.  For us,
+it's enough to understand that the function says how light coming in from a
+given direction is distributed among possible outgoing directions.)
+Note that a BSDF is also a function of the point that you are talking about,
+and it is generally a function of the wavelength of the light as well.</p>
+
+<p>Any point in space can be assigned a BSDF.  For empty space, the BSDF is trivial:
+It simply says that light arriving at a point has a 100% probability of continuing
+in the same direction.  But light passing through fog or dusty air or dirty water has some
+probability of being absorbed and some probability of being scattered to a random
+direction.  Similar remarks apply to light passing through the interior of a
+translucent solid object.</p>
+
+<p>Traditionally, though, computer graphics has been mostly concerned with what
+happens to light at the surface of an object.  Light can be absorbed or reflected or,
+if the object is translucent, transmitted through the surface.
+The function that describes the reflection of light from a surface is sometimes
+called a BRDF (Bidirectional Reflectance Distribution Function), and the formula
+for transmission of light is a BTDF (Bidirectional Transmission Distribution function).
+The BSDF for a surface is a combination of the two.</p>
+
+<p>Let's consider OpenGL materials in terms of BSDFs.  In basic OpenGL, light can only
+be reflected or absorbed.  For diffuse reflection, light has an
+equal probability of being reflected in every direction that makes an angle of less than
+90 degrees with the normal vector to the surface, and there is no dependence on
+the direction from which the light arrives.  For specular reflection, the incoming
+light direction matters.  In OpenGL, the possible outgoing directions for specularly reflected light form a cone,
+where the angle between the axis of the cone and the normal vector is equal to the angle between
+the normal vector and the incoming light direction.  The axis of the cone is the most 
+likely direction for outgoing light, and the probability falls off as the angle between the outgoing
+direction and
+the direction of the axis increases.  The rate of falloff is specified by the shininess property of the material.
+The BRFD for the surface combines the diffuse and specular reflection.  (The ambient material
+property doesn't fit well into the BSDF framework, since physically there is no such
+thing as an "ambient light" that is somehow different from regular light.)</p>
+
+<p>Ray tracing adds two new possibilities to the interaction of light with a surface:
+perfect, mirror-like reflection, where the outgoing light makes exactly the same angle
+with the normal vector as the incoming light, and transmission of light into a translucent
+object, where the outgoing angle is determined by the indices of refraction outside and
+inside the object.</p>
+
+<p>But BSDFs can provide even more realistic models of the interaction of light with
+surfaces.  For example, the distinction between mirror-like reflection of an object 
+and specular reflection of a light source is artificial.  A perfect mirror
+should reflect both light sources and objects in a mirror-like way.  For a shiny but
+rough surface, all specular reflection would send the light in a cone of directions,
+giving fuzzy images of objects and lights alike. A BSFD should handle both cases, and
+it shouldn't distinguish between light from light sources and light reflected off
+other objects.</p>
+
+<p>BSDFs can also correctly handle a phenomenon called <newword>subsurface scattering</newword>, which
+can be an important visual effect for materials that are just a bit translucent, such as
+milk, jade, and skin.  In sub-surface scattering, light that hits a surface can be 
+transmitted into the object, be scattered a few times internally inside the object, and
+then emerge from the surface at another point.  How the light behaves inside the object is determined
+by the BSDF of the material in the interior of the object.  The BSDF in this case would
+be similar to the one for fog, except that the probability of scattering would be larger.</p>
+
+<p>The point is that just about any physically realistic material can be modeled
+by a correctly chosen BSDF.</p>
+
+</subsection>
+
+<subsection title="The Path Tracing Algorithm" id="advanced.2.2">
+
+<p>Path tracing is based on a formula known as the "rendering equation."  The formula
+says that the amount of light energy leaving a given point in a given direction
+is equal to the amount of light energy emitted by the point in that direction
+plus the amount of light energy arriving at the point from other sources that
+is then scattered in that direction.</p>
+
+<p>Here, emitted light means light that is created, as by a light source.  In the rendering
+equation, any object can be an emitter of light.  In OpenGL terms, it's as if an object
+with an emission color actually emits light that can illuminate other objects.  An
+area light is just an extended object that emits light from every point, and it is common
+to illuminate scenes with large light-emitting objects.  (In fact, in
+a typical path tracing setup, point lights and directional lights have to be assigned
+some area to make them work correctly in the algorithm, or some forward path tracing
+has to be used.)</p>
+
+<p>As for scattered light, the BSDF at a point determines how light arriving at that point is scattered.
+Light can, in general, arrive from any direction
+and can originate from any other point in the scene.  The rendering equation holds
+at <b>every</b> point.  It relates the light arriving at and departing from each point to
+the light arriving at and departing from every other point.  It describes, in other words,
+an immensely complicated system, one for which you are unlikely to be able to find an
+exact solution.  A rendering algorithm can be thought of as an attempt to find
+a good approximate solution to the rendering equation.</p>
+
+<p>Path tracing is a probabilistic rendering algorithm.  It looks at possible paths
+that might have been followed by light arriving at the position of the viewer.
+Each possible path has a certain probability. Path tracing generates a random
+sample of possible paths, choosing paths in the sample according to their probabilities.
+It uses those paths to create an image that approximates a 
+solution to the rendering equation.  It can be shown that as the size of the random
+sample increases, the image that is generated will approach the true solution.
+To get a good quality image, the algorithm will have to trace thousands of paths
+for each pixel in the image, but the result can be an almost shocking level of
+realism.</p>
+
+<p>Let's think about how it should work.  First, consider the case where light
+is only emitted and reflected by surfaces.  As with ray tracing, we start at
+the position of the viewer and cast a ray in the direction of a point on the
+image, into the scene.  (See <localref href="advanced.1.1"/>.) 
+We find the first intersection of that ray with an object in the scene. 
+Our goal to trace one possible path that the ray could have followed from 
+its point of origin until it arrives at the viewer, and we want the
+probability that we select a given path to be the probability that the
+light actually followed that path.  This means that each time the light is
+scattered from a surface, we should choose the direction of the next segment
+of the path based on the BSDF for the surface.  That is, the direction is
+chosen at random, using the probability distribution that is encoded in the BSDF.
+We construct the next segment of the path by casting a ray in the selected
+direction.</p>
+
+<p>We continue to trace the path, backwards in time, possibly through multiple reflections, until it
+encounters an object that emits light.  That object serves as the original
+source of the light.  The color that the path contributes to the image is
+determined by the color and intensity of the emitter, by the colors of 
+surfaces that the light hits along the way,
+and by the angles at which the light hits each surface.  If the path escapes
+from the scene before it hits a light emitting object, then it does not
+contribute any color to the image. (It might be desirable to have a light-emitting
+background, like a sky, that emits light over a large area.)  Note that it
+is possible for an object to be both an emitter and a reflector of light.
+In that case, a path can continue even after it gets to a light source.</p> 
+
+<p>Of course, we have to trace many such paths.  The color for a pixel in
+the image is computed as an average of the colors obtained for all the paths
+that pass through that pixel.</p>
+
+<p>The algorithm can be extended to handle the case where light can be
+scattered at arbitrary points in space, and not just at surfaces.
+For light traveling in a medium in 3D space, the question is, how far will the light travel before it is
+scattered?  The BSDF for the medium will determine a probability distribution on possible travel distances
+between scatterings.  When light enters a medium, that probability distribution is used to select a
+random distance that the light will travel before it is scattered (unless it hits a surface or enters a
+new medium before it has traveled that distance).  When it scatters from a point in the medium, a
+new direction and length are chosen at random for the next segment of the path, according to the BSDF
+of the medium.  For a light fog, the average distance between scatterings would be quite large;
+for a dense medium like milk, it would be quite short.</p>
+
+<break/>
+
+<p>A great deal of computation is required to trace enough light paths to get
+a high-quality image.  Although path tracing was invented in the 1980s, it
+is only recently that it has become practical for general use, and it can still
+take many hours to get high quality rendering.  In fact, you can do path tracing
+on your desktop computer using the 3D modeling program Blender, which is discussed
+in <localref href="blender"/>.  Blender has a rendering engine
+called Cycles that uses path tracing. See the appendix for more information
+about Blender.</p>
+
+</subsection>
+
+</section>

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>POINTS Primitive With Textures</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    #tools p {
+        margin-top: 22px;
+    }
+    select {
+        margin-left: 15px;
+    }
+</style>
+
+<script src="../script/demo-core.js"></script>
+
+<script>
+
+"use strict";
+
+var vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "uniform float u_pointsize;\n" +
+       "uniform float u_width;\n" +
+       "uniform float u_height;\n" +
+       "void main() {\n" +
+       "   float x = -1.0 + 2.0*(a_coords.x / u_width);\n" +
+       "   float y = 1.0 - 2.0*(a_coords.y / u_height);\n" +
+       "   gl_Position = vec4(x, y, 0.0, 1.0);\n" +
+       "   gl_PointSize = u_pointsize;\n" +
+       "}\n";
+
+var fragmentShaderSource =
+       "precision mediump float;\n" +
+       "uniform bool u_useTexture;\n" +
+       "uniform sampler2D u_texture;\n" +
+       "void main() {\n" +
+       "   float distanceFromCenter = distance( gl_PointCoord, vec2(0.5,0.5) );\n" +
+       "   if ( distanceFromCenter >= 0.5 ) {\n" +
+       "       discard;  // don't draw this pixel!\n" +
+       "   }\n" +
+       "   float alpha = 1.0 - smoothstep(0.45, 0.5, distanceFromCenter);\n" +
+       "   vec3 color;\n" +
+       "   if ( u_useTexture ) {\n" +
+       "      color = texture2D( u_texture, gl_PointCoord ).rgb;\n" +
+       "   }\n" +
+       "   else {\n" +
+       "      color = vec3(1,0,0);\n" +
+       "   }\n" +
+       "   gl_FragColor = vec4( color, alpha );\n" +
+       "}\n";
+
+var canvas;  // The canvas where WebGL draws.
+var gl;  // The WebGL graphics context.
+
+var uniformWidth;   // Location of uniform named "u_width"
+var uniformHeight;  // Location of uniform named "u_height"
+var uniformPointsize;   // Location of uniform named "u_pointsize"
+var uniformTexture;  // Location of uniform named "u_Texture."
+var uniformUseTexture;  // Location of uniform named "u_useTexture."
+
+var attributeCoords;  // Location of the attribute named "a_coords".
+var bufferCoords;     // A vertex buffer object to hold the values for coords.
+
+var animating = false;  // is the animation running?
+
+var texturesLoaded = false;  // set to true after all textures have been loaded.
+
+var textureObjects;
+
+var textureURL = [  // URLs of the available textures.
+       "textures/brick001.jpg",
+       "textures/Earth-1024x512.jpg",
+       "textures/NightEarth-512x256.jpg",
+       "textures/marble.jpg",
+       "textures/metal003.gif",
+       "textures/mandelbrot.jpeg",
+   ];
+
+
+/* Data for the points, including their coordinates, velocities and colors.
+   The values for the arrays are created during initialization.  The random
+   colors are used when the user selects colored rather than red points.
+   The positions of the points are updated for each frame of the animation. */
+
+var POINT_COUNT = 20;
+var pointCoords = new Float32Array( 2*POINT_COUNT );
+var pointVelocities = new Float32Array( 2*POINT_COUNT );
+
+function createPointData() { // called during initialization to fill the arrays with data.
+    var i;
+    for (i = 0; i < POINT_COUNT; i++) {
+           // Each point has two coordinates and two velocities.  Velocity number k
+           // tells how fast coordinate number k changes in pixels per frame.
+        pointCoords[2*i] = 12 + (canvas.width-24) * Math.random();  // x-coordinate of point
+        pointCoords[2*i+1] = 12 + (canvas.height-24) * Math.random();  // y-coordinate of point
+        var randomVelocity = 1 + 3*Math.random();
+        var randomAngle = 2*Math.PI * Math.random();
+        pointVelocities[2*i] = randomVelocity * Math.cos(randomAngle);
+        pointVelocities[2*i+1] = randomVelocity * Math.sin(randomAngle);
+    }
+}
+
+function updatePointCoordsForFrame() { // called during an animation, before each frame.
+    var i;
+    var size = Number(document.getElementById("sizeChoice").value) / 2; // radius
+    for (i = 0; i < 2*POINT_COUNT; i += 2) { // x-coords
+        pointCoords[i] += pointVelocities[i];
+        if (pointCoords[i]-size < 0) {
+            pointCoords[i] = size-(pointCoords[i]-size);// move coord back onto canvas
+            pointVelocities[i] = Math.abs(pointVelocities[i]); // and make sure point is moving in positive direction
+        }
+        else if (pointCoords[i]+size > canvas.width) {
+            pointCoords[i] = canvas.width - (pointCoords[i]+size - canvas.width) - size;// move coord back onto canvas
+            pointVelocities[i] = -Math.abs(pointVelocities[i]); // and make sure point is moving in negative direction
+        }
+    }
+    for (i = 1; i < 2*POINT_COUNT; i += 2) { // y-coords
+        pointCoords[i] += pointVelocities[i];
+        if (pointCoords[i]-size < 0) {
+            pointCoords[i] = size-(pointCoords[i]-size);// move coord back onto canvas
+            pointVelocities[i] = Math.abs(pointVelocities[i]); // and make sure point is moving in positive direction
+        }
+        else if (pointCoords[i]+size > canvas.height) {
+            pointCoords[i] = canvas.height - (pointCoords[i]+size - canvas.height) - size;// move coord back onto canvas
+            pointVelocities[i] = -Math.abs(pointVelocities[i]); // and make sure point is moving in negative direction
+        }
+    }
+}
+
+
+/**
+ *  Draws the content of the canvas, in this case, a textured POINTS primitive
+ */
+function draw() {
+
+    gl.clearColor(1,1,1,1);  // specify the color to be used for clearing
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas (to black)
+        
+    /* Set up values for the "coords" attribute */
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);
+    gl.bufferData(gl.ARRAY_BUFFER, pointCoords, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attributeCoords); 
+   
+     /* Set the pointsize uniform variable */
+    
+    var pointsize = Number(document.getElementById("sizeChoice").value);
+    gl.uniform1f( uniformPointsize, pointsize );
+    
+    if (texturesLoaded) {
+        gl.uniform1i(uniformUseTexture, 1);
+        var textureNum = Number(document.getElementById("textureChoice").value);
+        gl.bindTexture(gl.TEXTURE_2D, textureObjects[textureNum]);
+    }
+    else {
+        gl.uniform1i(uniformUseTexture, 0);
+    }
+    
+    /* If the "Feather Edges" option is on, turn on alpha blending.  When alpha
+       blending is off, the alpha component of gl_FragColor is ignored. */
+    
+    if (document.getElementById("featherCheckbox").checked) {
+        gl.enable(gl.BLEND);
+    }
+    else {
+        gl.disable(gl.BLEND);
+    }
+    
+    /* Draw all the points with one command. */
+   
+    gl.drawArrays(gl.POINTS, 0, POINT_COUNT);
+    
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   var vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw "Error in vertex shader:  " + gl.getShaderInfoLog(vsh);
+   }
+   var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw "Error in fragment shader:  " + gl.getShaderInfoLog(fsh);
+   }
+   var prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+   }
+   return prog;
+}
+
+function loadTextures() {
+    var loaded = 0;  // number of textures that have been loaded
+    textureObjects = new Array(textureURL.length);
+    for (var i = 0; i < textureURL.length; i++) {
+        load(i,textureURL[i]);
+    }
+    function load(textureNum,url) {
+        var img = new Image();
+        img.onload = function() {
+            loaded++;
+            textureObjects[textureNum] = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, textureObjects[textureNum]);
+            try {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            }
+            catch (e) {
+                // Chrome, at least, gets a security error if it tries to use a local file.
+                document.getElementById("headline").innerHTML =
+                    "Sorry, can't access textures.  Note that some<br>browsers can't use textures from a local disk.";
+                return;
+            }
+            gl.generateMipmap(gl.TEXTURE_2D);
+            if (loaded == textureURL.length) {
+                texturesLoaded = true;
+                document.getElementById("headline").innerHTML = "Textured Points Demo";
+                if (!animating) {
+                    draw();
+                }
+            }
+        };
+        img.onerror = function() {
+            document.getElementById("headline").innerHTML = "Sorry, could not load textures.";
+        };
+        img.src = url;
+    }
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    var prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    attributeCoords = gl.getAttribLocation(prog, "a_coords");
+    bufferCoords = gl.createBuffer();
+    uniformHeight = gl.getUniformLocation(prog, "u_height");
+    uniformWidth = gl.getUniformLocation(prog, "u_width");
+    uniformUseTexture = gl.getUniformLocation(prog, "u_useTexture");
+    uniformTexture = gl.getUniformLocation(prog, "u_texture");
+    uniformPointsize = gl.getUniformLocation(prog, "u_pointsize");
+    gl.uniform1f(uniformHeight, canvas.height);
+    gl.uniform1f(uniformWidth, canvas.width);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(uniformTexture, 0);  // we will only use texture zero
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    createPointData();
+    loadTextures();
+}
+
+/*------------ Animation support ------------*/
+
+function doFrame() {
+    if (animating) {
+        updatePointCoordsForFrame();
+        draw();
+        requestAnimationFrame(doFrame);
+    }
+}
+
+function doAnimationCheckbox() {
+    var anim = document.getElementById("animateCheckbox").checked;
+    if (anim != animating) {
+        animating = anim;
+        if (animating) {
+            doFrame();
+        }
+    }
+}
+
+
+/*-------------------------------------------*/
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        var options = {  // no need for alpha channel or depth buffer in this program
+            alpha: false,
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    document.getElementById("animateCheckbox").checked = false;
+    document.getElementById("textureChoice").value = "1";
+    document.getElementById("sizeChoice").value = "64";
+    document.getElementById("featherCheckbox").checked = true;
+    document.getElementById("animateCheckbox").onchange = doAnimationCheckbox;
+    document.getElementById("sizeChoice").onchange =
+        document.getElementById("featherCheckbox").onchange =
+            document.getElementById("textureChoice").onchange = function() {
+        if (!animating) {
+            draw();
+        }
+    }
+    draw();
+}
+
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Textured Points Demo &mdash; LOADING TEXTURES</h3>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="400" height="300"></canvas>
+</div>
+
+<div id="tools">
+<p>
+    <label><b><input type="checkbox" id="animateCheckbox">Animate</b></label>
+</p>
+<p>
+    <label><b>Texture:</b><br>
+	<select id="textureChoice">
+        <option value="0">Brick</option>
+        <option value="1">Earth</option>
+        <option value="2">Night Earth</option>
+        <option value="3">Marble</option>
+        <option value="4">Metal</option>
+        <option value="5">Mandelbrot</option>
+	</select></label>
+</p>
+<p>
+    <label><b>Point Size:</b><br>
+    <select id="sizeChoice">
+        <option value="32">Small</option>
+        <option value="48">Medium</option>
+        <option value="64">Large</option>
+    </select></label>
+</p>
+<p>
+    <label><input type="checkbox" id="featherCheckbox"><b>Feather<br>
+          <span style="margin-left:30px">Edges</span></b></label>
+</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This is a simple demo, whose purpose is simply to show image textures
+being used on a primitive of type gl.POINTS.  It is similar to
+moving-points-demo.html, which also shows a gl.POINTS primitive, but without
+the texture.</p>
+<p>This program uses a single texture unit, texture unit zero, and the value
+of the uniform sampler variable in the fragment shader is initialized to zero
+and is never changed after that.  The program uses
+six texture objects for the six different texture images.</p>
+<p>Each vertex of the POINTS primitive is rendered as a disk.  The texture
+is applied to the disk by using the special <i>vec2</i> fragment shader variable
+<i>gl_PointCoord</i> as the texture coordinates. Since the x and y coordinates
+in <i>gl_PointCoord</i> range from 0.0 to 1.0, this effectively cuts a disk out
+of the texture image.</p>
+<p>The "Feature Edges" option will smooth the edges of the disks using alpha
+blending.  The disk fades from opaque to transparent as the distance of the
+pixel from the center increases from 0.45 to 0.5.  Distance is measured in
+the <i>gl_PointCoord</i> coordinate system.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>3D Axes</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script>
+
+var cylinder, cone;
+
+var camera;
+
+function draw() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 40);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.4,0.4,0.4,1]);
+    
+    camera.apply();
+        
+    glPushMatrix();
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [1,0,0,1]);
+    glTranslated(0,0,5);
+    glsimDrawModel(cylinder);
+    glTranslated(0,0,5);
+    glsimDrawModel(cone);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [0,.8,0,1]);
+    glRotated(90,0,1,0);
+    glTranslated(0,0,5);
+    glsimDrawModel(cylinder);
+    glTranslated(0,0,5);
+    glsimDrawModel(cone);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [.5,.5,1,1]);
+    glRotated(-90,1,0,0);
+    glTranslated(0,0,5);
+    glsimDrawModel(cylinder);
+    glTranslated(0,0,5);
+    glsimDrawModel(cone);
+    glPopMatrix();
+    
+}
+
+function initGL() {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [1,1,1,1]);    
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(0,0,0,1);
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+	return;
+    }
+    initGL();
+    cylinder = uvCylinder(0.7,10);
+    cone = uvCone(1.5,3);
+    camera = new Camera();
+    camera.lookAt( 15,12,30, 0,0,0, 0,1,0 );
+    camera.setScale(13.5);
+    camera.installTrackball(draw);
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">3D Axes</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo illustrates a set of coordinate axes in 3D.  It shows
+each axis as an arrow, with the x-axis in green,
+the y-axis in blue, and the z-axis in red.  
+This model uses "light-and-material" techniques that are covered
+in Chapter 4, to give a more realistic appearance.</p>
+<p><b>You can rotate the model to get a better view by dragging
+your mouse on the display.</b>  The same will be true of almost
+all of the OpenGL demos for this book.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Texture</title>
+<style>
+</style>
+<script src="three.min.js"></script>
+<script>
+
+/* Shows a pyramid with an optional texture. The pyramid geometry
+   is constructed by hand. */
+
+"use strict";
+
+let scene, camera, renderer;  // Three.js rendering basics.
+
+let canvas;  // The canvas on which the image is rendered.
+
+let pyramid;  // The pyramid object.
+let material; // The material for the pyramid.
+
+let texture = null;  // The THREE.Texture object representing the texture image.
+                     // This will be set in the applyTexture() function.
+
+
+/*  Create the scene graph.  This function is called once, as soon as the page loads.
+ *  The renderer has already been created before this function is called.
+ */
+function createWorld() {
+    renderer.setClearColor( 0 );  // Set background color (0, or 0x000000, is black).
+    scene = new THREE.Scene();
+    
+    // create a camera, sitting on the positive z-axis.  The camera is not part of the scene.
+    camera = new THREE.PerspectiveCamera(30, canvas.width/canvas.height, 1, 10);
+    camera.position.z = 6;
+    
+    // create some lights and add them to the scene.
+    scene.add( new THREE.DirectionalLight( 0xffffff, 0.4 ) ); // dim light shining from above
+    let viewpointLight = new THREE.DirectionalLight( 0xffffff, 1 );  // a light to shine in the direction the camera faces
+    viewpointLight.position.set(0,0,1);  // shines down the z-axis
+    scene.add(viewpointLight);
+
+   /* Create the pyramid, starting with the geometry. */
+    
+   let pyramidVertices = new Float32Array([
+               // Data for the pyramidGeom position attribute.
+               // Contains the x,y,z coordinates for the vertices.
+               // Each group of three numbers is a vertex;
+               // each group of three vertices is one face.
+            -1,0,1,  -1,0,-1,  1,0,-1, // First triangle in the base.
+            -1,0,1,   1,0,-1,  1,0,1,  // Second triangle in the base.
+            -1,0,1,   1,0,1,   0,1,0,  
+             1,0,1,   1,0,-1,  0,1,0,
+             1,0,-1, -1,0,-1,  0,1,0,
+            -1,0,-1, -1,0,1,   0,1,0
+        ]);
+   let pyramidGeom = new THREE.BufferGeometry();
+   pyramidGeom.setAttribute("position",
+                new THREE.BufferAttribute(pyramidVertices,3) );
+   
+   pyramidGeom.computeVertexNormals(); // Normals are needed for Lambert materials.
+	
+    /* Add the UV Texture Coordinates to the pyramid geometry.*/
+
+	let pyramidUVs = new Float32Array([
+	     0,0,  0,1,  1,1,
+	     0,0,  1,1,  1,0,
+	     0,0,  1,0,  0.5,1,
+	     1,0,  0,0,  0.5,1,
+	     0,0,  1,0,  0.5,1,
+	     1,0,  0,0,  0.5,1
+	]);
+	pyramidGeom.setAttribute("uv",
+                            new THREE.BufferAttribute(pyramidUVs,2) );
+ 
+ 	material = new THREE.MeshLambertMaterial({ color: "white" });
+	
+	pyramid = new THREE.Mesh( pyramidGeom, material );
+   pyramid.rotation.set(0.2,-0.4,0);  // Rotate object for a better view.
+   scene.add(pyramid);
+    
+}
+
+
+/*  Render the scene. 
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+
+/* Called when the setting of the "Use Texture" radio buttons is changed.
+ * Changes the material on the cube and pyramid to match the setting.
+ */
+function doChangeMaterial() {
+    if (document.getElementById("textured").checked) {  
+        material.map = texture;
+	}
+    else {
+        material.map = null;
+    }
+	material.needsUpdate = true;
+    render();   
+}
+
+
+/* This is called when the user changes the setting of the "Scale Texture" checkbox.
+ * When the box is checked, the texture has a repeat factor of 2 in the vertical and
+ * horizontal directions.
+ */
+function doChangeScale() {
+	if (document.getElementById("scaled").checked) {
+		texture.repeat.set(2,2);
+	}
+	else {
+		texture.repeat.set(1,1);
+	}
+	render();
+}
+
+
+/**
+ *  Apply the texture from a given URL to a given material, and calls render()
+ *  once the texture image has loaded, to show the image.  The image is loaded
+ *  asynchronously, and the texture will not be visible on the object until
+ *  after the load has finished.
+ */
+function applyTexture(textureURL, material) {
+
+   const callback = render;  // Function to be called after texture has been loaded.
+                             // In this case, just call render() to redraw the picture.
+   const error = function() { // Function to be called if there is an error loading texture
+         document.getElementById("message").innerHTML =
+         "<b>Error!  Failed to load texture!</b>";
+      };
+   
+   let loader = new THREE.TextureLoader();
+   texture = loader.load(textureURL, callback, undefined, error);
+   
+   texture.wrapS = THREE.RepeatWrapping;
+   texture.wrapT = THREE.RepeatWrapping;
+   
+   if (document.getElementById("scaled").checked) {
+       texture.repeat.set(2,2);
+   }
+   material.map = texture; // Applies this texture to the material and hence to the object.
+   material.needsUpdate = true;  // Essential to tell three.js that material properties have changed!!
+}
+
+
+//----------------------------- keyboard support ----------------------------------
+
+/*  Responds to user's key press.  Here, it is used to rotate the pyramid.
+ */
+function doKey(event) {
+    let code = event.keyCode;
+    let rotated = true;
+    switch( code ) {
+        case 37: pyramid.rotation.y -= 0.03; break;  // left arrow
+        case 39: pyramid.rotation.y += 0.03; break;  // right arrow
+        case 38: pyramid.rotation.x -= 0.03; break;  // up arrow
+        case 40: pyramid.rotation.x += 0.03; break;  // down arrow
+        case 33: pyramid.rotation.z -= 0.03; break;  // page up
+        case 34: pyramid.rotation.z += 0.03; break;  // page down
+        case 36: pyramid.rotation.set(0.2,-0.4,0); break;    // home key
+        default: rotated = false;
+    }
+    if (rotated) {
+        event.preventDefault();  // Prevent keys from scrolling the page.
+        render();
+    }
+}
+
+
+
+//----------------------------------------------------------------------------------
+
+/**
+ *  This init() function is called when by the onload event when the document has loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("glcanvas");
+        renderer = new THREE.WebGLRenderer( {
+            canvas: canvas,
+            antialias: true
+        } );
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+                 "<h3><b>Sorry, WebGL is required but is not available.</b><h3>";
+        return;
+    }
+    document.addEventListener("keydown", doKey, false);
+    document.getElementById("textured").checked = true;
+    document.getElementById("textured").addEventListener("change", doChangeMaterial, false);
+    document.getElementById("scaled").checked = true;
+    document.getElementById("scaled").addEventListener("change", doChangeScale, false);
+    createWorld();
+    render();
+    applyTexture("textures/brick001.jpg", material);
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<h2>Three.js:  Texture on an IndexedFaceSet</h2>
+
+<p id="message"><b>Use Arrow, PageUp, PageDown, and Home keys to rotate the models.</b></p>
+
+<p>
+   <label><input type="checkbox" id="textured">Show Texture on Pyramid</label>
+   <label style="margin-left:60px"><input type="checkbox" id="scaled">Scale Texture</label>
+</p>
+
+<div id="canvas-holder">
+<canvas id="glcanvas" width="500" height="500"></canvas>
+</div>
+
+</body>
+</html>

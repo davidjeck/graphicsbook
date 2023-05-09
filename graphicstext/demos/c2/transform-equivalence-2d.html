@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Modeling vs. Viewing</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    canvas {
+        background-color: white;
+    }
+    #sliders {
+        background: none;
+    }
+    table p {
+        margin: 0 0 3px 0;
+    }
+</style>
+<script src="../script/slider-canvas.js"></script>
+<script src="../script/demo-core.js"></script>
+<script>
+
+var canvas;    // Main canvas, shows image.
+var graphics;
+
+var mtCanvas;  // Shows transform as modeling transform
+var mtGraphics;
+
+var ctCanvas; // Shows transform as viewing transform
+var ctGraphics;
+
+var sliders;
+
+function drawScene(g) {
+    var w = g.measureText("Hello World").width;
+    g.fillStyle = "#AAAAFF";
+    g.strokeStyle = "black";
+    g.fillRect(-w/2-10, -25, w+20, 55);
+    g.strokeRect(-w/2-10, -25, w+20, 55);
+    g.fillStyle = "red";
+    g.fillText("Hello World", -w/2, 15);
+    g.strokeText("Hello World", -w/2, 15);
+    g.fillStyle = "green";
+    g.fillRect(-135,60,270,30);
+    g.fillStyle = "#AA00AA";
+    g.fillRect(-135,-90,270,30);
+}
+
+function drawAll() {
+    var dx = sliders.value(0);
+    var dy = sliders.value(1);
+    var angle = sliders.value(2);
+    var scale = sliders.value(3);
+    graphics.clearRect(0,0,300,300);
+    mtGraphics.clearRect(0,0,300,300);
+    ctGraphics.clearRect(0,0,300,300);
+    graphics.strokeRect(0.5,0.5,299,299);
+    mtGraphics.strokeRect(0.5,0.5,299,299);
+    ctGraphics.strokeRect(0.5,0.5,299,299);
+    graphics.save();
+    mtGraphics.save();
+    ctGraphics.save();
+    
+    graphics.translate(150,150);
+    graphics.translate(dx,dy);
+    graphics.rotate(angle);
+    graphics.scale(scale,scale);
+    drawScene(graphics);
+    
+    mtGraphics.translate(150,150);
+    mtGraphics.scale(0.5,0.5);
+    mtGraphics.save();
+    mtGraphics.translate(dx,dy);
+    mtGraphics.rotate(angle);
+    mtGraphics.scale(scale,scale);
+    drawScene(mtGraphics);
+    mtGraphics.restore();
+    mtGraphics.globalAlpha = 0.4;
+    mtGraphics.fillStyle = "black";
+    mtGraphics.fillRect(-150,-150,300,300);
+    mtGraphics.globalAlpha = 1;
+    mtGraphics.strokeStyle = "black";
+    mtGraphics.lineWidth = 1.8;
+    mtGraphics.strokeRect(-150,-150,300,300);
+    mtGraphics.beginPath();
+    mtGraphics.moveTo(0,-300);
+    mtGraphics.lineTo(0,0);
+    mtGraphics.lineTo(300,0);
+    mtGraphics.stroke();
+    
+    ctGraphics.translate(150,150);
+    ctGraphics.scale(0.5,0.5);
+    drawScene(ctGraphics);
+    ctGraphics.scale(1/scale,1/scale);
+    ctGraphics.rotate(-angle);
+    ctGraphics.translate(-dx,-dy);
+    ctGraphics.globalAlpha = 0.4;
+    ctGraphics.fillStyle = "black";
+    ctGraphics.fillRect(-150,-150,300,300);
+    ctGraphics.globalAlpha = 1;
+    ctGraphics.strokeStyle = "black";
+    ctGraphics.lineWidth = 2*scale;
+    ctGraphics.strokeRect(-150,-150,300,300);
+    ctGraphics.beginPath();
+    ctGraphics.moveTo(0,-600);
+    ctGraphics.lineTo(0,0);
+    ctGraphics.lineTo(600,0);
+    ctGraphics.stroke();
+    
+    graphics.restore();
+    mtGraphics.restore();
+    ctGraphics.restore()
+}
+
+function reset() {
+    sliders.setValue(0,0);
+    sliders.setValue(1,0);
+    sliders.setValue(2,0);
+    sliders.setValue(3,1);
+    drawAll();
+}
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+        graphics = canvas.getContext('2d');
+        mtCanvas = document.getElementById("mtcanvas");
+        mtGraphics = mtCanvas.getContext('2d');
+        ctCanvas = document.getElementById("ctcanvas");
+        ctGraphics = ctCanvas.getContext('2d');
+    }
+    catch (e) {
+        document.getElementById("headline").innerHTML = "ERROR: Canvas not supported";
+        return;
+    }
+    sliders = new SliderCanvas(document.getElementById("sliders"));
+    sliders.addSlider({label:"x-trans", min: -150, max:150, step:1, value:0});
+    sliders.addSlider({label:"y-trans", min: -150, max:150, step:1, value:0});
+    sliders.addSlider({label:"Rotate", min: -Math.PI, max:Math.PI, step:0.01, value:0, decimals:2});
+    sliders.addSlider({label:"Scale", min: 0.5, max:2, step:0.01, value:1, decimals:2});
+    sliders.onChange = drawAll;
+    sliders.draw();
+    graphics.font = "bold 35px sans-serif";
+    mtGraphics.font = "bold 35px sans-serif";
+    ctGraphics.font = "bold 35px sans-serif";
+    drawAll();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Modeling Transform vs. Viewport Transform</h3>
+
+<table border=0 cellpadding=5>
+<tr valign=top>
+  <td><canvas id="maincanvas" width="300" height="300"></canvas></td>
+  <td align=center><p><b>Transforms:</b></p>
+             <canvas id="sliders" width="300" height="200"></canvas><br>
+             <button onclick="reset()">Reset</button></td>
+</tr>
+<tr valign=top>
+  <td align=center><p><b>As Modeling Transform:</b></p><canvas id="mtcanvas" width="300" height="300"></canvas></td>
+  <td align=center><p><b>As Viewport Transform:</b></p><canvas id="ctcanvas" width="300" height="300"></canvas></td>
+</table>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>The point of this demo is to help you to understand the equivalence
+between modeling transformations and coordinate transformations.  Modeling
+transforms apply to objects; they scale, rotate, and move objects.  Coordinate
+transforms scale, rotate, and move the viewport, where the viewport is the
+rectangle that encloses the region that is shown in the image.</p>
+<p>At the top left in the demo is an image showing several objects.  The
+sliders to the right allow you to control some transformations that
+are applied to the image.  But are they applied to the <b>objects</b>
+in the image as modeling transforms, or are they applied to the <b>viewport</b>
+that picks out the part of the plane that is visible in the image?</p>
+<p>The two lower pictures will help you understand that the question can't
+really be answered, because of the equivalence between the two types of
+transformation.  Note that in all the pictures, the origin (0,0) has
+been translated to the center of the picture, so that scaling and rotation
+are about the center point.</p>
+<p>In the two lower pictures, the transparent gray square
+represents the viewport.  It encloses the part of the image that is
+visible in the upper picture.  On the lower left, the viewport remains
+untransformed, while the objects are transformed.  On the lower
+right, the objects remain untransformed, while the viewport is transformed.
+You can see that in both cases, the content of the viewport is exactly
+what you see in the image on the upper right.  Admittedly, the "modeling transform"
+version might be easier to understand, but the "viewport transform" version
+is equally valid.</p>
+<p>Remember that the effect of a transform on the viewport is the opposite
+of its effect on objects.  For example, a modeling transform that rotates
+object clockwise will rotate the viewport counterclockwise.  And translating
+the objects to the right is equivalent to
+translating the viewport to the left.  You should take note of this
+effect as you drag the sliders.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

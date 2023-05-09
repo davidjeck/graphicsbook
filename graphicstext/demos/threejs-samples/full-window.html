@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Full Window Demo</title>
+<style>
+    html, body {
+        margin: 0;  /* Make sure that there is no margin around the canvas */
+		      overflow: hidden;  /* Make sure we don't get scroll bars. */
+    }
+    canvas {
+        display: block; /* The default display, inline, would add small margin below the canvas */
+    }
+</style>
+<script src="three.min.js"></script>
+<script src="TrackballControls.js"></script>
+<script>
+
+/* This program shows an animation of a number of small, randomly
+ * colored balls bouncing around inside a cube.  The cube is shown
+ * as a transparent box. The user can rotate the view of the scene 
+ * the mouse.  The canvas in which the scene is drawn occupies the
+ * entire browser window, and the animation runs continuously.  This
+ * is how three.js is typically used, although it is not how I use
+ * it in other examples that I have written.
+ * 
+ * (Note:  The balls do not bounce off each other; balls just pass through
+ * other balls.)
+ */
+
+"use strict";
+
+let scene, camera, renderer;  // Three.js rendering basics.
+
+let canvas;  // The canvas on which the renderer will draw.
+             // This will be created by the renderer, and it will
+             // be added to the body of the page.
+             
+let controls;  // an object of type TrackballControls, the handles roatation using the mouse.
+
+let balls = [];   // An array of objects, each object has data for one bouncing ball.
+
+const BALL_COUNT = 50;  // Number of balls to be created.
+
+/**
+ *  Creates the bouncing balls and the translucent cube in which the balls bounce,
+ *  and adds them to the scene.  A light that shines from the direction of the
+ *  camera's view is also bundled with the camera and added to the scene.
+ */
+function createWorld() {
+
+    renderer.setClearColor( 0 );  // black background
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(28, window.innerWidth/window.innerHeight, 0.1, 100);
+
+    /* Add the camera and a light to the scene, linked into one object. */
+    let light = new THREE.DirectionalLight();
+    light.position.set(0,0,1);
+    camera.position.set(25,40,50);
+    camera.lookAt(scene.position);
+	   camera.add(light);
+    scene.add(camera);
+
+    /* Create and add the transparent cube to the scene */
+    let cube = new THREE.Mesh(
+        new THREE.BoxGeometry(20,20,20),
+        new THREE.MeshPhongMaterial( {
+            polygonOffset: true,  // will make sure the edges are visible.
+            polygonOffsetUnits: 1,
+            polygonOffsetFactor: 1,
+            color: "white",
+            specular: 0x202020,
+            transparent: true,
+            opacity: 0.3
+        } )
+    );
+	   scene.add(cube);
+    
+    /* Create and add a wireframe cube to the scene, to show the edges of the cube. */
+	   let edgeGeometry = new THREE.EdgesGeometry(cube.geometry);  // contains edges of cube without diagonal edges
+	   cube.add(new THREE.LineSegments(edgeGeometry, new THREE.LineBasicMaterial({color:0xffffff})));
+    
+    /* Create some balls and add them to the scene */
+    let geom = new THREE.SphereGeometry(1,20,12);  // Geometry will be reused for all the balls.
+    for (let i = 0; i < BALL_COUNT; i++) {
+        let ball = {};  // object will contain a sphere plus its position and velocity info
+        balls.push(ball);
+        
+        ball.obj = new THREE.Mesh( 
+            geom, 
+            new THREE.MeshPhongMaterial( {
+                color: Math.floor(Math.random() * 0x1000000), // random color
+                specular:0x080808,
+                shininess: 32
+            })
+        );
+
+        ball.x = 18*Math.random() - 9;   // set random ball position
+        ball.y = 18*Math.random() - 9;
+        ball.z = 18*Math.random() - 9;
+        ball.dx = Math.random() * 6 + 2;  // set random ball velocity, in units per second
+        ball.dy = Math.random() * 6 + 2;
+        ball.dz = Math.random() * 6 + 2;
+        if (Math.random() < 0.5)
+            ball.dx = -ball.dx;
+        if (Math.random() < 0.5)
+            ball.dy = -ball.dy;
+        if (Math.random() < 0.5)
+            ball.dz = -ball.dz;
+
+        ball.obj.position.set( ball.x, ball.y, ball.z );
+        scene.add(ball.obj);
+    }
+}
+
+
+/**
+ *  Render the scene.  This is called for each frame of the animation, after updating
+ *  the position and velocity data of the balls.
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+/**
+ *  When an animation is in progress, this function is called just before rendering each
+ *  frame of the animation.  In this case, the bouncing balls are moved by an amount
+ *  
+ */
+function updateForFrame() { 
+   let dt = clock.getDelta();  // time since last update
+   for (let ball of balls) {
+       
+       /* update ball position based on ball velocity and elapsed time */
+       ball.x += ball.dx * dt;
+       ball.y += ball.dy * dt;
+       ball.z += ball.dz * dt;
+       
+       /* if ball has moved outside the cube, reflect it back into the cube */
+       if (ball.x > 9) {
+           ball.x -= 2*(ball.x - 9);
+           ball.dx = -Math.abs(ball.dx);
+       }
+       else if (ball.x < -9) {
+           ball.x += 2*(-9 - ball.x);
+           ball.dx = Math.abs(ball.dx);
+       }
+       if (ball.y > 9) {
+           ball.y -= 2*(ball.y - 9);
+           ball.dy = -Math.abs(ball.dy);
+       }
+       else if (ball.y < -9) {
+           ball.y += 2*(-9 - ball.y);
+           ball.dy = Math.abs(ball.dy);
+       }
+       if (ball.z > 9) {
+           ball.z -= 2*(ball.z - 9);
+           ball.dz = -Math.abs(ball.dz);
+       }
+       else if (ball.z < -9) {
+           ball.z += 2*(-9 - ball.z);
+           ball.dz = Math.abs(ball.dz);
+       }
+       
+       ball.obj.position.set(ball.x, ball.y, ball.z);
+   }
+}
+
+
+//--------------------------- animation support -----------------------------------
+
+let clock;  // Keeps track of elapsed time of animation.
+
+function doFrame() {
+    updateForFrame();
+    controls.update();
+    render();
+    requestAnimationFrame(doFrame); 
+}
+
+//----------------------- respond to window resizing -------------------------------
+
+/* When the window is resized, we need to adjust the aspect ratio of the camera.
+ * We also need to reset the size of the canvas that used by the renderer to
+ * match the new size of the window.
+ */
+ function doResize() {
+     camera.aspect = window.innerWidth / window.innerHeight;
+     camera.updateProjectionMatrix(); // Need to call this for the change in aspect to take effect.
+     renderer.setSize(window.innerWidth, window.innerHeight);
+ }
+
+
+//----------------------------------------------------------------------------------
+
+/**
+ *  This init() function is called when by the onload event when the document has loaded.
+ */
+function init() {
+    try {
+        try {
+            renderer = new THREE.WebGLRenderer( { 
+               antialias: true
+            } );
+         }
+         catch (e) { 
+             document.body.innerHTML="<h3><b>Sorry, WebGL is required but is not available.</b><h3>";
+             return;
+         }
+         canvas = renderer.domElement;  // The canvas was created by the renderer.
+         renderer.setSize(window.innerWidth, window.innerHeight);  // match size of canvas to window
+         window.addEventListener("resize", doResize, false);  // Set up handler for resize event
+         document.body.appendChild(canvas);  // The canvas must be added to the body of the page.
+         clock = new THREE.Clock(); // For keeping time during the animation.
+         createWorld();
+         controls = new THREE.TrackballControls(camera, canvas);  // note: TrackballControls require animation.
+         controls.noPan = true;   // Don't do panning with the right mouse button.
+         controls.noZoom = true;  // Don't do zooming with middle mouse button.
+         requestAnimationFrame(doFrame);  // Start the animation.
+    }
+    catch (e) {
+        document.body.innerHTML = "<h3><b>Sorry, an error occurred:<br>" + e + "</b></h3>";
+	   }
+}
+
+window.onload = init;  // Arrange for init() function to be called when page is loaded.
+
+</script>
+</head>
+<body>
+
+</body>
+</html>

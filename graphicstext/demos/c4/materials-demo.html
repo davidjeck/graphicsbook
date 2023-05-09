@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Material Properites Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script src="../script/teapot-model-IFS.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var camera;
+
+var slidersDiffuse, slidersSpecular, sliderShininess;
+
+var currentModel = teapotModel;
+
+var cubeModel = null,
+    coneModel = null,
+    cylinderModel = null,
+    sphereModel = null,
+    torusModel = null;
+
+var materialProperties = [
+    [ /* basic gray */ 0.6, 0.6, 0.6, 1.0, 0.6, 0.6, 0.6, 1.0, 1, 1, 1, 1, 16 ],
+    [ /* "jade" */   0.135, 0.2225, 0.1575, 1.0, 0.54, 0.89, 0.63, 1.0, 0.316228, 0.316228, 0.316228, 1.0, 0.1*128 ],
+    [ /* "brass" */   0.329412, 0.223529, 0.027451, 1.0, 0.780392, 0.568627, 0.113725, 1.0, 0.992157, 0.941176, 0.807843, 1.0, 0.21794872*128 ],
+    [ /* "bronze" */   0.2125, 0.1275, 0.054, 1.0, 0.714, 0.4284, 0.18144, 1.0, 0.393548, 0.271906, 0.166721, 1.0, 0.2*128 ],
+    [ /* "copper" */   0.19125, 0.0735, 0.0225, 1.0, 0.7038, 0.27048, 0.0828, 1.0, 0.256777, 0.137622, 0.086014, 1.0, 0.1*128 ],
+    [ /* "gold" */   0.24725, 0.1995, 0.0745, 1.0, 0.75164, 0.60648, 0.22648, 1.0, 0.628281, 0.555802, 0.366065, 1.0, 0.4*128 ],
+    [ /* "green plastic" */   0.0, 0.0, 0.0, 1.0, 0.1, 0.35, 0.1, 1.0, 0.45, 0.55, 0.45, 1.0, .25*128 ],
+    [ /* "red plastic" */   0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 1.0, 0.7, 0.6, 0.6, 1.0, .25*128 ],
+    [ /* "black plastic" */   0, 0, 0, 1.0, 0.01, 0.01, 0.01, 1.0, 1, 1, 1, 1.0, .25*128 ],
+    [ /* "black rubber" */   0.02, 0.02, 0.02, 1.0, 0.01, 0.01, 0.01, 1.0, 0.4, 0.4, 0.4, 1.0, .078125*128 ],
+    [ /* "cyan rubber" */   0.0, 0.05, 0.05, 1.0, 0.4, 0.5, 0.5, 1.0, 0.04, 0.7, 0.7, 1.0, .078125*128 ],
+];
+
+
+function drawModelIFS(model) {
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3,GL_FLOAT,0,model.vertexPositions);
+    glEnableClientState(GL_NORMAL_ARRAY);
+    glNormalPointer(GL_FLOAT, 0, model.vertexNormals);
+    glDrawElements(GL_TRIANGLES, model.indices.length, GL_UNSIGNED_BYTE, model.indices);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_NORMAL_ARRAY);
+    
+}
+
+
+function newMaterial() {
+    var index = Number(document.getElementById("materialSelect").value);
+    if (index == -1) {
+	return;
+    }
+    var m = materialProperties[index];
+    slidersDiffuse.setValue(0,m[4]);
+    slidersDiffuse.setValue(1,m[5]);
+    slidersDiffuse.setValue(2,m[6]);
+    slidersSpecular.setValue(0,m[8]);
+    slidersSpecular.setValue(1,m[9]);
+    slidersSpecular.setValue(2,m[10]);
+    sliderShininess.setValue(0,Math.round(m[12]));
+    draw();
+}
+
+function newModel() {
+    var name = document.getElementById("modelSelect").value;
+    var model = null;
+    switch (name) {
+	case "Teapot":
+	    currentModel = teapotModel;
+	    break;
+	case "Cube":
+	    cubeModel = cubeModel || cube();
+	    currentModel = cubeModel;
+	    break;
+	case "Cone":
+	    coneModel = coneModel || uvCone(0.5, 1.2, 64);
+	    currentModel = coneModel;
+	    break;
+	case "Cylinder":
+	    cylinderModel = cylinderModel || uvCylinder(0.5, 1, 64);
+	    currentModel = cylinderModel;
+	    break;
+	case "Torus":
+	    torusModel = torusModel || uvTorus(0.5, 0.5/3, 64, 32);
+	    currentModel = torusModel;
+	    break;
+	case "Sphere":
+	    sphereModel = sphereModel || uvSphere(0.5,128,64);
+	    currentModel = sphereModel;
+	    break;
+    }
+    draw();
+}
+
+function sliderChange() {
+    document.getElementById("materialSelect").value = "-1";
+    draw();
+}
+
+function draw() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    camera.apply();
+    if (currentModel == teapotModel) {
+	glScalef(0.05,0.05,0.05);
+    }
+    else {
+	glRotatef(-90,1,0,0);
+    }
+    var r,g,b,s;
+    r = slidersDiffuse.value(0);
+    g = slidersDiffuse.value(1);
+    b = slidersDiffuse.value(2);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [r,g,b,1]);
+    r = slidersSpecular.value(0);
+    g = slidersSpecular.value(1);
+    b = slidersSpecular.value(2);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [r,g,b,1]);
+    s = sliderShininess.value(0);
+    glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, s);
+    drawModelIFS(currentModel);
+}
+
+function initGL() {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [0.4,0.4,0.4,1]);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, [1,1,1,1]);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(1,1,1,1);
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+	return;
+    }
+    document.getElementById("modelSelect").value = "Teapot";
+    document.getElementById("modelSelect").onchange = newModel;
+    document.getElementById("materialSelect").value = "0";
+    document.getElementById("materialSelect").onchange = newMaterial;
+    document.getElementById("reset").onclick = function() { camera.lookAt(2,2,5); draw() };
+    slidersDiffuse = new SliderCanvas(document.getElementById("diffuse-sliders"));
+    slidersDiffuse.addSlider({label:"Red", max:1, step:0.001, value:0.6, decimals:3});
+    slidersDiffuse.addSlider({label:"Green", max:1, step:0.001, value:0.6, decimals:3});
+    slidersDiffuse.addSlider({label:"Blue", max:1, step:0.001, value:0.6, decimals:3});
+    slidersDiffuse.draw();
+    slidersSpecular = new SliderCanvas(document.getElementById("specular-sliders"));
+    slidersSpecular.addSlider({label:"Red", max:1, step:0.001, value:1, decimals:3});
+    slidersSpecular.addSlider({label:"Green", max:1, step:0.001, value: 1, decimals:3});
+    slidersSpecular.addSlider({label:"Blue", max:1, step:0.001, value: 1, decimals:3});
+    slidersSpecular.draw();
+    sliderShininess = new SliderCanvas(document.getElementById("shininess-slider"));
+    sliderShininess.addSlider({min:0, max:128, value:16});
+    sliderShininess.draw();
+    slidersDiffuse.onChange = sliderChange;
+    slidersSpecular.onChange = sliderChange;
+    sliderShininess.onChange = sliderChange;
+    initGL();
+    camera = new Camera();
+    camera.setScale(0.8);
+    camera.lookAt(2,2,5);
+    draw();
+    camera.installTrackball(draw);
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Material Properites Demo</h3>
+
+<table cellpadding="5" border="0" cellspacing="0">
+<tr>
+    <td><div id="canvas-holder">
+        <canvas id="maincanvas" width="300" height="300"></canvas>
+        </div>
+    </td>
+    <td>
+    <p>Model:<br>
+    <select id="modelSelect">
+	<option>Teapot</option>
+	<option>Cube</option>
+	<option>Cone</option>
+	<option>Cylinder</option>
+	<option>Torus</option>
+	<option>Sphere</option>
+    </select>
+    </p>
+    <p>Material Presets:<br>
+    <select id="materialSelect">
+        <option value="-1">Custom Settings</option>
+	<option value="0">Basic Gray</option>
+	<option value="1">Jade</option>
+	<option value="2">Brass</option>
+	<option value="3">Bronze</option>
+	<option value="4">Copper</option>
+	<option value="5">Gold</option>
+	<option value="6">Green Plastic</option>
+	<option value="7">Red Plastic</option>
+	<option value="8">Black Plastic</option>
+	<option value="9">Black Rubber</option>
+	<option value="10">Cyan Rubber</option>
+    </select>
+    </p>
+    <p><button id="reset">Reset Rotation</button></p>
+    
+    <p style="margin-top:50px"><b>Shininess:</b><br>
+    <canvas id="shininess-slider" style="display:inline" width=250 height="45"></canvas>
+    </p>
+    </div>
+    </td>
+</tr>
+
+<tr>
+    <td>
+    <p><b>Diffuse Color:</b><br>
+    <canvas id="diffuse-sliders" style="display:inline" width=250 height="150"></canvas>
+    </p>
+    </td>
+    <td>
+    <p><b>Specular Color:</b><br>
+    <canvas id="specular-sliders" style="display:inline" width=250 height="150"></canvas>
+    </p>
+    </td>
+
+</tr>
+
+</table>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo lets you control three material properties: diffuse color, specular color,
+and shininess.  You can choose various objects on which to view the material.  You
+can rotate the objects with your mouse.  You can select preset material settings
+that are supposed to imitate various real materials such as bronze and red plastic.  (You can judge
+for yourself how much these materials look like the real thing.)</p>
+<p>The lighting for this demo is a single light that shines directly into the screen.
+The light is a white light with both diffuse and specular components.
+(In terms of light properties that haven't been covered yet, the light has 
+diffuse intensity [1,1,1] and specular intensity [0.4,0.4,0.4], and there
+is no ambient light.)  You have no control over the lighting.</p>
+<p>Some things to try:</p>
+<ul>
+<li>Check out what the objects look like with all the specular sliders set to zero.</li>
+<li>Set the Shininess to zero and note that it gives specular highlights
+that cover almost the whole object.  It looks pretty bad.</li>
+<li>Note how the highlight changes as you drag the Shininess 
+slider back and forth.</li>
+<li>Try setting the specular color to be very different
+from the diffuse color, such as a red object with green specular highlights.</li>
+<li>Rotate the objects, and see how the highlight changes; this works especially well with the Torus.
+What happens to the specular highlight if you look directly down the doughnut hole?</li>
+<li>Lighting calculations in OpenGL 1.1 are done only at the vertices and then the results are
+interpolated into the interiors of the polygons; see if you can spot how this affects the
+appearance of the objects.</li>
+<li>Set the diffuse color sliders to maximum, and note that the specular sliders don't have
+much effect. This is because setting the diffuse color to white means that, where the light is
+shining directly on an object, the red, green, and blue components of the surface color are
+already about as large as they can get.</li>
+</ul>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

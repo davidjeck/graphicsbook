@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Lit Cube Using glMatrix and WebGL</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+</style>
+
+<!--
+    Shows a cube drawn using very basic lighting:  A white
+    light shining in the direction of the negative z-axis,
+    in eye coordinates, with diffuse color only.
+-->
+
+
+<script src="gl-matrix-min.js"></script>
+
+<script>
+
+"use strict";
+
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    uniform mat4 modelviewProjection;
+    uniform bool lit;
+    uniform vec3 normal;
+    uniform mat3 normalMatrix;
+    uniform vec4 color;
+    varying vec4 v_color;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        gl_Position = modelviewProjection * coords;
+        if (lit) {
+           vec3 N = normalize(normalMatrix*normal);  // Transformed unit normal
+           float dotProduct = abs(N.z);  // cosine of angle of incidence of light with surface
+           v_color = vec4( dotProduct*color.rgb, color.a );
+        }
+        else {
+            v_color = color;
+        }
+    }`;
+
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec4 v_color;
+    void main() {
+        gl_FragColor = v_color;
+    }`;
+
+let gl;   // The webgl context.
+
+let a_coords_loc;       // Location of the a_coords attribute variable in the shader program.
+let a_coords_buffer;    // Buffer to hold the values for a_coords.
+let u_color;            // Location of the uniform vec4 specifying a color for the primitive
+let u_modelviewProj;    // Location of the uniform mat4 representing the modelview and projection transformation
+let u_lit;              // Location of the uniform bool that says whether lighting should be applied
+let u_normal;           // Location of the uniform vec3 representing the normal vector
+let u_normalMatrix;     // Location of the unifrom mat3 representing the transform to be applied to normal vectors
+
+const projection = mat4.create();    // projection matrix
+const modelview = mat4.create();     // modelview matrix
+const modelviewProj = mat4.create(); // combined transformation matrix
+const normalMatrix = mat3.create(); // matrix, derived from modelview matrix, for transforming normal vectors
+
+let rotateX = 0;   // rotation of cube about the x-axis; these three rotations are the modeling transformation
+let rotateY = 0;   // rotation of cube about the y-axis
+let rotateZ = 0;   // rotation of cube about the z-axis
+
+
+/* Draws a WebGL primitive.  The first parameter must be one of the constants
+ * that specifiy primitives:  gl.POINTS, gl.LINES, gl.LINE_LOOP, gl.LINE_STRIP,
+ * gl.TRIANGLES, gl.TRIANGLE_STRIP, gl.TRIANGLE_FAN.  The second parameter must
+ * be an array of 4 numbers in the range 0.0 to 1.0, giving the RGBA color of
+ * the color of the primitive.  The third parameter must be an array of numbers.
+ * The length of the array must be amultiple of 3.  Each triple of numbers provides
+ * xyz-coords for one vertex for the primitive.  This assumes that u_color is the
+ * location of a color uniform in the shader program, a_coords_loc is the location of
+ * the coords attribute, and a_coords_buffer is a VBO for the coords attribute.
+ */
+function drawPrimitive( primitiveType, color, vertices ) {
+     gl.enableVertexAttribArray(a_coords_loc);
+     gl.bindBuffer(gl.ARRAY_BUFFER,a_coords_buffer);
+     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+     gl.uniform4fv(u_color, color);
+     gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+     gl.drawArrays(primitiveType, 0, vertices.length/3);
+}
+
+
+/* Draws a colored cube, along with a set of coordinate axes.
+ * (Note that the use of the above drawPrimitive function is not an efficient
+ * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
+ */
+function draw() { 
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    /* Set the value of projection to represent the projection transformation. */
+    
+    if (document.getElementById("persproj").checked) {
+         mat4.perspective(projection, Math.PI/5, 1, 4, 8);
+    }
+    else {
+         mat4.ortho(projection,-2, 2, -2, 2, 4, 8);
+    }
+    
+    /* Set the value of modelview to represent the viewing transform. */
+
+    mat4.lookAt(modelview, [2,2,6], [0,0,0], [0,1,0]);
+    
+    /* Apply the modeling tranformation to modelview, and send modelview
+       to the corresponding uniform variable in the shader program. */
+    
+    mat4.rotateX(modelview, modelview, rotateX);
+    mat4.rotateY(modelview, modelview, rotateY);
+    mat4.rotateZ(modelview, modelview, rotateZ);
+    
+    /* Multiply the modelview and projection transformss to get the combined
+       transform, and send it to the shader program. */
+    
+    mat4.multiply( modelviewProj, projection, modelview );
+    gl.uniformMatrix4fv(u_modelviewProj, false, modelviewProj );
+    
+    /* Get the matrix for transforming normal vectors from the modelview matrix. */
+    
+    mat3.normalFromMat4(normalMatrix, modelview);
+    gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+
+    /* Draw the six faces of a cube, with different colors.  The faces are drawn
+       with lighting turned on, and with the normal vectors that are needed for
+       the lighting calculuations. */
+    
+    gl.uniform1i( u_lit, 1 );  // Turn on lighting calculations for the cube.
+
+    gl.uniform3f( u_normal, 0, 0, 1 ); // send normal vector to shader program
+    drawPrimitive( gl.TRIANGLE_FAN, [1,0,0,1], [ -1,-1,1, 1,-1,1, 1,1,1, -1,1,1 ]);
+    gl.uniform3f( u_normal, 0, 0, -1 );
+    drawPrimitive( gl.TRIANGLE_FAN, [0,1,0,1], [ -1,-1,-1, -1,1,-1, 1,1,-1, 1,-1,-1 ]);
+    gl.uniform3f( u_normal, 0, 1, 0 );
+    drawPrimitive( gl.TRIANGLE_FAN, [0,0,1,1], [ -1,1,-1, -1,1,1, 1,1,1, 1,1,-1 ]);
+    gl.uniform3f( u_normal, 0, -1, 0 );
+    drawPrimitive( gl.TRIANGLE_FAN, [1,1,0,1], [ -1,-1,-1, 1,-1,-1, 1,-1,1, -1,-1,1 ]);
+    gl.uniform3f( u_normal, 1, 0, 0 );
+    drawPrimitive( gl.TRIANGLE_FAN, [1,0,1,1], [ 1,-1,-1, 1,1,-1, 1,1,1, 1,-1,1 ]);
+    gl.uniform3f( u_normal, -1, 0, 0 );
+    drawPrimitive( gl.TRIANGLE_FAN, [0,1,1,1], [ -1,-1,-1, -1,-1,1, -1,1,1, -1,1,-1 ]);
+    
+    /* Draw coordinate axes as thick colored lines that extend through the cube.
+       The lines are drawn with lighting disabled. */
+       
+    gl.uniform1i( u_lit, 0 );  // Turn off lighting
+    
+    gl.lineWidth(4);
+    drawPrimitive( gl.LINES, [1,0,0,1], [ -2,0,0, 2,0,0] );
+    drawPrimitive( gl.LINES, [0,1,0,1], [ 0,-2,0, 0,2,0] );
+    drawPrimitive( gl.LINES, [0,0,1,1], [ 0,0,-2, 0,0,2] );
+    gl.lineWidth(1);
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    u_modelviewProj = gl.getUniformLocation(prog, "modelviewProjection");
+    u_color =  gl.getUniformLocation(prog, "color");
+    u_lit =  gl.getUniformLocation(prog, "lit");
+    u_normal =  gl.getUniformLocation(prog, "normal");
+    u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    a_coords_buffer = gl.createBuffer();
+    gl.enable(gl.DEPTH_TEST);
+}
+
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/**
+ *  An event listener for the keydown event.  It is installed by the init() function.
+ *  The arrow keys, PageUp, and PageDown will rotate the cube by modifying the
+ *  modeling transformation.  Home and Return key resets the modeling transform
+ *  to the identity.
+ */
+function doKey(evt) {
+    let rotationChanged = true;
+    switch (evt.keyCode) {
+        case 37: rotateY -= 0.05; break;        // left arrow
+        case 39: rotateY +=  0.05; break;       // right arrow
+        case 38: rotateX -= 0.05; break;        // up arrow
+        case 40: rotateX += 0.05; break;        // down arrow
+        case 33: rotateZ += 0.05; break;        // PageUp
+        case 34: rotateZ -= 0.05; break;        // PageDown
+        case 13:                                // return key
+        case 36: rotateX = rotateY = rotateZ = 0; break;  // home key
+        default: rotationChanged = false;
+    }
+    if (rotationChanged) {
+              evt.preventDefault();
+             draw();
+    }
+}
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    try {
+        let canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e.message + "</p>";
+        return;
+    }
+    document.getElementById("persproj").checked = true;
+    document.getElementById("persproj").onchange = draw;
+    document.getElementById("orthproj").onchange = draw;
+    document.addEventListener("keydown", doKey, false);
+    draw();
+}
+
+
+window.onload = init;
+
+</script>
+</head>
+<body>
+
+<h2>A Cube with Basic Lighting</h2>
+
+<p id=message>Use arrow keys, PageUp, and PageDown to rotate the cube.<br>
+Home or Return key resets rotations to zero.</p>
+
+<p>
+  <label><input type="radio" name="projectionType" id="persproj" value="perspective">Perspective projection</label>
+  <label><input type="radio" name="projectionType" id="orthproj" value="orthogonal" style="margin-left:1cm">Orthogonal projection</label>
+</p>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<div id="canvas-holder">
+   <canvas width=600 height=600 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+
+</body>
+</html>
+

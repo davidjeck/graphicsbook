@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Texture Transform</title>
+<style>
+    body {
+        background-color: #DDDDDD;
+    }
+    #canvas-holder {
+        float: left;
+        border: thin solid black;
+    }
+    #tools {
+        float: left;
+        margin-left: 20px;
+        padding: 0px 7px;
+        background-color: white;
+        border: thin solid black;
+    }
+    canvas {
+        display: block;
+    }
+    p {
+        margin-top: 15px;
+    }
+    select {
+        margin-left: 30px;
+    }
+</style>
+
+<!--
+    Uses glMatrix to do texture transformations.
+-->
+
+
+<script src="trackball-rotator.js"></script>
+<script src="gl-matrix-min.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+<script src="teapot-model-IFS.js"></script>
+
+<script>
+
+"use strict";
+
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    attribute vec2 a_texCoords;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    uniform mat3 textureTransform;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    varying vec2 v_texCoords;
+    void main() {
+        vec4 objectCoords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * objectCoords;
+        gl_Position = projection * eyeCoords;
+        v_normal = normalize(a_normal);
+        v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+        vec3 texcoords = textureTransform * vec3(a_texCoords,1.0);
+        v_texCoords = texcoords.xy;
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    uniform mat3 normalMatrix;
+    uniform sampler2D texture;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    varying vec2 v_texCoords;
+    void main() {
+        vec3 N = normalize( normalMatrix*v_normal );
+        vec3 L = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        float diffuseFactor = dot(N,L);
+        vec4 color = texture2D(texture, v_texCoords);
+        gl_FragColor = vec4( diffuseFactor*color.rgb, 1.0);
+    }`;
+
+
+let gl;   // The webgl context.
+
+let a_coords_loc;          // Locations of attributes in the shader program
+let a_normal_loc; 
+let a_texCoords_loc; 
+
+let u_projection;          // Locations of uniforms in the shader program
+let u_modelview;
+let u_textureTransform;
+let u_texture;
+let u_normalMatrix;
+
+const projection = mat4.create();        // projection matrix
+let modelview;                           // will come from rotator
+const normalMatrix = mat3.create();      // normal transform matrix
+const textureTransform = mat3.create();  // texture transform matrix
+
+let rotator;  // A TrackballRotator object that lets the user rotate the view by mouse.
+
+let textureLoaded;  // True when a texture has been successfully loaded.
+
+let objects;  // array of objects, containing models created using createModel()
+              // Contains:  Cube, Sphere, Cylinder, Cone, Torus, Teapot
+
+const textureURLs = [
+        "textures/brick001.jpg",
+        "textures/Earth-1024x512.jpg",
+        "textures/NightEarth-512x256.jpg",
+        "textures/marble.jpg",
+        "textures/metal003.gif",
+        "textures/mandelbrot.jpeg"
+];
+
+let texture;
+
+let frameNumber = 0;  // frame number for texture animation
+let animating = false;
+
+
+/* Draws a colored cube, along with a set of coordinate axes.
+ * (Note that the use of the above drawPrimitive function is not an efficient
+ * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
+ */
+function draw() { 
+    gl.clearColor(1,1,1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!textureLoaded) {
+        return;
+    }
+    let objectNum = Number(document.getElementById("object").value);
+    let transformNum = Number(document.getElementById("transform").value);
+    modelview = rotator.getViewMatrix();
+    mat3.identity(textureTransform);
+    let scale = frameNumber % 300;
+    if (scale > 150) {
+        scale = 300-scale;
+    }
+    scale = 0.25 + 1.75*(scale/150);
+    switch (transformNum) {
+        case 0:
+            mat3.translate(textureTransform,textureTransform,[frameNumber/200,0]);
+            break;
+        case 1:
+            mat3.translate(textureTransform,textureTransform,[0,frameNumber/200]);
+            break;
+        case 2:
+            mat3.translate(textureTransform,textureTransform,[frameNumber/200,frameNumber/111]);
+            break;
+        case 3:
+            mat3.scale(textureTransform,textureTransform,[scale,1]);
+            break;
+        case 4:
+            mat3.scale(textureTransform,textureTransform,[1,scale]);
+            break;
+        case 5:
+            mat3.scale(textureTransform,textureTransform,[scale,scale]);
+            break;
+        case 6:
+            mat3.rotate(textureTransform,textureTransform,frameNumber/200);
+            break;
+        case 7:
+            mat3.translate(textureTransform,textureTransform,[0.5,0.5]);
+            mat3.rotate(textureTransform,textureTransform,frameNumber/200);
+            mat3.translate(textureTransform,textureTransform,[-0.5,-0.5]);
+            break;
+    }
+    gl.uniformMatrix3fv(u_textureTransform,false,textureTransform); console.log(textureTransform)
+    objects[objectNum].render(); // sets up modelview and normal matrices
+}
+
+
+/**
+ *  Create an object representing an IFS model.  The modelData holds the data for
+ *  an IFS using the structure from basic-objects-IFS.js.  This function
+ *  creates VBOs to hold the coordinates, normal vectors, and indices
+ *  from the IFS, and it loads the data into those buffers.  The function
+ *  creates a new object whose properties are the identifiers of the
+ *  VBOs.  The new object also has a function, render(), that can be called to
+ *  render the object, using all the data from the buffers.  That object
+ *  is returned as the value of the function.  
+ */
+function createModel(modelData) {
+    let model = {};
+    model.coordsBuffer = gl.createBuffer();
+    model.normalBuffer = gl.createBuffer();
+    model.texCoordsBuffer = gl.createBuffer();
+    model.indexBuffer = gl.createBuffer();
+    model.count = modelData.indices.length;
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.coordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexPositions, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexNormals, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.texCoordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexTextureCoords, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, modelData.indices, gl.STATIC_DRAW);
+    model.render = function() {  // This function will render the object.
+           // Since the buffer from which we are taking the coordinates and normals
+           // change each time an object is drawn, we have to use gl.vertexAttribPointer
+           // to specify the location of the data. And to do that, we must first
+           // bind the buffer that contains the data.  Similarly, we have to
+           // bind this object's index buffer before calling gl.drawElements.
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.coordsBuffer); 
+        gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+        gl.vertexAttribPointer(a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordsBuffer);
+        gl.vertexAttribPointer(a_texCoords_loc, 2, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(u_modelview, false, modelview );
+        mat3.normalFromMat4(normalMatrix, modelview);
+        gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);  
+        gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
+    }
+    return model;
+}
+
+/* Loads a texture image, based on the selected image in a popup menu.
+   When the texture has been loaded, the scene is redrawn with the texture.
+   While the texture is loading, the canvas is blank.
+*/
+function loadTexture() {
+    textureLoaded = false;
+    animating = false;
+    draw();
+    let textureNum = Number(document.getElementById("texture").value);
+    document.getElementById("message").innerHTML = "<b>LOADING TEXTURE</b>";
+    let img = new Image();
+    img.onload = function() { 
+        try {
+           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        }
+        catch (e) {
+           document.getElementById("message").innerHTML =
+              "<b>SORRY, can't access texture image.  Note that some<br>browsers can't use a texture from a local disk.</b>";
+           return;
+        }
+        gl.generateMipmap(gl.TEXTURE_2D);
+        textureLoaded = true;
+        document.getElementById("message").innerHTML = "Drag your mouse on the object to rotate it.";
+        doAnimationCheckbox();
+        if (!animating) {
+            draw();
+        }
+    };
+    img.onerror = function() {
+        document.getElementById("message").innerHTML = "<b>SORRY, COULDN'T LOAD TEXTURE IMAGE.</b>";
+    };
+    img.src = textureURLs[textureNum];
+}
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    gl.enable(gl.DEPTH_TEST);
+    gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1 );    
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    a_texCoords_loc =  gl.getAttribLocation(prog, "a_texCoords");
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix = gl.getUniformLocation(prog, "normalMatrix"); 
+    u_texture = gl.getUniformLocation(prog, "texture");
+    u_textureTransform = gl.getUniformLocation(prog, "textureTransform");
+    
+    gl.enableVertexAttribArray(a_coords_loc);
+    gl.enableVertexAttribArray(a_normal_loc);
+    gl.enableVertexAttribArray(a_texCoords_loc);
+
+    gl.uniform1i(u_texture, 0); 
+    texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    
+    mat4.perspective(projection, Math.PI/10, 1, 1, 10);
+    gl.uniformMatrix4fv(u_projection, false, projection);
+    
+    objects = new Array(6);              
+    objects[0] = createModel( cube() );
+    objects[1] = createModel( uvSphere(0.7,64,32) );
+    objects[2] = createModel( uvCylinder() );
+    objects[3] = createModel( uvCone() );
+    objects[4] = createModel( uvTorus(0.65,0.2,64,24) );
+    for (let i = 0; i < teapotModel.vertexPositions.length; i++) {
+        teapotModel.vertexPositions[i] *= 0.05; // scale teapot model to a size that matches other objects
+    }
+    objects[5] = createModel( teapotModel );
+    loadTexture();
+}
+
+
+//--------------------------------- animation framework ------------------------------
+
+
+let prevTime = null;  // time since previous call to frame()
+// Note: To avoid having the animation play too fast on computers
+// where requestAnimationFrame is called more than 60 times per
+// second, the frame number has been converted into an elapsed
+// time measured in sixtieths of a second.
+
+function frame(time) {
+    if (!animating) {
+        return;  // stops the animation
+    }
+    if (prevTime == null) { // Just save the start time.
+        prevTime = time;
+    }
+    else {
+        let elapsedTimeInSecs = (time - prevTime)/1000;
+        prevTime = time;
+        let delta = elapsedTimeInSecs * 60;  // time change in units of 1/60 second.
+        frameNumber += delta;
+        draw();
+    }
+    requestAnimationFrame(frame);
+}
+
+function doAnimationCheckbox() {
+    let run = document.getElementById("animCheckbox").checked;
+    if (run !== animating) {
+        animating = run;
+        if (animating) {
+            prevTime = null;
+            requestAnimationFrame(frame);
+        }
+    }
+}
+
+//-------------------------------------------------------------------------
+
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    document.getElementById("object").value = "0";
+    document.getElementById("texture").value = "0";
+    document.getElementById("transform").value = "0";
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("animCheckbox").checked = true;
+    document.getElementById("animCheckbox").onchange = doAnimationCheckbox;
+    document.getElementById("texture").onchange = loadTexture;
+    document.getElementById("object").onchange = draw;
+    document.getElementById("reset").onclick = function() {
+        rotator.setView(5,[2,2,3]);
+        frameNumber = 0;
+        if (!animating) {
+            draw();
+        }
+    };
+    document.getElementById("transform").onchange = function() {
+        frameNumber = 0;
+        if (!animating) {
+            draw();
+        }
+    };
+    rotator = new TrackballRotator(canvas, draw, 5, [2,2,3]);
+}
+
+window.onload = init;
+
+</script>
+</head>
+<body>
+
+<h2>Animating a Texture with Texture Transformation in WebGL</h2>
+
+<p id=message>Drag your mouse (or finger on a touchscreen) on the object to rotate it.</p>
+
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<div id="canvas-holder">
+   <canvas width=600 height=600 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+<div id="tools">
+<p><label><input type="checkbox" id="animCheckbox"> <b>Animate</b></label></p>
+<p><label><b>Texture Animation:</b><br> <select id="transform">
+    <option value="0">Translate X</option>
+    <option value="1">Translate Y</option>
+    <option value="2">Translate Both</option>
+    <option value="3">Scale X</option>
+    <option value="4">Scale Y</option>
+    <option value="5">Scale Both</option>
+    <option value="6">Rotate</option>
+    <option value="7">Rotate Centered</option>
+</select></label>
+<p><label><b>Object:</b><br> <select id="object">
+    <option value="0">Cube</option>
+    <option value="1">Sphere</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Torus</option>
+    <option value="5">Teapot</option>
+</select></label></p>
+<p><label><b>Texture:</b><br> <select id="texture">
+    <option value="0">Brick</option>
+    <option value="1">Earth</option>
+    <option value="2">Earth at Night</option>
+    <option value="3">Marble</option>
+    <option value="4">Metal</option>
+    <option value="5">Mandelbrot</option>
+</select></label></p>
+<p><button id="reset">Reset</button></p>
+</div>
+
+</body>
+</html>
+

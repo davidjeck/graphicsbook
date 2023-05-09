@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Using different materials on different faces</title>
+<style>
+</style>
+<script src="../script/three.min.js"></script>
+<script>
+
+
+"use strict";
+
+let scene, camera, renderer;  // Three.js rendering basics.
+
+let canvas;  // The canvas on which the image is rendered.
+
+let cube, pyramid;  // The two visible objects.
+
+let cubeWireframe, pyramidWireframe;  // Wireframe versions of the objects,
+                                      // which are only visible when
+                                      // "Show Edges" checkbox is checked.
+
+const material = new THREE.MeshLambertMaterial( { color: "white" });
+
+
+
+/*  Create the scene graph. 
+ *  The renderer has already been created before this function is called.
+ */
+function createWorld() {
+   renderer.setClearColor( 0x555555 );  // Set background color.
+   scene = new THREE.Scene();
+   
+   // create some lights and add them to the scene.
+   scene.add( new THREE.DirectionalLight( 0xffffff, 0.5 ) ); // dim light shining from above
+   var viewpointLight = new THREE.DirectionalLight( 0xffffff, 1 );  // a light to shine in the direction the camera faces
+   viewpointLight.position.set(0,0,1);  // shines down the z-axis
+   scene.add(viewpointLight);
+    
+   // create a camera, sitting on the positive z-axis.  The camera is not part of the scene.
+   camera = new THREE.PerspectiveCamera(20, canvas.width/canvas.height, 1, 30);
+   camera.position.z = 10;
+        
+     
+   /* Create the pyramid, starting with the geometry. */
+    
+   let pyramidVertices = new Float32Array([
+               // Data for the pyramidGeom position attribute.
+               // Contains the x,y,z coordinates for the vertices.
+               // Each group of three numbers is a vertex;
+               // each group of three vertices is one face.
+            -1,0,1,  -1,0,-1,  1,0,-1, // First triangle in the base.
+            -1,0,1,   1,0,-1,  1,0,1,  // Second triangle in the base.
+            -1,0,1,   1,0,1,   0,1,0,  
+             1,0,1,   1,0,-1,  0,1,0,
+             1,0,-1, -1,0,-1,  0,1,0,
+            -1,0,-1, -1,0,1,   0,1,0
+        ]);
+   let pyramidGeom = new THREE.BufferGeometry();
+   pyramidGeom.setAttribute("position",
+                new THREE.BufferAttribute(pyramidVertices,3) );
+   
+   pyramidGeom.computeVertexNormals(); // Normals are needed for Lambert materials.
+   
+   pyramidGeom.setAttribute(
+         "color",
+         new THREE.BufferAttribute(new Float32Array([
+                  1,1,1,  1,1,1, 1,1,1, // Base vertices are white
+                  1,1,1,  1,1,1, 1,1,1,
+                  1,0,0,  1,0,0, 1,0,0, // Front face vertices are red,
+                  0,1,0,  0,1,0, 0,1,0, // Right face vertices are green,
+                  0,0,1,  0,0,1, 0,0,1, // Back face vertices are blue,
+                  1,1,0,  1,1,0, 1,1,0  // Left face vertices are yellow.
+               ]), 3)
+      );
+
+   pyramid = new THREE.Mesh( 
+        pyramidGeom, 
+        new THREE.MeshLambertMaterial({
+              color: "white",
+              vertexColors: true
+         }) 
+      );
+   pyramid.rotation.set(0.2,-0.4,0);
+   
+   /* Create wireframe versions of the objects. */
+   
+     scene.add(pyramid);
+    
+} // end createWorld()
+
+
+/*  Render the scene.
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+
+
+
+//----------------------------- keyboard support ----------------------------------
+
+/*  Responds to user's key press.  Here, it is used to rotate the models.
+ */
+function doKey(event) {
+    let code = event.keyCode;
+    let rotated = true;
+    switch( code ) {
+        case 37:  pyramid.rotation.y -= 0.03;    break;    // left arrow
+        case 39:  pyramid.rotation.y += 0.03;    break;    // right arrow
+        case 38:   pyramid.rotation.x -= 0.03;    break;    // up arrow
+        case 40:   pyramid.rotation.x += 0.03;    break;    // down arrow
+        case 33:   pyramid.rotation.z -= 0.03;    break;    // page up
+        case 34:   pyramid.rotation.z += 0.03;    break;    // page down
+        case 36:  pyramid.rotation.set(0.2,-0.4,0); break;    // home
+        default: rotated = false;
+    }
+    if (rotated) {
+        event.preventDefault();  // Prevent keys from scrolling the page.
+        render();
+    }
+}
+
+
+
+//----------------------------------------------------------------------------------
+
+/**
+ *  This init() function is called when when the document has loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("glcanvas");
+        renderer = new THREE.WebGL1Renderer( {
+            canvas: canvas,
+            antialias: true
+        } );
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+                 "<h3><b>Sorry, WebGL is required but is not available.</b><h3>";
+        return;
+    }
+    document.addEventListener("keydown", doKey, false);
+    createWorld();
+    render();
+}
+
+window.onload = init;  // Arranges for init() to be called after page is loaded.
+
+</script>
+</head>
+<body>
+
+<h2>Three.js:  Using An Array of Materials</h2>
+
+<p><b>Use Arrow, PageUp, PageDown, and Home keys to rotate the models.</b></p>
+
+<p>
+   <label><input type="radio" name="material" id="white">White Material</label>
+   <label style ="margin-left:25px"><input type="radio" name="material" id="multi">Array of Colored Materials</label>
+   <label style ="margin-left:60px"><input type="checkbox" id="wireframe">Show Edges</label>
+</p>
+
+<div id="canvas-holder">
+<canvas id="glcanvas" width="600" height="300"></canvas>
+</div>
+
+</body>
+</html>

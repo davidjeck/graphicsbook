@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1><localref href="gl1geom"/> and <localref href="gl1light"/> introduced 3D graphics 
+using <word>OpenGL</word>&nbsp;1.1.  Most of the ideas covered in those chapters remain relevant to modern
+computer graphics, but there have been many changes and improvements since the early
+days of OpenGL.  In the remaining chapters, we will be using <word>WebGL</word>,
+a modern version of OpenGL that is used to create 3D graphics content for web pages.</p1>
+
+<p>WebGL is a low level language&mdash;even more so than OpenGL 1.1, since a WebGL program
+has to handle a lot of the low-level implementation details that were handled internally
+in the original version of OpenGL.  This makes WebGL much more flexible, but more difficult
+to use.  We will soon turn to working
+directly with WebGL.  However, before we do that, we will look
+at a higher-level <word>API</word> for 3D web graphics that is built on top of WegGL:  
+<i><newword>three.js</newword></i>.  There are several reasons for starting at this high level.
+It will allow you to see how some of the things that you have learned are used in
+a modern object-oriented graphics package.  It will allow me to introduce some new features such as
+shadows and environment mapping.  It will let you work with a graphics library that
+you might use in real web applications.
+And it will be a break from the low-level detail we have been dealing with, before
+we move on to an even lower level.</p>
+
+<p>You can probably follow much of the discussion in this chapter without knowing 
+JavaScript.  However, if you want to do any programming with <i>three.js</i> (or with 
+WebGL), you need to know JavaScript.  The basics of the language are covered in
+<localref href="proglang.3"/> in <localref href="proglang"/>.</p>
+
+</intro>

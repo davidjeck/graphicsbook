@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Basic Texturing in WebGL</title>
+<style>
+body {
+    background-color: lightblue;
+    -webkit-user-select: none; /* turning off text selection  / Webkit */
+    -moz-user-select: none;    /* Firefox */
+    -ms-user-select: none;     /* IE 10  */
+    -o-user-select: none;    /* Opera */
+    user-select: none;
+}
+canvas {
+    display: block;
+    background-color: black;
+}
+</style>
+    
+<!-- vertex shader used with fshader-texture, fshader-diff, and fshader-average -->
+<script type="x-shader/x-vertex" id="vshader">
+    attribute vec2 a_coords;  // coordinates on square, ranging from 0 to 1
+    varying vec2 v_coords;
+    void main() {
+        gl_Position = vec4( 2.0*a_coords - 1.0, 0, 1 ); 
+        v_coords = a_coords;
+    }
+</script>
+
+<script type="x-shader/x-vertex" id="vshader-draw">
+    attribute vec2 a_coords;  // coordinates on square, ranging from 0 to 1
+    attribute float a_color;  // grayscale value only
+    varying float v_color;
+    void main() {
+        gl_Position = vec4( 2.0*a_coords - 1.0, 0, 1 ); 
+        v_color = a_color;
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-draw">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying float v_color;
+    void main() {
+        gl_FragColor = vec4(v_color,v_color,v_color,1.0);
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-texture">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec2 v_coords;
+    uniform sampler2D texture;
+    void main() {
+        gl_FragColor = texture2D(texture, v_coords);
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-average">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec2 v_coords;
+    uniform sampler2D texture;
+    uniform float offsetX, offsetY;
+    void main() {
+        vec4 a = texture2D(texture, v_coords);
+        vec4 b = texture2D(texture, v_coords + vec2(offsetX,0));
+        vec4 c = texture2D(texture, v_coords + vec2(0,offsetX));
+        vec4 d = texture2D(texture, v_coords + vec2(offsetX,offsetY));
+        gl_FragColor = (a + b + c + d)/4.0;
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-diff">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec2 v_coords;
+    uniform sampler2D texture1, texture2;
+    uniform float offsetX, offsetY;
+    void main() {
+        vec4 a = texture2D(texture1, v_coords);
+        vec4 b = texture2D(texture2, v_coords);
+        gl_FragColor = abs(a - b);
+    }
+</script>
+
+<script>
+
+"use strict";
+
+var gl, gl2;  // The WebGL graphics context.
+
+var textureProg;  // An object holding info about the basic shader program for displaying a texture.
+var diffProg;     // An object holding info about the shader program for differencing two textures.
+var averageProg;  // An object holding info about the shader program for averaging the colors in a texture.
+var drawProg;     // An object holding info about the shader program for drawing primitives with color attribute.
+
+var texture = null;   // A texture object to hold an image that is being approximated, for drawing of orig.
+var texture2;  // A texture object holding the same image, for use in evaluating individuals.
+
+var EXTcbf;  // object representing the WEBGL_color_buffer_float extension.
+var EXTtf;   // object representing the OES_texture_float extension.
+
+var fb1, fb2;    // framebuffer objects
+var tex1, tex2;  // texture objects bound as color buffers to fb1, fb2
+
+var colorBuffer, coordsBuffer;
+
+var squaresBuffer;
+
+var TRIANGLES = 100;
+var POPULATION_SIZE = 100;  // MUST BD EVEN!
+
+var CROSSOVER_PROBABILITY = 1;
+var MUTATION_PROBABILITY = 0.9;
+
+var population, newPopulation;
+
+var avgColorOfOriginal = 0.5;
+
+var generation = 1;
+
+function drawOrig() {
+    if (texture) {
+        gl2.drawArrays(gl.TRIANGLE_FAN,0,4);
+    }
+}
+
+function createInitialPopulation() {
+    population = new Array(POPULATION_SIZE);
+    for (var j = 0; j < POPULATION_SIZE; j++) {
+        var ind = {};
+        ind.coords = new Float32Array( TRIANGLES*6 );
+        ind.colors = new Float32Array( TRIANGLES*3 );
+        var i;
+        for (i = 0; i < TRIANGLES*6; i++) {
+            ind.coords[i] = Math.random()*1.2 - 0.1;
+        }
+        for (i = 0; i < TRIANGLES*3; i++) {
+            ind.colors[i] = Math.random();
+        }
+        population[j] = ind;
+    }
+}
+
+function individualValue(individual) {
+    draw(individual, fb1);
+    doDiff();
+    return 1 - getAverageColor(fb2,fb1);
+}
+
+function draw(individual, framebuffer) { 
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.useProgram(drawProg.prog);
+//    gl.clearColor(avgColorOfOriginal,avgColorOfOriginal,avgColorOfOriginal,1);
+    gl.clearColor(1,1,1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindBuffer(gl.ARRAY_BUFFER, coordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, individual.coords, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(drawProg.a_coords);
+    gl.vertexAttribPointer(drawProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, individual.colors, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(drawProg.a_color);
+    gl.vertexAttribPointer(drawProg.a_color, 1, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, TRIANGLES);
+    gl.disableVertexAttribArray(drawProg.a_coords);
+    gl.disableVertexAttribArray(drawProg.a_color);
+}
+
+function getAverageColor(src, dest) {
+        // get avg color value (assuming grayscale) in framebuffer src,
+        // with dest as 2nd framebuffer. Data in both color buffers is changed.
+    gl.useProgram(averageProg.prog);
+    var size = 0.5;
+    gl.uniform1i(averageProg.u_texture,1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.enableVertexAttribArray(averageProg.a_coords);
+    gl.vertexAttribPointer(averageProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+    for (var level = 1; level < 7; level++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dest);
+        if (src == fb1) {
+            gl.bindTexture(gl.TEXTURE_2D, tex1);
+        }
+        else {
+            gl.bindTexture(gl.TEXTURE_2D, tex2);
+        }
+        gl.uniform1f(averageProg.u_offsetX, size);
+        gl.uniform1f(averageProg.u_offsetY, size);
+        gl.drawArrays(gl.TRIANGLE_FAN, level*4, 4);
+        var temp = src;
+        src = dest;
+        dest = temp;
+        size /= 2;
+    }
+    gl.disableVertexAttribArray(averageProg.a_coords);
+
+    var data = new Float32Array( 4*4*4 );
+    gl.readPixels(0,0,4,4,gl.RGBA,gl.FLOAT,data);
+    var sum = 0;
+    for (var i = 0; i < data.length; i += 4) {
+        sum += data[i];
+    }
+    return sum/16;
+}
+
+function doDiff() {
+    gl.useProgram(diffProg.prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb2);
+    gl.bindBuffer(gl.ARRAY_BUFFER, squaresBuffer);
+    gl.enableVertexAttribArray(diffProg.a_coords);
+    gl.vertexAttribPointer(diffProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, texture2);
+    gl.uniform1i(diffProg.u_texture1, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D,tex1);
+    gl.uniform1i(diffProg.u_texture2, 2);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    gl.disableVertexAttribArray(diffProg.a_coords);
+}
+
+function findAvgColorOfOriginal() {
+    gl.useProgram(diffProg.prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb1);
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    doDiff();
+    avgColorOfOriginal = getAverageColor(fb2,fb1);
+    //console.log(avgColorOfOriginal)
+}
+
+function doFitness() {
+    var max = 0;
+    var maxLoc;
+    var sum = 0;
+    for (var i = 0; i < POPULATION_SIZE; i++) {
+         population[i].fitness = individualValue(population[i]);
+         sum += population[i].fitness;
+    }
+    population.sort( function(a,b) { return (b.fitness > a.fitness)? 1 : -1; } );
+    document.getElementById("message").innerHTML = "Generation " +
+               generation + ", maximum fitness = " + population[0].fitness.toFixed(4) +
+               ", average fitness = " + (sum/POPULATION_SIZE).toFixed(4);
+    draw(population[0],null);
+    generation++;
+}
+
+function evolve() {
+    // make new population
+    var start = new Date().getTime();
+    var i,j,k,tmp;
+    var half = POPULATION_SIZE/2;
+    for (i = 0; i < half; i++) {
+        population[i+half] = {
+            coords: new Float32Array(population[i].coords),
+            colors: new Float32Array(population[i].colors)
+        }
+    }
+    var indices = new Uint32Array(POPULATION_SIZE);
+    for (i = 0; i < indices.length; i++) {
+        indices[i] = i;
+    }
+    var top = indices.length;
+    while (top > 0) {
+        var i = Math.floor(top*Math.random());
+        do {
+            var j = Math.floor(top*Math.random());
+        } while (i == j);
+        var a = indices[i];
+        var b = indices[j];
+       // console.log("crossover " + a + " " + b + " " + i + " " + j);
+        indices[i] = indices[top-1];
+        indices[j] = indices[top-2];
+        top -= 2;
+        if (Math.random() > CROSSOVER_PROBABILITY) {
+            continue;
+        }
+        a = population[a];
+        b = population[b];
+        // do crossover by interleaving triangles from two individuals
+        for (j = 0; j < TRIANGLES; j++) {
+            for (k = 3*j; k < 3*j+3; k++) {
+                tmp = a.colors[k];
+                a.colors[k] = b.colors[k];
+                b.colors[k] = tmp
+            }
+            for (k = 6*j; k < 6*j+6; k++) {
+                tmp = a.coords[k];
+                a.coords[k] = b.coords[k];
+                b.coords[k] = tmp
+            }
+            tmp = a;
+            a = b;
+            b = tmp;
+        }
+    }
+    for (i = 0; i < POPULATION_SIZE; i++) {
+        var ct = 0;
+        while (ct < 100 && Math.random() < MUTATION_PROBABILITY) {
+            ct++;
+            if (Math.random() < 0.33) { // transposition
+                var x = Math.floor(TRIANGLES*Math.random());
+                var y = Math.floor(TRIANGLES*Math.random());
+                for (j = 0; j < 3; j++) {
+                   var t = population[i].colors[3*x+j];
+                   population[i].colors[3*x+j] = population[i].colors[3*y+j];
+                   population[i].colors[3*y+j] = t;
+                }
+                for (j = 0; j < 6; j++) {
+                   var t = population[i].coords[6*x+j];
+                   population[i].coords[6*x+j] = population[i].coords[6*y+j];
+                   population[i].coords[6*y+j] = t;
+                }
+            }
+            if (Math.random() < 0.5) {
+                j = Math.floor( Math.random()*population[i].coords.length);
+                population[i].coords[j] = 1.2*Math.random() - 0.1;
+            }
+            else {
+                j = Math.floor( Math.random()*population[i].colors.length);
+                population[i].colors[j] = Math.random();
+            }
+        }
+    }
+    doFitness();
+    var time = (new Date().getTime()) - start;
+    console.log("compute time: " + time);
+    setTimeout(evolve, 100);
+}
+
+
+/**
+ *  Loads a texture image asynchronously.  The first paramter is the url
+ *  from which the image is to be loaded.  The second parameter is the
+ *  texture object into which the image is to be loaded.  When the image
+ *  has finished loading, the callback function will be called.  (Also,
+ *  if an error occurs during loading, an error message is displayed on
+ *  the page, and the callback function is not called.)
+ */
+function loadTexture( url ) {
+    document.getElementById("message").innerHTML = "Loading initial image from " + url;
+    var img = new Image();  //  A DOM image element to represent the image.
+    img.onload = function() { 
+        gl2.bindTexture(gl2.TEXTURE_2D, texture);
+        try {
+           gl2.texImage2D(gl2.TEXTURE_2D,0,gl2.LUMINANCE,gl2.LUMINANCE,gl2.UNSIGNED_BYTE,img);
+        }
+        catch (e) {
+            document.getElementById("message").innerHTML =
+                 "Error while trying to load texture.</br>" +
+                 " Note that some browsers can't load textures from the local disk.";
+            return;
+        }
+        gl2.generateMipmap(gl2.TEXTURE_2D); // Create mipmaps; you must either
+                                            // do this or change the minification filter.
+        drawOrig();
+        gl.bindTexture(gl.TEXTURE_2D, texture2);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.LUMINANCE,gl.LUMINANCE,gl.UNSIGNED_BYTE,img);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        findAvgColorOfOriginal();
+        document.getElementById("message").innerHTML = "Image Loaded.  Ready to start.";
+        doFitness();
+        setTimeout(evolve, 100);
+    }
+    img.onerror = function(e,f) { 
+        // This function will be called if an error occurs while loading.
+        document.getElementById("message").innerHTML =
+                        "Sorry, texture image could not be loaded.";
+    }
+    img.src = url;  // Start loading of the image.
+                    // This must be done after setting onload and onerror.
+}
+
+/* Creates a shader program for use in the WebGL context gl, and returns the
+ * identifier for that program. 
+ *    The second and third parameters are the id attributes for the script
+ * elements that contain the source code for the vertex and fragment shaders.
+ */
+function createProgram(gl, vertexShaderID, fragmentShaderID) {
+    function getTextContent( elementID ) { // Get text content of an HTML element.
+        var element = document.getElementById(elementID);
+        var node = element.firstChild;
+        var str = "";
+        while (node) {
+            if (node.nodeType == 3) // this is a text node
+                str += node.textContent;
+            node = node.nextSibling;
+        }
+        return str;
+    }
+    try {
+        var vertexShaderSource = getTextContent( vertexShaderID );
+        var fragmentShaderSource = getTextContent( fragmentShaderID );
+    }
+    catch (e) {
+        throw "Error: Could not get shader source code from script elements " +
+                   vertexShaderID + " and " + fragmentShaderID + ": " + e;
+    }
+    var vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vertexShaderSource);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw "Error in vertex shader with id=" + vertexShaderID +" :  " + gl.getShaderInfoLog(vsh);
+     }
+    var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw "Error in fragment shader with id=" + fragmentShaderID + ":  " + gl.getShaderInfoLog(fsh);
+    }
+    var prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+    }
+    return prog;
+}
+
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    EXTcbf = gl.getExtension("WEBGL_color_buffer_float");
+    EXTtf = gl.getExtension("OES_texture_float"); // Should be available if EXTcbf is.
+    if (!EXTcbf || !EXTtf) {
+        throw "This programs requires WebGL extensions that are not available in this browser.";
+    }
+
+    gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1 );    
+    gl2.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1 );    
+    
+    textureProg = {};
+    textureProg.prog = createProgram( gl2, "vshader", "fshader-texture" );
+    textureProg.a_coords = gl2.getAttribLocation(textureProg.prog, "a_coords");
+    textureProg.u_texture = gl2.getUniformLocation(textureProg.prog, "u_texture");
+    gl2.useProgram(textureProg.prog);
+    var buffer = gl2.createBuffer();
+    gl2.bindBuffer(gl2.ARRAY_BUFFER, buffer);
+    gl2.bufferData(gl2.ARRAY_BUFFER, new Float32Array([0,0,1,0,1,1,0,1]), gl2.STATIC_DRAW);
+    gl2.enableVertexAttribArray(textureProg.a_coords);
+    gl2.vertexAttribPointer(textureProg.a_coords, 2, gl.FLOAT, false, 0, 0);
+    gl2.activeTexture(gl.TEXTURE0);
+    gl2.uniform1i(textureProg.u_texture, 0);
+    texture = gl2.createTexture();
+    
+    drawProg = {};
+    drawProg.prog = createProgram( gl, "vshader-draw", "fshader-draw");
+    drawProg.a_coords = gl.getAttribLocation(drawProg.prog, "a_coords");
+    drawProg.a_color = gl.getAttribLocation(drawProg.prog, "a_color");
+    
+    averageProg = {};
+    averageProg.prog = createProgram( gl, "vshader", "fshader-average" );
+    averageProg.a_coords = gl.getAttribLocation(averageProg.prog, "a_coords");
+    averageProg.u_texture = gl.getUniformLocation(averageProg.prog, "texture");
+    averageProg.u_offsetX = gl.getUniformLocation(averageProg.prog, "offsetX");
+    averageProg.u_offsetY = gl.getUniformLocation(averageProg.prog, "offsetY");
+    
+    diffProg = {};
+    diffProg.prog = createProgram( gl, "vshader", "fshader-diff");
+    diffProg.a_coords = gl.getAttribLocation(diffProg.prog, "a_coords");
+    diffProg.u_texture1 = gl.getUniformLocation(diffProg.prog, "texture1");
+    diffProg.u_texture2 = gl.getUniformLocation(diffProg.prog, "texture2");
+    
+    texture2 = gl.createTexture();
+   
+    var coords = new Float32Array( 7*4*2 );  // Used with averageProg, and for drawing texture with diffProg.
+                                             // Holds vertices for 6 squares, each half the size of the previous.
+    var size = 1;
+    var j = 0;
+    for (var level = 0; level < 7; level++) {
+        coords[j++] = 0;     // first vertex
+        coords[j++] = 0;
+        coords[j++] = size;  // second vertex
+        coords[j++] = 0;
+        coords[j++] = size;  // third vertex
+        coords[j++] = size;
+        coords[j++] = 0;     // fourth vertex
+        coords[j++] = size;
+        size /= 2;
+     }
+     
+    squaresBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, squaresBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+
+    coordsBuffer = gl.createBuffer();
+    colorBuffer = gl.createBuffer();
+    
+    tex1 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.FLOAT, null);
+         //With null as the last parameter, the previous method allocates memory for the texture and fills it with zeros.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    fb1 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fb1);  // select the framebuffer, so we can attach the texture to it
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex1, 0);
+
+    tex2 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex2);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.FLOAT, null);
+         //With null as the last parameter, the previous method allocates memory for the texture and fills it with zeros.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    fb2 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fb2);  // select the framebuffer, so we can attach the texture to it
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex2, 0);
+}
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        var options = {  
+            alpha: false,
+            depth: false
+        };
+        var canvas = document.getElementById("c2");
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        canvas = document.getElementById("c1");
+        gl2 = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl || ! gl2 ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "Sorry, could not get a WebGL graphics context.";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "Sorry, could not initialize the WebGL graphics context:" + e;
+        return;
+    }
+    createInitialPopulation();
+    loadTexture("image/shape-for-ga.gif");
+}
+
+</script>
+</head>
+<body onload="init()" style="background-color: lightGray">
+
+<h2 id="headline">WebGL Genetic Algorithm: Evolving an Image</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<p id="message">Initializing</p>
+
+<table border=0 cellpadding=0 cellspacing=10>
+<tr>
+   <td><p>Original Image:</p><canvas id="c1" width="256" height="256"></canvas></td>
+   <td><p>Best Approximation So Far:</p><canvas id="c2" width="256" height="256"></canvas></td>
+</tr>
+</div>
+
+</body>
+</html>

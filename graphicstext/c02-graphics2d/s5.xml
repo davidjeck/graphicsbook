@@ -1,0 +1,667 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Java Graphics2D" id="graphics2d.5">
+
+<p1>In the rest of this chapter, we look at specific implementations
+of two-dimensional graphics.  There are a few new ideas here,
+but mostly you will see how the general concepts that we have covered are used in several
+real graphics systems.</p1>
+
+<p>In this section, our focus is on the Java programming language.
+Java remains one of the most popular programming languages.  Its
+standard desktop version includes a sophisticated 2D graphics API,
+which is our topic here.  Before reading this section, you should
+already know the basics of Java programming. But even if you don't,
+you should be able to follow most of the discussion of the
+graphics API itself.  (See <localref href="proglang.1"/> in <localref href="proglang"/> for a very basic
+introduction to Java.)</p>
+
+<p>The graphics <word>API</word> that is discussed here is part of Swing, an API for
+graphical user interface programming that is included as part of the standard distribution
+of Java.  Many Java programs are now written using an alternative API called JavaFX,
+which is not part of the standard distribution.  JavaFX is not discussed in this
+textbook.  Its graphics API is, in fact, quite similar to the API for 
+HTML canvas graphics, which is discussed in <localref href="graphics2d.6"/>.</p>
+
+<p>The original version of Java had a much smaller graphics API.  It was
+tightly focused on pixels, and it used only integer coordinates.  The API
+had subroutines for stroking and filling a variety of basic shapes,
+including lines, rectangles, ovals, and polygons (although Java uses the
+term <i>draw</i> instead of <i>stroke</i>).  Its specification
+of the meaning of drawing operations was very precise on the pixel
+level.  Integer coordinates are defined to refer to the lines
+between pixels.  For example, a 12-by-8 pixel grid has
+<i>x</i>-coordinates from 0 to 12 and <i>y</i>-coordinates from
+0 to 8, as shown below.  The lines between pixels are numbered,
+not the pixels.</p>
+
+<img src="Java-pixel-graphics.png" width="448" height="145" tex="Java-pixel-graphics.eps" texscale="0.75"/>
+
+<np>The command <i>fillRect</i>(3,2,5,3)
+fills the rectangle with upper left corner at (3,2), with
+width 5, and with height 3, as shown on the left above.  The command
+<i>drawRect</i>(3,2,5,3) conceptually drags a "pen" around the outline
+of this rectangle.  However, the pen is a 1-pixel square, and it is the
+upper left corner of the pen that moves along the outline.  As the pen
+moves along the right edge of the rectangle, the pixels to the <i>right</i>
+of that edge are colored; as the pen moves along the bottom edge, the
+pixels below the edge are colored.  The result is as shown on the right above.
+My point here is not to belabor the details, but to point out that having
+a precise specification of the meaning of graphical operations gives you very
+fine control over what happens on the pixel level.</np>
+
+<p>Java's original graphics did not support things like real-number coordinates, 
+<word term="geometric transform">transforms</word>, <word>antialiasing</word>, or 
+<word term="gradient">gradients</word>.  Just a few years after Java was first introduced,
+a new graphics API was added that does support all of these.  It is that
+more advanced API that we will look at here.</p>
+
+<subsection title="Graphics2D" id="graphics2d.5.1">
+
+<p>Java is an object-oriented language.  Its API is defined as a large set
+of classes,   The actual drawing operations in the original graphics API
+were mostly contained in the class named <classname>Graphics</classname>.  
+In the newer Swing API, drawing operations are methods in a class named <classname>Graphics2D</classname>,
+which is a subclass of <classname>Graphics</classname>, so that all the original drawing operations
+are still available.  (A class in Java is contained in a collection of classes known as a "package."
+<classname>Graphics</classname> and <classname>Graphics2D</classname>, for example, are in the
+package named <i>java.awt</i>.  Classes that define shapes and transforms are in a package
+named <i>java.awt.geom</i>.)</p>
+
+<p>A graphics system needs a place to draw.  In Java, the drawing surface is often an object
+of the class <classname>JPanel</classname>, which represents a rectangular area on the
+screen.  The <classname>JPanel</classname> class has a method named <i>paintComponent</i>()
+to draw its content.  To create a drawing surface, you can create a subclass of
+<classname>JPanel</classname> and provide a definition for its <i>paintComponent</i>()
+method.  All drawing should be done inside <i>paintComponent</i>(); when it is necessary
+to change the contents of the drawing, you can call the panel's <i>repaint</i>() method
+to trigger a call to <i>paintComponent</i>().  The <i>paintComponent</i>() method has
+a parameter of type <classname>Graphics</classname>, but the parameter that is passed
+to the method is actually an object of type <classname>Graphics2D</classname>, and
+it can be type-cast to <classname>Graphics2D</classname> to obtain access to the
+more advanced graphics capabilities.  So, the definition of the <i>paintComponent</i>()
+method usually looks something like this:</p>
+
+<pre>protected void paintComponent( Graphics g ) {
+    Graphics2D g2;
+    g2 = (Graphics2D)g;  // Type-cast the parameter to Graphics2D.
+       .
+       .  // Draw using g2.
+       .
+}</pre>
+
+<np>In the rest of this section, I will assume that <i>g2</i> is a variable of
+type <classname>Graphics2D</classname>, and I will discuss some of the things
+that you can do with it.  As a first example, I note that <classname>Graphics2D</classname>
+supports <word>antialiasing</word>, but it is not turned on by default.  It
+can be enabled in a graphics context <i>g2</i> with the rather intimidating
+command</np>
+
+<pre>g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                             RenderingHints.VALUE_ANTIALIAS_ON);</pre>
+
+<p>For simple examples of graphics in complete Java programs,
+you can look at the sample programs <sourceref href="java2d/GraphicsStarter.java"/>
+and <sourceref href="java2d/AnimationStarter.java"/>.  They provide very minimal
+frameworks for drawing static and animated images, respectively, using <classname>Graphics2D</classname>.
+The program <sourceref href="java2d/EventsStarter.java"/> is a similar framework for
+working with mouse and key events in a graphics program.
+You can use these programs as the basis for some experimentation if you want to explore
+Java graphics.</p>
+
+</subsection>
+
+
+<subsection title="Shapes" id="graphics2d.5.2">
+
+<p>Drawing with the original <classname>Graphics</classname> class is done using integer coordinates, 
+with the measurement given in pixels. This works well in the standard coordinate system, but is
+not appropriate when real-number coordinates are used, since the unit of measure in such a 
+coordinate system will not be equal to a pixel.  We need to be able to specify shapes using
+real numbers.  The Java package <i>java.awt.geom</i> provides support for shapes defined using real number 
+coordinates.  For example, the class <classname>Line2D</classname> in that package represents line segments
+whose endpoints are given as pairs of real numbers.</p>
+
+<p>Now, Java has two real number types: <ptype>double</ptype> and <ptype>float</ptype>.
+The <ptype>double</ptype> type can represent a larger range of numbers than <ptype>float</ptype>, with a greater
+number of significant digits, and <ptype>double</ptype> is the
+more commonly used type.  In fact, <ptype>doubles</ptype> are simply easier to use in Java.
+However, <ptype>float</ptype>  values generally have enough accuracy
+for graphics applications, and they have the advantage of taking up less space in memory.
+Furthermore, computer graphics hardware often uses float values internally.</p>
+
+<p>So, given
+these considerations, the <i>java.awt.geom</i> package actually provides
+two versions of each shape, one using coordinates of type <ptype>float</ptype> and
+one using coordinates of type <ptype>double</ptype>.  This is done in a rather strange way.
+Taking <classname>Line2D</classname> as an example, the class <classname>Line2D</classname>
+itself is an <word>abstract class</word>.  It has two subclasses, one that represents lines using
+<ptype>float</ptype> coordinates and one using <ptype>double</ptype> coordinates.
+The strangest part is that these subclasses are defined as nested classes
+inside <classname>Line2D</classname>: <classname>Line2D.Float</classname> and
+<classname>Line2D.Double</classname>.  This means that you can declare a variable of
+type <classname>Line2D</classname>, but to create an object, you need to use
+<classname>Line2D.Double</classname> or <classname>Line2D.Float</classname>:
+</p>
+
+<pre>Line2D line1, line2;
+line1 = new Line2D.Double(1,2,5,7); // Line from (1.0,2.0) to (5.0,7.0)
+line2 = new Line2D.Float(2.7F,3.1F,1.5F,7.1F); // (2.7,3.1) to (1.5,7.1)</pre>
+
+<np>Note that when using constants of type <ptype>float</ptype> in Java,
+you have to add "F" as a suffix to the value.  This is one reason why <ptype>doubles</ptype>
+are easier in Java.  For simplicity, you might want to stick to using
+<classname>Line2D.Double</classname>.  However, <classname>Line2D.Float</classname> might give
+slightly better performance.</np>
+
+<break/>
+
+<p>Let's take a look at some of the other classes from <i>java.awt.geom</i>.
+The abstract class <classname>Point2D</classname>&mdash;with its concrete subclasses 
+<classname>Point2D.Double</classname> and <classname>Point2D.Float</classname>&mdash;represents
+a point in two dimensions, specified by two real number coordinates.  A point is not a
+shape; you can't fill or stroke it.  A point can be
+constructed from two real numbers ("<code>new Point2D.Double(1.2,3.7)</code>").  If <i>p</i>
+is a variable of type <classname>Point2D</classname>, you can use <i>p.getX</i>() and
+<i>p.getY</i>() to retrieve its coordinates, and you can use <i>p.setX</i>(<i>x</i>),
+<i>p.setY</i>(<i>y</i>), or <i>p.setLocation</i>(<i>x</i>,<i>y</i>) to set its coordinates.
+If <i>pd</i> is a variable of type <classname>Point2D.Double</classname>, you can also refer
+directly to the coordinates as <i>pd.x</i> and <i>pd.y</i>
+(and similarly for <classname>Point2D.Float</classname>).
+Other classes in <i>java.awt.geom</i> offer a similar variety of ways
+to manipulate their properties, and I won't try to list them all here.
+</p>
+
+<p>There is a variety of classes that represent geometric shapes, including  <classname>Line2D</classname>,
+<classname>Rectangle2D</classname>, <classname>RoundRectangle2D</classname>,
+<classname>Ellipse2D</classname>, <classname>Arc2D</classname>,
+and <classname>Path2D</classname>.
+All of these are abstract classes, and each of them contains a pair of subclasses such as
+<classname>Rectangle2D.Double</classname> and <classname>Rectangle2D.Float</classname>.
+Some shapes, such as rectangles, have
+interiors that can be filled; such shapes also have
+outlines that can be stroked.  Some shapes, such as lines, are purely one-dimensional
+and can only be stroked.</p>
+
+<p>Aside from lines, rectangles are probably the simplest shapes.  A <classname>Rectangle2D</classname>
+has a corner point (<i>x</i>,<i>y</i>), a <i>width</i>, and a <i>height</i>, and
+can be constructed from that data ("<code>new&nbsp;Rectangle2D.Double(x,y,w,h)</code>").  The corner point
+(<i>x</i>,<i>y</i>) specifies the minimum <i>x</i>- and <i>y</i>-values in the rectangle.
+For the usual pixel coordinate
+system, (<i>x</i>,<i>y</i>) is the upper left corner.  However, in a coordinate system in which the
+minimum value of <i>y</i> is at the bottom, (<i>x</i>,<i>y</i>) would be the lower left corner.
+The sides of the rectangle are parallel to the coordinate axes.  A variable
+<i>r</i> of type <classname>Rectangle2D.Double</classname>
+has public instance variables <i>r.x</i>, <i>r.y</i>, <i>r.width</i>, and <i>r.height</i>.
+If the width or the height is less than or equal to zero, nothing will be drawn when the rectangle
+is filled or stroked.   A common task is to define a rectangle from two corner points (<i>x1</i>,<i>y1</i>)
+and (<i>x2</i>,<i>y2</i>).  This can be accomplished by creating a rectangle with height and width
+equal to zero and then <i>adding</i> the second point to the rectangle.
+Adding a point to a rectangle causes the rectangle to grow just enough to include that point:
+</p>
+
+<pre>Rectangle2D.Double r = new Rectangle2D.Double(x1,y1,0,0);
+r.add(x2,y2);</pre>
+
+
+<p>The classes <classname>Line2D</classname>,
+<classname>Ellipse2D</classname>, <classname>RoundRectangle2D</classname>
+and <classname>Arc2D</classname> create other basic shapes and work similarly
+to <classname>Rectangle2D</classname>.  You can check the Java API documentation for details.</p>
+
+<p>The <classname>Path2D</classname> class is more interesting. It represents general
+paths made up of segments that can be lines and <word term="Bezier curve">Bezier curves</word>.
+Paths are created using methods similar to the <i>moveTo</i> and <i>lineTo</i>
+subroutines that were discussed in <localref href="graphics2d.2.3"/>.  To create a
+path, you start by constructing an object of type <classname>Path2D.Double</classname>
+(or <classname>Path2D.Float</classname>):</p>
+
+<pre>Path2D.Double p = new Path2D.Double();</pre>
+
+<np>The path <i>p</i> is empty when it is first created.
+You construct the path by moving an imaginary "pen" along the path that you want to create.
+The method <i>p.moveTo</i>(<i>x</i>,<i>y</i>) moves the pen to the point (<i>x</i>,<i>y</i>) without
+drawing anything.  It is used to specify the initial point of the path or
+the starting point of a new piece of the path.
+The method <i>p.lineTo</i>(<i>x</i>,<i>y</i>) draws a line
+from the current pen position to (<i>x</i>,<i>y</i>), leaving the pen at (<i>x</i>,<i>y</i>).
+The method <i>p.close</i>() can be used to close the path (or the current piece of the path) 
+by drawing a line back to its starting point.
+For example, the following code creates a triangle with vertices at (0,5), (2,-3), and (-4,1):
+</np>
+
+<pre>Path2D.Double p = new Path2D.Double();
+p.moveTo(0,5);
+p.lineTo(2,-3);
+p.lineTo(-4,1);
+p.close();
+</pre>
+
+<p>You can also add Bezier curve segments to a <classname>Path2D</classname>.  
+Bezier curves were discussed in <localref href="graphics2d.2.3"/>.   You can
+add a cubic Bezier curve to a <classname>Path2D</classname> <i>p</i> with the method
+</p>
+
+<pre>p.curveTo( cx1, cy1, cx2, cy2, x, y );</pre>
+
+<np>This adds a curve segment that starts at the current pen position and ends at
+(<i>x</i>,<i>y</i>), using (<i>cx1</i>,<i>cy1</i>) and (<i>cx2</i>,<i>cy2</i>) as
+the two <word term="control point">control points</word> for the curve.  The
+method for adding a quadratic Bezier curve segment to a path is <i>quadTo</i>.
+It requires only a single control point:</np>
+
+<pre>p.quadTo( cx, cy, x, y );</pre>
+
+<p>When a path intersects itself, its interior is determined by looking at
+the <word>winding number</word>, as discussed in <localref href="graphics2d.2.2"/>.
+There are two possible rules for determining whether a point is interior:
+asking whether the winding number of the curve about that point is non-zero, 
+or asking whether it is odd.  You can set the winding rule used by a <classname>Path2D</classname>
+<i>p</i> with</p>
+
+<pre>p.setWindingRule( Path2D.WIND_NON_ZERO );
+p.setWindingrule( Path2D.WIND_EVEN_ODD );</pre>
+
+<np>The default is <code>WIND_NON_ZERO</code>.</np>
+
+<p>Finally, I will note that it is possible to draw a copy of an image into a graphics context.
+The image could be loaded from a file or created by the program.  I discuss the second possibility
+later in this section.  An image is represented by an object of type <classname>Image</classname>.
+In fact, I will assume here that the object is of type <classname>BufferedImage</classname>,
+which is a subclass of <classname>Image</classname>.  If <i>img</i> is such an object, then</p>
+
+<pre>g2.drawImage( img, x, y, null );</pre>
+
+<np>will draw the image with its upper left corner at the point (<i>x</i>,<i>y</i>).  (The fourth
+parameter is hard to explain, but it should be specified as <i>null</i> for <classname>BufferedImages</classname>.)  
+This draws the image
+at its natural width and height, but a different width and height can be specified in the method:</np>
+
+<pre>g2.drawImage( img, x, y, width, height, null );</pre>
+
+<np>There is also a method for drawing a string of text.  The method specifies the
+string and the basepoint of the string.  (The basepoint is the lower left corner of
+the string, ignoring "descenders" like the tail on the letter "g".)  For example,</np>
+
+<pre>g2.drawString( "Hello World", 100, 50 );</pre>
+
+<np>Images and strings are subject to transforms in the same way as other shapes. Transforms
+are the only way to get rotated text and images.  As an example, here is what can happen
+when you apply a rotation to some text and an image:</np>
+
+<img src="RotatedStringAndImage.jpg" width="408" height="210" tex="RotatedStringAndImage.eps" texscale="0.75" bordered="true"/>
+
+
+</subsection>
+
+
+
+<subsection title="Stroke and Fill" id="graphics2d.5.3">
+
+<p>Once you have an object that represents a shape, you can fill the shape or stroke it.
+The <classname>Graphics2D</classname> class defines methods for doing this.
+The method for stroking a shape is called <i>draw</i>:</p>
+
+<pre>g2.fill(shape);
+g2.draw(shape);</pre>
+
+<np>Here, <i>g2</i> is of type <classname>Graphics2D</classname>, and
+shape can be of type <classname>Path2D</classname>, <classname>Line2D</classname>,
+<classname>Rectangle2D</classname> or any of the other shape classes.  These are
+often used on a newly created object, when that object represents a shape that
+will only be drawn once.  For example</np>
+
+<pre>g2.draw( new Line2D.Double( -5, -5, 5, 5 ) );</pre>
+
+<np>Of course, it is also possible to create shape objects and reuse them many
+times.</np>
+
+<p>The "pen" that is used for stroking a shape is usually represented by an
+object of type <classname>BasicStroke</classname>.  The default stroke has line
+width equal to&nbsp;1.  That's one unit in the current coordinate system, not
+one pixel.  To get a line with a different width, you can install a new stroke
+with</p>
+
+<pre>g2.setStroke( new BasicStroke(width) );</pre>
+
+<np>The <i>width</i> in the constructor is of type <ptype>float</ptype>.  It is possible to
+add parameters to the constructor to control the shape of a stroke at its endpoints and
+where two segments meet.  (See <localref href="graphics2d.2.1"/>.)  For example,</np>
+
+<pre>g2.setStroke( new BasicStroke( 5.0F,
+           BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL) );</pre>
+           
+<np>It is also possible to make strokes out of dashes and dots, but I won't discuss how
+to do it here.</np>
+
+<break/>
+
+<p>Stroking or filling a shape means setting the colors of certain pixels.  In Java, the rule
+that is used for coloring those pixels is called a "paint."  Paints can be solid colors,
+<word term="gradient">gradients</word>, or <word term="pattern fill">patterns</word>.
+Like most things in Java, paints are represented by objects.  If <i>paint</i> is
+such an object, then</p>
+
+<pre>g2.setPaint(paint);</pre>
+
+<np>will set <i>paint</i> to be used in the graphics context <i>g2</i> for subsequent
+drawing operations, until the next time the paint is changed.  (There is also an
+older method, <i>g2.setColor</i>(<i>c</i>), that works only for colors and is
+equivalent to calling <i>g2.setPaint</i>(<i>c</i>).)</np>
+
+<p>Solid colors are represented by objects of type <classname>Color</classname>.  A color
+is represented internally as an <word>RGBA color</word>. An opaque color, with maximal
+alpha component, can be created using the constructor</p>
+
+<pre>new Color( r, g, b );</pre>
+
+<np>where <i>r</i>, <i>g</i>, and <i>b</i> are integers in the range 0 to 255 that give
+the red, green, and blue components of the color.  To get a translucent color, you can
+add an alpha component, also in the range 0 to 255:</np>
+
+<pre>new Color( r, b, g, a );</pre>
+
+<np>There is also a function, <i>Color.getHSBColor</i>(<i>h,s,b</i>), that creates a color
+from values in the HSB color model (which is another name for <word term="HSV color">HSV</word>).
+In this case, the hue, saturation, and brightness color components must be given as values of
+type <ptype>float</ptype>.  And there are constants to represent about a dozen common
+colors, such as <i>Color.WHITE</i>, <i>Color.RED</i>, and <i>Color.YELLOW</i>.
+For example, here is how I might draw a square with a black outline and a light
+blue interior:</np>
+
+<pre>Rectangle2D square = new Rectangle2D.Double(-2,-2,4,4);
+g2.setPaint( new Color(200,200,255) );
+g2.fill( square );
+g2.setStroke( new BasicStroke(0.1F) );
+g2.setPaint( Color.BLACK );
+g2.draw( square );
+</pre>
+
+<p>Beyond solid colors, Java has the class <classname>GradientPaint</classname>, to represent
+simple <word term="linear gradient">linear gradients</word>, and <classname>TexturePaint</classname>
+to represent to represent <word term="pattern fill">pattern fills</word>.  (Image patterns
+used in a similar way in 3D graphics are called <word term="texture">textures</word>.)
+Gradients and patterns were discussed in <localref href="graphics2d.2.2"/>.
+For these paints, the color that is applied to a pixel depends on the coordinates of the
+pixel.</p>
+
+<p>To create a <classname>TexturePaint</classname>, you need a <classname>BufferedImage</classname>
+object to specify the image that it will use as a pattern.  You also
+have to say how coordinates in the image will map
+to drawing coordinates in the display.  You do this by specifying a rectangle in
+that will hold one copy of the image.  So the constructor takes the form:</p>
+
+<pre>new TexturePaint( image, rect );</pre>
+
+<np>where <i>image</i> is the <classname>BufferedImage</classname> and <i>rect</i> 
+is a <classname>Rectangle2D</classname>.  Outside that specified rectangle, the image is
+repeated horizontally and vertically. The constructor for a <classname>GradientPaint</classname> 
+takes the form</np>
+
+<pre>new GradientPaint( x1, y1, color1, x2, y2, color2, cyclic )</pre>
+
+<np>Here, <i>x1</i>, <i>y1</i>, <i>x2</i>, and <i>y2</i> are values of type <ptype>float</ptype>;
+<i>color1</i> and <i>color2</i> are of type <classname>Color</classname>; and
+<i>cyclic</i> is <ptype>boolean</ptype>.  The gradient color will vary along the line
+segment from the point (<i>x1</i>,<i>y1</i>) to the point (<i>x2</i>,<i>y2</i>).
+The color is <i>color1</i> at the first endpoint and is <i>color2</i> at the second
+endpoint.  Color is constant along lines perpendicular to that line segment.  The
+boolean parameter <i>cyclic</i> says whether or not the color pattern repeats.
+As an example, here is a command that will install a <classname>GradientPaint</classname>
+into a graphics context:</np>
+
+<pre>g2.setPaint( new GradientPaint( 0,0, Color.BLACK, 200,100, Color.RED, true ) );</pre>
+
+<np>You should, by the way, note that the current paint is used for strokes as well
+as for fills.</np>
+
+<p>The sample Java program <sourceref href="java2d/PaintDemo.java"/> displays a polygon
+filled with a <classname>GradientPaint</classname> or a <classname>TexturePaint</classname> 
+and lets you adjust their properties.  The image files <sourceref href="java2d/QueenOfHearts.png"/>
+and <sourceref href="java2d/TinySmiley.png"/> are part of that program, and they must be
+in the same location as the compiled class files that make up that program when it is run.</p>
+
+</subsection>
+
+
+
+<subsection title="Transforms" id="graphics2d.5.4">
+
+<p>Java implements <word term="geometric transform">geometric transformations</word> as
+methods in the <classname>Graphics2D</classname> class. For example, if <i>g2</i> is a
+<classname>Graphics2D</classname>, then calling <i>g2.translate</i>(1,3) will apply
+a translation by (1,3) to objects that are drawn after the method is called. The methods
+that are available correspond to the transform functions discussed in <localref href="graphics2d.3"/>:</p>
+
+<ul>
+<li><codedef>g2.scale(sx,sy)</codedef> &mdash; scales by a horizontal scale factor
+<i>sx</i> and a vertical scale factor <i>sy</i>.</li>
+<li><codedef>g2.rotate(r)</codedef> &mdash; rotates by the angle <i>r</i> about the origin,
+where the angle is measured in radians.  A positive angle rotates the positive x-axis in the
+direction of the positive y-axis.</li>
+<li><codedef>g2.rotate(r,x,y)</codedef> &mdash; rotates by the angle <i>r</i> about 
+the point (<i>x</i>,<i>y</i>).</li>
+<li><codedef>g2.translate(dx,dy)</codedef> &mdash; translates by <i>dx</i> horizontally and
+<i>dy</i> vertically.</li>
+<li><codedef>g2.shear(sx,sy)</codedef> &mdash; applies a horizontal shear amount <i>sx</i> and
+a vertical shear amount <i>sy</i>.  (Usually, one of the shear amounts is 0, giving a pure
+horizontal or vertical shear.)</li>
+</ul>
+
+
+<p>A transform in Java is represented as an object of the class <classname>AffineTransform</classname>.
+You can create a general <word>affine transform</word> with the contstructor
+</p>
+
+<pre>AffineTransform trns = new AffineTransform(a,b,c,d,e,f);</pre>
+
+<np>The transform <i>trns</i> will transform a point (<i>x,y</i>) to the point (<i>x1,y1</i>) given by</np>
+
+<pre>x1 = a*x + c*y + e
+y1 = b*x + d*y + f;</pre>
+
+<np>You can apply the transform <i>trns</i> to a graphics context <i>g2</i> by calling
+<i>g2.transform</i>(<i>trns</i>).</np>
+
+<p>The graphics context <i>g2</i> includes the current affine transform, which is the
+composition of all the transforms that have been applied.  Commands such as
+<i>g2.rotate</i> and <i>g2.transform</i> modify the current transform.  You can
+get a copy of the current transform by calling <i>g2.getTransform</i>(), which returns
+an <classname>AffineTransform</classname> object.
+You can set the current transform using <i>g2.setTransform</i>(<i>trns</i>).
+This replaces the current transform in <i>g2</i> with the <classname>AffineTransform</classname>
+<i>trns</i>.  (Note that <i>g2.setTransform</i>(<i>trns</i>) is different from <i>g2.transform</i>(<i>trns</i>);
+the first command <b>replaces</b> the current transform in <i>g2</i>, while the second
+<b>modifies</b> the current transform by composing it with <i>trns</i>.)</p>
+
+<p>The <i>getTransform</i> and <i>setTransform</i> methods can be used to implement
+<word>hierarchical modeling</word>.  The idea, as discussed in <localref href="graphics2d.4"/>,
+is that before drawing an object, you should save the current transform.  
+After drawing the object, restore the saved transform.  Any additional modeling
+transformations that are applied while drawing the object and its sub-objects will have
+no effect outside the object.  In Java, this looks like</p>
+
+<pre>AffineTransform savedTransform = g2.getTransform();
+drawObject();
+g2.setTransform( savedTransform );</pre>
+
+<np>For hierarchical graphics, we really need a <word>stack</word> of transforms.  However, if the hierarchy is implemented
+using subroutines, then the above code would be part of a subroutine, and the value of the local
+variable <i>savedTransform</i> would be stored on the subroutine call stack.  Effectively, we
+would be using the subroutine call stack to implement the stack of saved transforms.</np>
+
+<p>In addition to modeling transformations, transforms are used to set up the
+<word term="view window">window</word>-to-<word>viewport</word> transformation that
+establishes the <word>coordinate system</word> that will be used for drawing.
+This is usually done in Java just after the graphics context has been created,
+before any drawing operations.  It can be done with a Java version of the
+<i>applyWindowToViewportTransformation</i> 
+function from <localref href="graphics2d.3.7"/>.  See the sample program
+<sourceref href="java2d/GraphicsStarter.java"/> for an example.</p>
+
+<break/>
+
+<p>I will mention one more use for <classname>AffineTransform</classname> objects:  Sometimes,
+you do need to explicitly transform coordinates.  For example, given <word>object coordinates</word>
+(<i>x</i>,<i>y</i>), I might need to know where they will actually end up on the screen, in 
+pixel coordinates.  That is, I would like to transform (<i>x</i>,<i>y</i>) by the current transform
+to get the corresponding pixel coordinates.  The <classname>AffineTransform</classname> class
+has a method for applying the affine transform to a point.  It works with objects of type
+<classname>Point2D</classname>.  Here is an example:</p>
+
+<pre>AffineTransform trns = g2.getTransform();
+Point2D.Double originalPoint = new Point2D.Double(x,y);
+Point2D.Double transformedPoint = new Point2D.Double();
+trns.transform( originalPoint, transformedPoint );
+// transformedPoint nowcontains the pixel coords corresponding to (x,y)
+int pixelX = (int)transformedPoint.x;
+int pixelY = (int)transformedPoint.y;</pre>
+
+<np>One way I have used this is when working with strings.  Often when displaying a string in a
+transformed coordinate system, I want to transform the basepoint of a string, but not
+the string itself.  That is, I want the transformation to affect the location of the string
+but not its size or rotation.  To accomplish this, I use the above technique to obtain
+the pixel coordinates for the transformed basepoint, and then draw the string at
+those coordinates, using an original, untransformed graphics context.</np>
+
+<p>The reverse operation is also sometimes necessary.  That is, given pixel coordinates
+(<i>px</i>,<i>py</i>), find the point (<i>x</i>,<i>y</i>) that is transformed to (<i>px</i>,<i>py</i>)
+by a given affine transform.  For example, when implementing mouse interaction, you will
+generally know the pixel coordinates of the mouse, but you will want to find the corresponding
+point in your own chosen coordinate system.  For that, you need an <newword>inverse transform</newword>.
+The inverse of an affine transform <b>T</b> is another transform that performs the opposite transformation.
+That is, if <b>T</b>(<i>x</i>,<i>y</i>) = (<i>px</i>,<i>py</i>), 
+and if <b>R</b> is the inverse transform, then <b>R</b>(<i>px</i>,<i>py</i>)
+= (<i>x</i>,<i>y</i>). In Java, the inverse transform of an <classname>AffineTransform</classname>
+<i>trns</i> can be obtained with</p>
+
+<pre>AffineTransform inverse = trns.createInverse();</pre>
+
+<p>(A final note: The older drawing
+methods from <classname>Graphics</classname>, such as <i>drawLine</i>, use integer coordinates.
+It's important to note that any shapes drawn using these older methods are subject to the same transformation
+as shapes such as <classname>Line2D</classname> that are specified with real
+number coordinates. For example, drawing a line with <i>g.drawLine</i>(1,2,5,7)
+will have the same effect as drawing a <classname>Line2D</classname> that
+has endpoints (1.0,2.0) and (5.0,7.0).  In fact, all drawing is affected by
+the transformation of coordinates.)</p>
+
+</subsection>
+
+
+
+<subsection title="BufferedImage and Pixels" id="graphics2d.5.5">
+
+<p>In some graphics applications, it is useful to be able to work with images that
+are not visible on the screen.  That is, you need what I call an <newword>off-screen canvas</newword>.
+You also need a way to quickly copy the off-screen canvas onto the screen.
+For example, it can be useful to store a copy of the on-screen image in an off-screen canvas.
+The canvas is the official copy of the image.  Changes to the image are made to the canvas,
+then copied to the screen.  One reason to do this is that you can then draw extra stuff on
+top of the screen image without changing the official copy.  For example, you might draw
+a box around a selected region in the on-screen image.  You can do this without damaging the
+official copy in the off-screen canvas.  To remove the box from the screen, you just have
+to copy the off-screen canvas image onto the screen.</p>
+
+<p>In Java, an off-screen image can be implemented as an object of type <classname>BufferedImage</classname>.
+A <classname>BufferedImage</classname> represents a region in memory where you can draw, in exactly the
+same way that you can draw to the screen.  That is, you can obtain a graphics context
+<i>g2</i> of type <classname>Graphics2D</classname> that you can use for drawing on the image.
+A <classname>BufferedImage</classname> is an <classname>Image</classname>, and you can draw
+it onto the screen&mdash;or into any other graphics context&mdash;like any other <classname>Image</classname>,
+that is, by using the <i>drawImage</i> method of the graphics context where you want to display the
+image.  In a typical setup, there are variables</p>
+
+<pre>BufferedImage OSC;  // The off-screen canvas.
+Graphics2D OSG;     // graphics context for drawing to the canvas</pre>
+
+<np>The objects are created using, for example,</np>
+
+<pre>OSC = new BufferedImage( 640, 480, BufferedImage.TYPE_INT_RGB );
+OSG = OSC.createGraphics();</pre>
+
+<np>The constructor for <classname>BufferedImage</classname> specifies the
+width and height of the image along with its type.  The type tells what
+colors can be represented in the image and how they are stored.  Here,
+the type is <code>TYPE_INT_RGB</code>, which means the image uses
+regular <word term="RGB color">RGB colors</word> with 8 bits for each
+color component.  The three color components for a pixel are packed
+into a single integer value.</np>
+
+<p>In a program that uses a <classname>BufferedImage</classname> to store a copy of
+the on-screen image, the <i>paintComponent</i> method generally has the form</p>
+
+<pre>protected void paintComponent(Graphics g) {
+    g.drawimage( OSC, 0, 0, null );
+    Graphics2D g2 = (Graphics2D)g.create();
+      .
+      . // Draw extra stuff on top of the image.
+      .
+}</pre>
+
+<p>A sample program that uses this technique is <sourceref href="java2d/JavaPixelManipulation.java"/>.
+In that program, the user can draw lines, rectangles, and ovals by dragging the mouse.
+As the mouse moves, the shape is drawn between the starting point of the mouse and its
+current location.  As the mouse moves, parts of the existing image can be repeatedly covered 
+and uncovered, without changing the existing image.  In fact, the image is in an off-screen 
+canvas, and the shape that the user is drawing is actually drawn by <i>paintComponent</i>
+over the contents of the canvas.  The shape is not drawn to the official image in the canvas
+until the user releases the mouse and ends the drag operation.</p>
+
+<p>But my main reason for writing the program was to illustrate pixel manipulation, that is,
+computing with the color components of individual pixels.  The <classname>BufferedImage</classname>
+class has methods for reading and setting the color of individual pixels.  An image consists of
+rows and columns of pixels.  If <i>OSC</i> is a <classname>BufferedImage</classname>, then</p>
+
+<pre>int color = OSC.getRGB(x,y)</pre>
+
+<np>gets the integer that represents the color of the pixel in column number <i>x</i> and row
+number <i>y</i>.  Each color component is stored in an 8-bit field in the integer <i>color</i>
+value.  The individual color components can be extracted for processing using Java's bit
+manipulation operators:</np>
+
+<pre>int red = (color &gt;&gt; 16) &amp; 255;
+int green = (color &gt;&gt; 8) &amp; 255;
+int blue = color &amp; 255;</pre>
+
+<p>Similarly, given red, green, and blue color component values in the range 0 to 255,
+we can combine those component values into a single integer and use it to set the
+color of a pixel in the image:</p>
+
+<pre>int color = (red &lt;&lt; 16) | (green &lt;&lt; 8) | blue;
+OSC.setRGB(x,y,color);</pre>
+
+<np>There are also methods for reading and setting the colors of an entire rectangular
+region of pixels.</np>
+
+<p>Pixel operations are used to implement two features of the sample program.  First, there is a
+"Smudge" tool.  When the user drags with this tool, it's like smearing wet paint.  When
+the user first clicks the mouse, the color components from a small square of pixels surrounding
+the mouse position are copied into arrays.  As the user moves the mouse, color from the
+arrays is blended into the color of the pixels near the mouse position, while those colors
+are blended into the colors in the arrays.  Here is a
+small rectangle that has been "smudged":</p>
+
+<img src="smudge.png" width="94" height="44" tex="smudge.eps" texscale="0.8" bordered="true"/>
+
+<p>The second use of pixel manipulation is in implementing "filters."  A filter, in this
+program, is an operation that modifies an image by replacing the color of each 
+pixel with a weighted average of the colors of a 3-by-3 square of pixels.
+A "Blur" filter for example, uses equal weights for all pixels in the average, 
+so the color of a pixel is changed to the simple average of the colors of that 
+pixel and its neighbors.  Using different weights for each pixel can produce some 
+striking effects.</p>
+
+<p>The pixel manipulation in the sample program produces effects that can't be achieved
+with pure <word>vector graphics</word>.  I encourage you to learn more by looking at
+the <sourceref href="java2d/JavaPixelManipulation.java">source code</sourceref>.
+You might also take a look at the live demos in the  <localref href="graphics2d.6">next section</localref>,
+which implement the same effects using <word>HTML canvas</word> graphics.</p>
+
+</subsection>
+
+
+
+
+</section>

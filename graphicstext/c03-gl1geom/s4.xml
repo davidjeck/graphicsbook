@@ -1,0 +1,656 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Polygonal Meshes and glDrawArrays" id="gl1geom.4">
+
+<p1>We have drawn only very simple shapes with OpenGL.  In this section,
+we look at how more complex shapes can be represented in a way that
+is convenient for rendering in OpenGL, and we introduce a new,
+more efficient way to draw OpenGL primitives.</p1>
+
+<p>OpenGL can only directly render points, lines, and polygons.  
+(In fact, in modern OpenGL, the only polygons that are used are triangles.)
+A <newword>polyhedron</newword>, the 3D analog of a polygon,  
+can be represented exactly, since a polyhedron
+has faces that are polygons.  On the other hand, if only polygons are available, then 
+a curved surface, such as the surface of a sphere, can only be approximated.
+A polyhedron can be represented, or a curved surface can be approximated,
+as a <newword>polygonal mesh</newword>,
+that is, a set of polygons that are connected along their edges.  If the
+polygons are small, the approximation can look like a curved surface.  (We will
+see in the <localref href="gl1light">next chapter</localref> how lighting effects
+can be used to make a polygonal mesh look more like a curved surface and
+less like a polyhedron.)</p>
+
+<p>So, our problem is to represent a set of polygons&mdash;most often a set
+of triangles.  We start by defining a convenient way to represent such a
+set as a data structure.</p>
+
+<subsection title="Indexed Face Sets" id="gl1geom.4.1">
+
+<p>The polygons in a polygonal mesh are also referred to as
+"faces" (as in the faces of a polyhedron), and one of the
+primary means for representing a polygonal mesh is as
+an <newword>indexed face set</newword>, or IFS.
+</p>
+
+<p>The data for an IFS includes a list of all the
+vertices that appear in the mesh, giving the coordinates
+of each vertex.  A vertex can then be identified by
+an integer that specifies its index, or position, in the list.
+As an example, consider this "house," a polyhedron with
+10 vertices and 9 faces:
+</p>
+
+<img src="houseIFS.png" width="404" height="202" tex="houseIFS.eps" texscale="0.75"/>
+
+<np>The vertex list for this polyhedron has the form</np>
+
+<pre>Vertex #0.  (2, -1, 2)
+Vertex #1.  (2, -1, -2)
+Vertex #2.  (2, 1, -2)
+Vertex #3.  (2, 1, 2)
+Vertex #4.  (1.5, 1.5, 0)
+Vertex #5.  (-1.5, 1.5, 0)
+Vertex #6.  (-2, -1, 2)
+Vertex #7.  (-2, 1, 2)
+Vertex #8.  (-2, 1, -2)
+Vertex #9.  (-2, -1, -2)</pre>
+
+
+<np>The order of the vertices is completely arbitrary.  The purpose is simply
+to allow each vertex to be identified by an integer.</np>
+
+<p>To describe one of the polygonal faces of a mesh, we just have to list its vertices, 
+in order going around the polygon. For an IFS, we
+can specify a vertex by giving its index in the list.  For example,
+we can say that one of the triangular faces of the pyramid is the polygon
+formed by vertex #3, vertex #2, and vertex #4.  So, we can complete our
+data for the mesh by giving a list of vertex indices for each face.
+Here is the face data for the house.  Remember that the numbers in parenthese
+are indices into the vertex list:</p>
+
+<pre>Face #0:  (0, 1, 2, 3)
+Face #1:  (3, 2, 4)
+Face #2:  (7, 3, 4, 5)
+Face #3:  (2, 8, 5, 4)
+Face #4:  (5, 8, 7)
+Face #5:  (0, 3, 7, 6)
+Face #6:  (0, 6, 9, 1)
+Face #7:  (2, 1, 9, 8)
+Face #8:  (6, 7, 8, 9)</pre>
+
+
+<np>Again, the order in which the faces are listed in arbitrary.
+There is also some freedom in how the vertices for a face are listed.
+You can start with any vertex.  Once you've picked a starting vertex,
+there are two possible orderings, corresponding to the two possible
+directions in which you can go around the circumference of the polygon.
+For example, starting with vertex 0, the first face in the list could
+be specified either as (0,1,2,3) or as (0,3,2,1).  However, the
+first possibility is the right one in this case, for the following reason.
+A polygon in 3D can be viewed from either side; we can think of it
+as having two faces, facing in opposite directions.  It turns out that
+it is often convenient to consider one of those faces to be the
+"front face" of the polygon and one to be the "back face."
+For a polyhedron like the house, the front face is the one that faces
+the outside of the polyhedron.  The usual rule is that the
+vertices of a polygon should be listed in counterclockwise order
+when looking at the front face of the polygon.  When looking at the
+back face, the vertices will be listed in clockwise order.  This is
+the default rule used by OpenGL.</np>  
+
+<img src="vertex-order.png" width="264" height="124" bordered="true" tex="vertex-order.eps" texscale="0.75"/>
+
+
+
+<p>The vertex and face data for an indexed face set can be represented as
+a pair of two-dimensional arrays.  For the house, in a version for Java, we could use</p>
+
+<pre>double[][] vertexList =
+         {  {2,-1,2}, {2,-1,-2}, {2,1,-2}, {2,1,2}, {1.5,1.5,0},
+               {-1.5,1.5,0}, {-2,-1,2}, {-2,1,2}, {-2,1,-2}, {-2,-1,-2}  };
+         
+int[][] faceList =
+         {  {0,1,2,3}, {3,2,4}, {7,3,4,5}, {2,8,5,4}, {5,8,7},
+               {0,3,7,6}, {0,6,9,1}, {2,1,9,8}, {6,7,8,9}  };</pre>
+
+<np>In most cases, there will be additional data for the IFS.  For example, if we
+want to color the faces of the polyhedron, with a different color for each face,
+then we could add another array, <i>faceColors</i>, to hold the color data.
+Each element of <i>faceColors</i> would be an array of three <ptype>double</ptype>
+values in the range 0.0 to 1.0, giving the <word>RGB color</word> components for
+one of the faces.  With this setup, we could use the following code to draw
+the polyhedron, using Java and <word>JOGL</word>:</np>
+
+<pre>for (int i = 0; i &lt; faceList.length; i++) {
+    gl2.glColor3dv( faceColors[i], 0 );  // Set color for face number i.
+    gl2.glBegin(GL2.GL_TRIANGLE_FAN);
+    for (int j = 0; j &lt; faceList[i].length; j++) {
+        int vertexNum = faceList[i][j];  // Index for vertex j of face i.
+        double[] vertexCoords = vertexList[vertexNum];  // The vertex itself.
+        gl2.glVertex3dv( vertexCoords, 0 );
+    }
+    gl2.glEnd();
+}</pre>
+
+<p>Note that every vertex index is used three or four times in the face data.
+With the IFS representation, a vertex is represented in the face list by a single
+integer.  This representation uses
+less memory space than the alternative, which would be to write out
+the vertex in full each time it occurs in the face data.  For the house example,
+the IFS representation uses 64 numbers to represent the vertices and faces of the polygonal mesh,
+as opposed to 102 numbers for the alternative representation.</p>
+
+<p>Indexed face sets have another advantage.  Suppose that we want to modify the shape of
+the polygon mesh by moving its vertices.  We might do this in each frame of
+an animation, as a way of "morphing" the shape from one form to another.
+Since only the positions of the vertices are changing, and not the way
+that they are connected together, it will only be necessary to update the
+30 numbers in the vertex list.  The values in the face list will remain
+unchanged.</p>
+
+<break/>
+               
+<p>There are other ways to store the data for an IFS.
+In C, for example, where two-dimensional arrays are more problematic, we might use one
+dimensional arrays for the data.  In that case, we would store all the vertex coordinates
+in a single array.  The length of the vertex array would
+be three times the number of vertices, and the data for vertex number <i>N</i> will
+begin at index 3*<i>N</i> in the array.  For the face list, we have to deal with the
+fact that not all faces have the same number of vertices.  A common solution is to
+add a -1 to the array after the data for each face.  In C, where it is not possible
+to determine the length of an array, we also need variables to store the number of
+vertices and the number of faces.  Using this representation,
+the data for the house becomes:</p>
+
+<pre>int vertexCount = 10;  // Number of vertices.
+double vertexData[] =
+          {  2,-1,2, 2,-1,-2, 2,1,-2, 2,1,2, 1.5,1.5,0,
+                 -1.5,1.5,0, -2,-1,2, -2,1,2, -2,1,-2, -2,-1,-2  };
+
+int faceCount = 9;  // Number of faces.       
+int[][] faceData =
+          {  0,1,2,3,-1, 3,2,4,-1, 7,3,4,5,-1, 2,8,5,4,-1, 5,8,7,-1,
+               0,3,7,6,-1, 0,6,9,1,-1, 2,1,9,8,-1, 6,7,8,9,-1  };</pre>
+
+<np>After adding a <i>faceColors</i> array to hold color data for the faces,
+we can use the following C code to draw the house:</np>
+
+<pre>int i,j;
+j = 0; // index into the faceData array
+for (i = 0; i &lt; faceCount; i++) {
+    glColor3dv( &amp;faceColors[ i*3 ] );  // Color for face number i.
+    glBegin(GL_TRIANGLE_FAN);
+    while ( faceData[j] != -1) { // Generate vertices for face number i.
+        int vertexNum = faceData[j]; // Vertex number in vertexData array.
+        glVertex3dv( &amp;vertexData[ vertexNum*3 ] );
+        j++;
+    }
+    j++;  // increment j past the -1 that ended the data for this face.
+    glEnd();
+}</pre>
+
+<np>Note the use of the C address operator, &amp;.  For example,
+<code>&amp;faceColors[i*3]</code> is a pointer to element number <i>i*3</i> in
+the <i>faceColors</i> array.  That element is the first of the three color
+component values for face number&nbsp;<i>i</i>.  This matches the parameter
+type for <i>glColor3dv</i> in C, since the parameter is a pointer type.</np>
+
+<break/>
+
+<p>We could easily draw the edges of the polyhedron instead of the
+faces simply by using <i>GL_LINE_LOOP</i> instead of <i>GL_TRIANGLE_FAN</i>
+in the drawing code (and probably leaving out the color changes).
+An interesting issue comes up if we want to draw both the faces and
+the edges.  This can be a nice effect, but we run into a problem with
+the depth test:  Pixels along the edges lie at the same depth as
+pixels on the faces.  As discussed in <localref href="gl1geom.1.4"/>, the depth
+test cannot handle this situation well.  However, OpenGL has a solution:
+a feature called "polygon offset."  This feature can 
+adjust the depth, in clip coordinates, of a polygon, in order to avoid having two
+objects exactly at the same depth.  To apply polygon offset, you need to
+set the amount of offset by calling</p>
+
+<pre>glPolygonOffset(1,1);</pre>
+
+<np>The second parameter gives the amount of offset, in units determined by the first parameter.
+The meaning of the first parameter is somewhat obscure; a value of 1 seems to work
+in all cases.  You also have to enable the <i>GL_POLYGON_OFFSET_FILL</i> feature while
+drawing the faces.  An outline for the procedure is
+</np>
+
+<pre>glPolygonOffset(1,1);
+glEnable( GL_POLYGON_OFFSET_FILL );
+   .
+   .   // Draw the faces.
+   .
+glDisable( GL_POLYGON_OFFSET_FILL );
+   .
+   .   // Draw the edges.
+   .</pre>
+
+
+<demo src="c3/IFS-polyhedron-viewer.html" width="650" height="375">
+<p>There is a sample program that can draw the house and a number of other
+polyhedra.  It uses drawing code very similar to what we have looked at here,
+including polygon offset.  The program is also an example of using the
+camera and trackball API that was discussed in <localref href="gl1geom.3.5"/>,
+so that the user can rotate a polyhedron by dragging it with the mouse.
+The program has menus that allow the user to turn rendering of edges 
+and faces on and off, plus some other options.  The Java version of the
+program is <sourceref href="jogl/IFSPolyhedronViewer.java"/>, and the C version is
+<sourceref href="glut/ifs-polyhedron-viewer.c"/>.  To get at the menu in the C version,
+right-click on the display.  The data for the polyhedra are
+created in <sourceref href="jogl/Polyhedron.java"/> and 
+<sourceref href="glut/polyhedron.c"/>.  <web>And here is a live demo version of the program
+for you to try:</web><tex>There is also a live demo version of the program in this section on line.</tex></p>
+</demo>
+
+</subsection>
+
+
+<subsection title="glDrawArrays and glDrawElements" id="gl1geom.4.2">
+
+<p>All of the OpenGL commands that we have seen so far were part of the original
+OpenGL&nbsp;1.0.  OpenGL&nbsp;1.1 added some features to increase performance.  One
+complaint about the original OpenGL was the large number of function calls needed to
+draw a <word term="geometric primitive">primitive</word> 
+using functions such as <i>glVertex2d</i> and <i>glColor3fv</i> with
+<i>glBegin/glEnd</i>.  To address this issue, OpenGL&nbsp;1.1 introduced the
+functions <i>glDrawArrays</i> and <i>glDrawElements</i>.  These functions are still
+used in modern OpenGL, including <word>WebGL</word>.  We will look at <i>glDrawArrays</i>
+first.  There are some differences between the C and the Java versions of the API.
+We consider the C version first and will deal with the changes necessary for the
+Java version in the next subsection.</p>
+
+<p>When using <i>glDrawArrays</i>,
+all of the data that is needed to draw a primitive, including vertex coordinates, colors,
+and other vertex <word term="attribute">attributes</word>, can be packed into
+arrays.  Once that is done, the primitive can be drawn with a single call to
+<i>glDrawArrays</i>.  Recall that a primitive such
+as a <i>GL_LINE_LOOP</i> or a <i>GL_TRIANGLES</i> can include a large number of
+vertices, so that the reduction in the number of function calls can be 
+substantial.</p>
+
+<p>To use <i>glDrawArrays</i>, you must store all of the vertex coordinates
+for a primitive in a single one-dimensional array.  You can use an array of
+<ptype>int</ptype>, <ptype>float</ptype>, or <ptype>double</ptype>, and you can have 2, 3, or
+4 coordinates for each vertex.  The data in the array are the same numbers
+that you would pass as parameters to a function such as <i>glVertex3f</i>,
+in the same order.  You need to tell OpenGL where to find the data by
+calling</p>
+
+<pre>void glVertexPointer(int size, int type, int stride, void* array)</pre>
+
+<np>The <i>size</i> parameter is the number of coordinates per vertex.  
+(You have to provide the same number of coordinates
+for each vertex.)   The <i>type</i> is a constant that tells the data
+type of each of the numbers in the array.  The possible values are
+<i>GL_FLOAT</i>, <i>GL_INT</i>, and <i>GL_DOUBLE</i>. 
+The constant that you provide here must match the data type of the numbers in the array.
+The <i>stride</i> is usually 0, meaning that the data
+values are stored in consecutive locations in the array; if that is
+not the case, then <i>stride</i> gives the distance <b>in bytes</b> between
+the location of the data for one vertex and location for the next vertex.
+(This would allow you to store other data, along with the vertex coordinates,
+in the same array.) The final parameter is the array that contains the data.
+It is listed as being of type "<i>void*</i>", which is a C data type for a
+pointer that can point to any type of data.  (Recall that an array variable
+in C is a kind of pointer, so you can just pass an array variable as the
+fourth parameter.)  For example, suppose that we want to draw a square in 
+the <i>xy</i>-plane.  We can set up the vertex array with</np>
+
+<pre>float coords[8] = { -0.5,-0.5, 0.5,-0.5, 0.5,0.5, -0.5,0.5 };
+
+glVertexPointer( 2, GL_FLOAT, 0, coords );</pre>
+
+<np>In addition to setting the location of the vertex coordinates, you have to enable
+use of the array by calling</np>
+
+<pre>glEnableClientState(GL_VERTEX_ARRAY);</pre>
+
+<np>OpenGL ignores the vertex pointer except when this state is enabled.  You can use
+<i>glDisableClientState</i> to disable use of the vertex array.  Finally,
+in order to actually draw the primitive, you would call the function</np>
+
+<pre>void glDrawArrays( int primitiveType, int firstVertex, int vertexCount)</pre>
+
+<np>This function call corresponds to one use of glBegin/glEnd.
+The <i>primitiveType</i> tells which primitive type is being drawn,
+such as <i>GL_QUADS</i> or <i>GL_TRIANGLE_STRIP</i>.
+The same ten primitive types that can be used with <i>glBegin</i> can
+be used here.  The parameter <i>firstVertex</i> is the number of the first
+vertex that is to be used for drawing the primitive.  Note that the position
+is given in terms of vertex number; the corresponding array index would
+be the vertex number times the number of coordinates per vertex, which
+was set in the call to <i>glVertexPointer</i>.
+The <i>vertexCount</i> parameter is the number of vertices to be used,
+just as if <i>glVertex*</i> were called <i>vertexCount</i> times.
+Often, <i>firstVertex</i> will be zero, and <i>vertexCount</i>
+will be the total number of vertices in the array.  The command for
+drawing the square in our example would be</np>
+
+<pre>glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );</pre>
+
+<p>Often there is other data associated with each vertex in addition to
+the vertex coordinates.  For example, you might want to specify a different
+color for each vertex.  The colors for the vertices can be put into
+another array.  You have to specify the location of the data by calling</p>
+
+<pre>void glColorPointer(int size, int type, int stride, void* array)</pre>
+
+<np>which works just like <i>gVertexPointer</i>.  And you need to enable
+the color array by calling</np>
+
+<pre>glEnableClientState(GL_COLOR_ARRAY);</pre>
+
+<np>With this setup, when you call <i>glDrawArrays</i>, OpenGL
+will pull a color from the color array for each vertex at the
+same time that it pulls the vertex coordinates from the vertex array.
+Later, we will encounter other kinds of vertex data besides coordinates
+and color that can be dealt with in much the same way.</np>
+
+<p>Let's put this together to draw the standard OpenGL red/green/blue triangle,
+which we drew using <i>glBegin/glEnd</i> in <localref href="gl1geom.1.2"/>.
+Since the vertices of the triangle have different colors, we will use a color array
+in addition to the vertex array.</p>
+
+<pre>float coords[6] = { -0.9,-0.9,  0.9,-0.9,  0,0.7 }; // two coords per vertex.
+float colors[9] = { 1,0,0,  0,1,0,  1,0,0 };  // three RGB values per vertex.
+
+glVertexPointer( 2, GL_FLOAT, 0, coords );  // Set data type and location.
+glColorPointer( 3, GL_FLOAT, 0, colors );
+
+glEnableClientState( GL_VERTEX_ARRAY );  // Enable use of arrays.
+glEnableClientState( GL_COLOR_ARRAY );
+
+glDrawArrays( GL_TRIANGLES, 0, 3 ); // Use 3 vertices, starting with vertex 0.</pre>
+
+<np>In practice, not all of this code has to be in the same place.  The function
+that does the actual drawing, <i>glDrawArrays</i>, must be in the display routine
+that draws the image.  The rest could be in the display routine, but could also
+be done, for example, in an initialization routine.</np>
+
+<break/>
+
+<p>The function <i>glDrawElements</i> is similar to <i>glDrawArrays</i>, but it is
+designed for use with data in a format similar to an indexed face set.
+With <i>glDrawArrays</i>, OpenGL pulls data from the enabled arrays in order,
+vertex 0, then vertex 1, then vertex 2, and so on.  With <i>glDrawElements</i>,
+you provide a list of vertex numbers.  OpenGL will go through the list of
+vertex numbers, pulling data for the specified vertices from the arrays.
+The advantage of this comes, as with indexed face sets, from the fact that the
+same vertex can be reused several times.</p>
+
+<p>To use <i>glDrawElements</i> to draw a primitive, you need an array to store the vertex numbers.
+The numbers in the array can be 8, 16, or 32 bit integers.  (They are supposed to be unsigned
+integers, but arrays of regular positive integers will also work.)  You also need
+arrays to store the vertex coordinates and other vertex data, and you must enable 
+those arrays in the same way as for <i>glDrawArrays</i>, using functions such as
+<i>glVertexArray</i> and <i>glEnableClientState</i>.  To actually draw the primitive,
+call the function</p>
+
+
+<pre>void glDrawElements( int primitiveType, vertexCount, dataType, void *array)</pre>
+
+<np>Here, <i>primitiveType</i> is one of the ten primitive types such as <i>GL_LINES</i>,
+<i>vertexCount</i> is the number of vertices to be drawn, <i>dataType</i> specifies the
+type of data in the array, and <i>array</i> is the array that holds the list of
+vertex numbers.  The <i>dataType</i> must be given as one of the constants
+<i>GL_UNSIGNED_BYTE</i>, <i>GL_UNSIGNED_SHORT</i>, or <i>GL_UNSIGNED_INT</i> to specify
+8, 16, or 32 bit integers respectively.</np>
+
+<p>As an example, we can draw a cube.  We can draw all six faces of the cube as one
+primitive of type <i>GL_QUADS</i>.  We need the vertex coordinates in one array
+and the vertex numbers for the faces in another array.  I will also use a color
+array for vertex colors.  The vertex colors will be interpolated to pixels on the
+faces, just like the red/green/blue triangle.
+Here is code that could be used to draw the cube.
+Again, all this would not necessarily be in the same part of a program:</p>
+
+<pre>float vertexCoords[24] = {  // Coordinates for the vertices of a cube.
+           1,1,1,   1,1,-1,   1,-1,-1,   1,-1,1,
+          -1,1,1,  -1,1,-1,  -1,-1,-1,  -1,-1,1  };
+          
+float vertexColors[24] = {  // An RGB color value for each vertex
+           1,1,1,   1,0,0,   1,1,0,   0,1,0,
+           0,0,1,   1,0,1,   0,0,0,   0,1,1  };
+          
+int elementArray[24] = {  // Vertex numbers for the six faces.
+          0,1,2,3, 0,3,7,4, 0,4,5,1,
+          6,2,1,5, 6,5,4,7, 6,7,3,2  };
+          
+glVertexPointer( 3, GL_FLOAT, 0, vertexCoords );
+glColorPointer( 3, GL_FLOAT, 0, vertexColors );
+
+glEnableClientState( GL_VERTEX_ARRAY );
+glEnableClientState( GL_COLOR_ARRAY );
+
+glDrawElements( GL_QUADS, 24, GL_UNSIGNED_INT, elementArray );</pre>
+
+<np>Note that the second parameter is the number of vertices, not the number of quads.</np>
+
+<p>The sample program <sourceref href="glut/cubes-with-vertex-arrays.c"/> uses this code
+to draw a cube.  It draws a second cube using <i>glDrawArrays</i>.  The Java
+version is <sourceref href="jogl/CubesWithVertexArrays.java"/>, but you need to 
+read the next subsection before you can understand it.  There is also a
+JavaScript version, <sourceref href="glsim/cubes-with-vertex-arrays.html"/>.</p>
+
+</subsection>
+
+
+<subsection title="Data Buffers in Java" id="gl1geom.4.3">
+
+<p>Ordinary Java arrays are not suitable for use with <i>glDrawElements</i> and
+<i>glDrawArrays</i>, partly because of the format in which data is stored in them and
+partly because of inefficiency in transfer of data between Java arrays and the <word term="GPU">Graphics Processing Unit</word>.
+These problems are solved by using <newword term="nio buffer">direct nio buffers</newword>.
+The term "nio" here refers to the package <i>java.nio</i>, which contains classes for
+input/output.  A "buffer" in this case is an object of the class <classname>java.nio.Buffer</classname>
+or one of its subclasses, such as <classname>FloatBuffer</classname> or <classname>IntBuffer</classname>.
+Finally, "direct" means that the buffer is optimized for direct transfer of data between memory
+and other devices such as the GPU.  Like an array, an nio buffer is a numbered sequence of
+elements, all of the same type. A <classname>FloatBuffer</classname>, for example, contains
+a numbered sequence of values of type <ptype>float</ptype>.  There are subclasses of
+<classname>Buffer</classname> for all of Java's primitive data types except <ptype>boolean</ptype>.</p>
+
+<p>Nio buffers are used in JOGL in several places where
+arrays are used in the C API.  For example, JOGL has the following
+<i>glVertexPointer</i> method in the <classname>GL2</classname> class:</p>
+
+<pre>public void glVertexPointer(int size, int type, int stride, Buffer buffer)</pre>
+
+<np>Only the last parameter differs from the C version.  The buffer can be of type
+<classname>FloatBuffer</classname>, <classname>IntBuffer</classname>,
+or <classname>DoubleBuffer</classname>.  The type of buffer must match the <i>type</i>
+parameter in the method.   Functions such as <i>glColorPointer</i> work the same way,
+and <i>glDrawElements</i> takes the form</np>
+
+<pre>public void glDrawElements( int primitiveType, vertexCount, 
+                                          dataType, Buffer buffer)</pre>
+
+<np>where the <i>buffer</i> can be of type <classname>IntBuffer</classname>,
+<classname>ShortBuffer</classname>, or <classname>ByteBuffer</classname>
+to match the <i>dataType</i> <i>UNSIGNED_INT</i>, <i>UNSIGNED_SHORT</i>,
+or <i>UNSIGNED_BYTE</i>.</np>
+
+<p>The class <classname>com.jogamp.common.nio.Buffers</classname> contains static
+utility methods for working with direct nio buffers.  The easiest to use are
+methods that create a buffer from a Java array.  For example, the method
+<i>Buffers.newDirectFloatBuffer</i>(<i>array</i>) takes a <ptype>float</ptype>
+array as its parameter and creates a <classname>FloatBuffer</classname> of the
+same length and containing the same data as the array.  These methods are
+used to create the buffers in the sample program <sourceref href="jogl/CubesWithVertexArrays.java"/>.
+For example,</p>
+
+<pre>float[] vertexCoords = {  // Coordinates for the vertices of a cube.
+            1,1,1,   1,1,-1,   1,-1,-1,   1,-1,1,
+            -1,1,1,  -1,1,-1,  -1,-1,-1,  -1,-1,1  };
+            
+int[] elementArray = {  // Vertex numbers for the six faces.
+            0,1,2,3, 0,3,7,4, 0,4,5,1,
+            6,2,1,5, 6,5,4,7, 6,7,3,2  };
+
+// Buffers for use with glVertexPointer and glDrawElements:            
+FloatBuffer vertexCoordBuffer = Buffers.newDirectFloatBuffer(vertexCoords);
+IntBuffer elementBuffer = Buffers.newDirectIntBuffer(elementArray);</pre>
+
+<np>The buffers can then be used when drawing the cube:</np>
+
+<pre>gl2.glVertexPointer( 3, GL2.GL_FLOAT, 0, vertexCoordBuffer );
+
+gl2.glDrawElements( GL2.GL_QUADS, 24, GL2.GL_UNSIGNED_INT, elementBuffer );</pre>
+
+<p>There are also methods such as <i>Buffers.newDirectFloatBuffer</i>(<i>n</i>),
+which creates a <classname>FloatBuffer</classname> of length <i>n</i>.  Remember that
+an nio <classname>Buffer</classname>, like an array, is simply a linear sequence of elements of a given type.
+In fact, just as for an array, it is possible to refer to items in a buffer by
+their index or position in that sequence.  Suppose that <i>buffer</i> is a variable
+of type <classname>FloatBuffer</classname>, <i>i</i> is an <ptype>int</ptype> and
+<i>x</i> is a <ptype>float</ptype>.  Then</p>
+
+<pre>buffer.put(i,x);</pre>
+
+<np>copies the value of <i>x</i> into position number <i>i</i> in the buffer.
+Similarly, <i>buffer.get</i>(<i>i</i>) can be used to retrieve the value at
+index <i>i</i> in the buffer.  These methods make it possible to work with buffers
+in much the same way that you can work with arrays.</np>
+
+
+
+</subsection>
+
+
+
+<subsection title="Display Lists and VBOs" id="gl1geom.4.4">
+
+<p>All of the OpenGL drawing commands that we have considered so far have an unfortunate
+inefficiency when the same object is going be drawn more than once:  The commands and
+data for drawing that object must be transmitted to the GPU each time the object is
+drawn.  It should be possible to store information on the GPU, so that it can be reused
+without retransmitting it.  We will look at two techniques for doing this:
+<newword term="display list">display lists</newword> and 
+<newword term="VBO">vertex buffer objects</newword> (VBOs).  Display lists
+were part of the original OpenGL 1.0, but they are not part of the modern OpenGL API.
+VBOs were introduced in OpenGL 1.5 and are still important in modern OpenGL; we will discuss
+them only briefly here and will consider them more fully when we get to <word>WebGL</word>.</p>
+
+<p>Display lists are useful when the same sequence of OpenGL commands will be used
+several times.  A display list is a list of graphics commands and the data used by those commands.
+A display list can be stored in a GPU.
+The contents of the display list only have to be transmitted once
+to the GPU.  Once a list has been created, it can be "called."
+The key point is that calling a list requires only one OpenGL
+command.  Although the same list of commands still has to be executed, only one
+command has to be transmitted from the CPU to the graphics card, and then the full power
+of hardware acceleration can be used to execute the commands at the highest possible
+speed.</p>
+
+<p>Note that calling a display list twice can result in two different effects, since the effect
+can depend on the OpenGL state at the time the display list is called.  For
+example, a display list that generates the geometry for a sphere can draw
+spheres in different locations, as long as different modeling transforms are
+in effect each time the list is called.  The list can also produce spheres
+of different colors, as long as the drawing color is changed between calls to the
+list.</p>
+
+<p>If you want to use a display list,
+you first have to ask for an integer that will identify that list to the GPU.
+This is done with a command such as</p>
+
+<pre>listID = glGenLists(1);</pre>
+
+<p>The return value is an <ptype>int</ptype> which will be the identifier for the list.
+The parameter to <i>glGenLists</i> is also an <ptype>int</ptype>, which is usually&nbsp;1.  
+(You can actually ask for
+several list IDs at once; the parameter tells how many you want.
+The list IDs will be consecutive integers, so that if
+<i>listA</i> is the return value from <i>glGenLists</i>(3), then the identifiers for
+the three lists will be <i>listA</i>, <i>listA</i>&nbsp;+&nbsp;1, and <i>listA</i>&nbsp;+&nbsp;2.)</p>
+
+<p>Once you've allocated a list in this way, you can store commands into it.  If <i>listID</i>
+is the ID for the list, you would do this with code of the form:</p>
+
+<pre>glNewList(listID, GL_COMPILE);
+   ...  // OpenGL commands to be stored in the list.
+glEndList();</pre>
+
+<np>The parameter <i>GL_COMPILE</i> means that you only want to store commands into the list,
+not execute them.  If you use the alternative parameter <i>GL_COMPILE_AND_EXECUTE</i>,
+then the commands will be executed immediately as well as stored in the list for later reuse.</np>
+
+<p>Once you have created a display list in this way, you can call the list with the command</p>
+
+<pre>glCallList(listID);</pre>
+
+<np>The effect of this command is to tell the GPU to execute a list that it
+has already stored.  You can tell the graphics card that a list is no longer
+needed by calling</np>
+
+<pre>gl.glDeleteLists(listID, 1);</pre>
+
+<np>The second parameter in this method call plays the same role as the parameter in
+<i>glGenLists</i>; that is, it allows you delete several sequentially numbered lists.
+Deleting a list when you are through with it allows the GPU to reuse the 
+memory that was used by that list.</np>
+
+<break/>
+
+<p>Vertex buffer objects take a different approach to reusing information.
+They only store data, not commands.  A VBO is similar to an array.  In fact, it
+is essentially an array that can be stored on the GPU for efficiency of reuse. 
+There are OpenGL commands to
+create and delete VBOs and to transfer data from an array on the CPU side
+into a VBO on the GPU.  You can configure <i>glDrawArrays</i>() and <i>glDrawElements</i>()
+to take the data from a VBO instead of from an ordinary array (in C) or from an nio Buffer (in JOGL).
+This means that you can send the data once to the GPU and use it any number of times.</p>
+
+<p>I will not discuss how to use VBOs here, since it was not a part of OpenGL 1.1.
+However, there is a sample program that lets you compare different techniques for
+rendering a complex image.  The C version of the program is
+<sourceref href="glut/color-cube-of-spheres.c"/>, and the Java version is
+<sourceref href="jogl/ColorCubeOfSpheres.java"/>.  The program draws 1331 spheres,
+arranged in an 11-by-11-by-11 cube.  The spheres are different colors, with the amount
+of red in the color varying along one axis, the amount of green along a second axis,
+and the amount of blue along the third.  Each sphere has 66 vertices, whose coordinates can
+be computed using the math functions <i>sin</i> and <i>cos</i>.  The program allows
+you to select from five different rendering methods, and it shows the time that
+it takes to render the spheres using the selected method.  (The Java version has a drop-down
+menu for selecting the method; in the C version, right-click the image to get the menu.)
+You can use your mouse to rotate the cube of spheres, both to get a better view and to generate more
+data for computing the average render time.  The five rendering techniques are:</p>
+
+<ul>
+<li><i>Direct Draw, Recomputing Vertex Data</i> &mdash; A remarkably foolish way to
+draw 1331 spheres, by recomputing all of the vertex coordinates every time a sphere is
+drawn.</li>
+<li><i>Direct Draw, Precomputed Data</i> &mdash; The vertex coordinates are computed once
+and stored in an array.  The spheres are drawn using <i>glBegin/glEnd</i>, but the data
+used in the calls to <i>glVertex*</i> are taken from the array rather than recomputed each
+time they are needed.</li>
+<li><i>Display List</i> &mdash; A display list is created containing all of the commands
+and data needed to draw a sphere.  Each sphere can then be drawn by a single call of that
+display list.</li>
+<li><i>DrawArrays with Arrays</i> &mdash; The data for the sphere is stored in a vertex array (or, for
+Java, in an nio buffer), and each sphere is drawn using a call to <i>glDrawArrays</i>, using the 
+techniques discussed earlier in this section.  The data has to be sent to the GPU every time
+a sphere is drawn.</li>
+<li><i>DrawArrays with VBOs</i> &mdash; Again, <i>glDrawArrays</i> is used to draw the spheres,
+but this time the data is stored in a VBO instead of in an array, so the data only has to
+be transmitted to the GPU once.</li>
+</ul>
+
+<p> In my own experiments, I found, as expected, that display 
+lists and VBOs gave the shortest rendering times, with little difference between the two.
+There were some interesting differences between the results for the C version and the
+results for the Java version, which seem to be due to the fact that function calls in C
+are more efficient than method calls in Java.  You should try the program on your own computer, 
+and compare the rendering times for the various rendering methods.</p>
+
+
+</subsection>
+
+
+
+</section>

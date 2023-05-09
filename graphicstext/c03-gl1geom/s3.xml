@@ -1,0 +1,728 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Projection and Viewing" id="gl1geom.3">
+
+<p1>In the <localref href="gl1geom.2">previous section</localref>, we looked at the
+modeling transformation, which transforms from object coordinates to world
+coordinates.  However, for 3D computer graphics, you need to know about
+several other coordinate systems and the transforms between them.  We discuss
+them in this section.</p1>
+
+<p>We start with an overview of the various coordinate systems.  Some of
+this is review, and some of it is new.</p>
+
+<subsection title="Many Coordinate Systems" id="gl1geom.3.1">
+
+<p>The coordinates that you actually use for drawing an object are called
+<word>object coordinates</word>.  The object coordinate system is chosen to be
+convenient for the object that is being drawn.   A <word>modeling transformation</word>
+can then be applied to set the size, orientation, and position of the object
+in the overall scene (or, in the case of hierarchical modeling, in the
+object coordinate system of a larger, more complex object).  The modeling transformation
+is the first that is applied to the vertices of an object.</p>
+
+<p>The coordinates in which you build the complete scene are called
+<word>world coordinates</word>.  These are the coordinates for
+the overall scene, the imaginary 3D world that you are creating.
+The modeling transformation maps from object coordinates to world coordinates.
+</p>
+
+<p>In the real world, what you see depends on where you are standing
+and the direction in which you are looking.  That is, you can't make a picture
+of the scene until you know the position of the "viewer" and where the
+viewer is looking&mdash;and, if you think about it, how the viewer's head
+is tilted.  For the purposes of OpenGL, we imagine that the
+viewer is attached to their own individual coordinate system, which is known
+as <newword>eye coordinates</newword>.
+In this coordinate system, the viewer is at the origin, (0,0,0), looking
+in the direction of the negative <i>z</i>-axis; the positive direction of
+the <i>y</i>-axis is pointing straight up; and the  <i>x</i>-axis is pointing
+to the right.  This is a viewer-centric coordinate
+system.   In other words, eye coordinates are (almost) the coordinates
+that you actually want to <b>use</b> for drawing on the screen.
+The transform from world coordinates to eye coordinates is called the 
+<newword>viewing transformation</newword>. </p>
+
+<p>If this is confusing, think of it this way: We are free to use any
+coordinate system that we want on the world.  Eye coordinates are the
+natural coordinate system for making a picture of the world as seen by
+a viewer.  If we used a different coordinate system (world coordinates) when building the world,
+then we have to transform those coordinates to eye coordinates to find
+out what the viewer actually sees.  That transformation is the viewing transform.
+</p>
+
+<p>Note, by the way, that OpenGL doesn't keep track of separate modeling
+and viewing transforms.  They are combined into a single transform, which is known as the
+<newword>modelview transformation</newword>.  In fact, even though world coordinates
+might seem to be the most important and natural coordinate system, OpenGL doesn't have any
+representation for them and doesn't use them internally.  For OpenGL, only
+object and eye coordinates have meaning.  OpenGL goes directly from object coordinates to
+eye coordinates by applying the modelview transformation.</p>
+
+
+<p>We are not done.  The viewer can't see the entire 3D world,
+only the part that fits into the <newword>viewport</newword>, which is the
+rectangular region of the screen or other display device where the
+image will be drawn.  We say that the scene is
+"clipped" by the edges of the viewport.  Furthermore, in OpenGL,
+the viewer can see only a limited range of <i>z</i>-values in the eye coordinate system.  
+Points with larger
+or smaller <i>z</i>-values are clipped away and are not rendered into the image.
+(This is not, of course, the way that viewing works in the real world, but it's
+required by the use of the <word>depth test</word> in OpenGL.  See <localref href="gl1geom.1.4"/>.)
+The volume of space that
+is actually rendered into the image is called the <newword>view volume</newword>.
+Things inside the view volume make it into the image; things that are not
+in the view volume are clipped and cannot be seen.  For purposes of drawing,
+OpenGL applies a coordinate transform that maps the view volume
+onto a <b>cube</b>.  The cube is centered at the origin and extends from -1 to
+1 in the x-direction, in the y-direction, and in the z-direction.  The coordinate
+system on this cube is referred to as <newword>clip coordinates</newword>.
+The transformation from eye coordinates to clip coordinates is
+called the <newword>projection transformation</newword>.  At this point, we
+haven't quite projected the 3D scene onto a 2D surface, but we can now do
+so simply by discarding the z-coordinate.  (The z-coordinate, however, is still
+needed to provide the depth information that is needed for the depth test.)</p>
+
+<p>Note that clip coordinates are the coordinates will be used if you apply
+no transformation at all, that is if both the modelview and the 
+projection transforms are the <word term="identity transform">identity</word>.
+It is a left-handed coordinate system, with the positive direction of the <i>z</i>-axis
+pointing into the screen.
+</p>
+
+<p>We <b>still</b> aren't done.  In the end, when things are actually drawn, there are
+<newword>device coordinates</newword>, the 2D coordinate system in which the
+actual drawing takes place on a physical display device such as the computer screen.
+Ordinarily, in  device coordinates, the pixel is the unit of measure.
+The drawing region is a rectangle of pixels.  This is the rectangle that is called
+the viewport.  The <newword>viewport transformation</newword>
+takes x and y from the clip coordinates and scales them to fit
+the viewport.</p>
+
+<p>Let's go through the sequence of transformations one more time.  Think of a 
+<word term="geometric primitive">primitive</word>, such
+as a line or triangle, that is part of the scene and that might appear in the image
+that we want to make of the scene.  The primitive goes through the following sequence of
+operations:
+</p>
+
+<img src="opengl-transform-pipeline.png" width="551" height="91" tex="opengl-transform-pipeline.eps" texscale="0.8"/>
+
+
+
+<ol>
+
+<li>The points that define the primitive are specified in object coordinates, using methods
+such as <i>glVertex3f</i>.</li>
+
+<li>The points are first subjected to the modelview transformation, which is a combination of
+the modeling transform that places the primitive into the world and the viewing transform
+that maps the primitive into eye coordinates.</li>
+
+<li>The projection transformation is then applied to map the view volume that is visible to 
+the viewer onto the clip coordinate cube.  If the transformed primitive lies outside
+that cube, it will not be part of the image, and the processing stops.  If part of the
+primitive lies inside and part outside, the part that lies outside is clipped away and discarded, 
+and only the part that remains is processed further.</li>
+
+<li>Finally, the viewport transform is applied to produce the device coordinates that will
+actually be used to draw the primitive on the display device.  After that, it's just a matter
+of deciding how to color the individual pixels that are part of the primitive.</li>
+
+</ol>
+
+<np>We need to consider these transforms in more detail and see how to use them in
+OpenGL&nbsp;1.1.</np>
+
+</subsection>
+
+
+
+<subsection title="The Viewport Transformation" id="gl1geom.3.2">
+
+<p>The simplest of the transforms is the viewport transform.  It transforms
+<i>x</i> and <i>y</i> clip coordinates to the coordinates that are used on
+the display device.  To specify the viewport transform, it is only necessary
+to specify the rectangle on the device where the scene will be rendered.
+This is done using the <i>glViewport</i> function.</p>
+
+<p>OpenGL must be provided with a drawing surface by the environment in which
+it is running, such as <word>JOGL</word> for Java or the <word>GLUT</word> library for C.  
+That drawing surface is a rectangular grid of pixels, with a horizontal size
+and a vertical size.  OpenGL uses a coordinate system on the drawing surface
+that puts (0,0) at the lower left, with y increasing from bottom to top and
+x increasing from left to right.  When the drawing surface is first given to
+OpenGL, the viewport is set to be the entire drawing surface.  However,
+it is possible for OpenGL to draw to a different rectangle by calling</p>
+
+<pre>glViewport( x, y, width, height );</pre>
+
+<np>where (<i>x,y</i>) is the lower left corner of the viewport, in the
+drawing surface coordinate system, and <i>width</i> and <i>height</i>
+are the size of the viewport.  Clip coordinates from -1 to 1 will then
+be mapped to the specified viewport.  Note that this means in particular
+that drawing is limited to the viewport.  It is not an error for the
+viewport to extend outside of the drawing surface, though it would be
+unusual to set up that situation deliberately.</np>
+
+<p>When the size of the drawing surface changes, such as when the user resizes
+a window that contains the drawing surface, OpenGL does not automatically
+change the viewport to match the new size.  However, the environment in which OpenGL
+is running might do that for you.  (See <localref href="gl1geom.6"/> for information 
+about how this is handled by JOGL and GLUT.)</p>
+
+<p><i>glViewport</i> is often used to draw several different scenes, or several views
+of the same scene, on the same drawing surface.  Suppose, for example, that
+we want to draw two scenes, side-by-side, and that the drawing surface is 600-by-400 pixels.
+An outline for how to do that is very simple:
+</p>
+
+<pre>glViewport(0,0,300,400);  // Draw to left half of the drawing surface.
+     .
+     .   // Draw the first scene.
+     .
+     
+glViewport(300,0,300,400);  // Draw to right half of the drawing surface.
+     .
+     .   // Draw the second scene.
+     .</pre>
+     
+<np>The first <i>glViewport</i> command establishes a 300-by-400 pixel viewport with
+its lower left corner at (0,0).  That is, the lower left corner of the viewport is
+at the lower left corner of the drawing surface.  This viewport fills the left
+half of the drawing surface.  Similarly, the second viewport, with its lower left
+corner at (300,0), fills the right half of the drawing surface.</np>
+
+</subsection>
+
+
+
+
+<subsection title="The Projection Transformation" id="gl1geom.3.3">
+
+<p>We turn next to the projection transformation.  Like any transform, the projection
+is represented in OpenGL as a <word>matrix</word>.  OpenGL keeps track of the 
+projection matrix separately from the matrix that represents the modelview
+transformation.  The same transform functions, such as <i>glRotatef</i>, can be applied to both
+matrices, so OpenGL needs some way to know which matrix those functions apply to.
+This is determined by an OpenGL state property called the <newword>matrix mode</newword>.
+The value of the matrix mode is a constant such as <i>GL_PROJECTION</i> or <i>GL_MODELVIEW</i>.
+When a function such as <i>glRotatef</i> is called, it modifies a matrix; which matrix
+is modified depends on the current value of the matrix mode.
+The value is set by calling the function <i>glMatrixMode</i>.  The initial value is
+<i>GL_MODELVIEW</i>.  This means that if you want to work on the projection matrix,
+you must first call</p>
+
+<pre>glMatrixMode(GL_PROJECTION);</pre>
+
+<np>If you want to go back to working on the modelview matrix, you must call</np>
+
+<pre>glMartrixMode(GL_MODELVIEW);</pre>
+
+<np>In my programs, I generally set the matrix mode to <i>GL_PROJECTION</i>, set up
+the projection transformation, and then immediately set the matrix mode
+back to <i>GL_MODELVIEW</i>.  This means that anywhere else in the program, I can
+be sure that the matrix mode is <i>GL_MODELVIEW</i>.</np>
+
+<break/>
+
+<p>To help you to understand projection, remember that
+a 3D image can show only a part of the infinite 3D world.  The view volume
+is the part of the world that is visible in the image.  The view volume
+is determined by a combination of the viewing transformation and the projection
+transformation.  The viewing transform determines where the viewer is located and
+what direction the viewer is facing,  but it doesn't say how much of the world the 
+viewer can see.  The projection transform does that:  It specifies the shape and 
+extent of the region that is in view.   Think of the viewer as a camera, with 
+a big invisible box attached to the front of the camera that encloses
+the part of the world that that camera has in view.  The inside of the box is the
+view volume.  As the camera moves around in the world, the box moves with it,
+and the view volume changes.  But the shape and size of the box don't change.
+The shape and size of the box correspond to the projection transform.
+The position and orientation of the camera correspond to the viewing
+transform.</p>
+
+<p>This is all just another way of saying that, mathematically, 
+the OpenGL projection transformation transforms eye coordinates
+to clip coordinates, mapping the view volume onto the 2-by-2-by-2 clipping cube that contains
+everything that will be visible in the image.  To specify a projection just means
+specifying the size and shape of the view volume, relative to the viewer.</p>
+
+<p>There are two general types of projection, <newword>perspective projection</newword>
+and <newword>orthographic projection</newword>.  Perspective projection is more
+physically realistic.  That is, it shows what you would see if the OpenGL display rectangle
+on your computer screen were a window into an actual 3D world (one that
+could extend in front of the screen as well as behind it).  It shows a view that
+you could get by taking a picture of a 3D world with an ordinary camera.  In a perspective
+view, the apparent size of an object depends on how far it is away from the
+viewer.  Only things that are in front of the viewer can be seen.  In fact,
+ignoring clipping in the <i>z</i>-direction for the moment,
+the part of the world that is in view is an infinite pyramid, with the
+viewer at the apex of the pyramid, and with the sides of the pyramid
+passing through the sides of the viewport rectangle.</p>
+
+
+<p>However, OpenGL can't actually show everything in this pyramid, because of
+its use of the <word>depth test</word> to solve the <word>hidden surface problem</word>.  Since the
+depth buffer can only store a finite range of depth values, it can't
+represent the entire range of depth values for the infinite pyramid that 
+is theoretically in view.  Only objects in a certain range of distances from 
+the viewer can be part of the image.  That range of distances 
+is specified by two values,  <i>near</i> and <i>far</i>.  
+For a perspective transformation, both of these values must be positive numbers, and <i>far</i> must be greater 
+than <i>near</i>.  Anything that is closer to the viewer than the <i>near</i> distance
+or farther away than the <i>far</i> distance is discarded and does not appear
+in the rendered image.  The volume of space that is represented in the image
+is thus a "truncated pyramid."  This pyramid is the view volume for a perspective
+projection: 
+</p>
+
+
+<img src="projection-frustum.png" width="587" height="226" bordered="true" tex="projection-frustum.eps" texscale="0.75"/>
+
+
+<p>The view volume is bounded by six planes&mdash;the four sides plus the top and bottom
+of the truncated pyramid.  These
+planes are called clipping planes because anything that lies on the wrong side
+of each plane is clipped away. The projection transformation maps the six sides of the
+truncated pyramid in eye coordinates to the six sides of the clipping cube in clip coordinates.</p>
+
+
+<p>In OpenGL, setting up the projection transformation is equivalent to defining
+the view volume.  For a perspective transformation, you have to set up a view volume
+that is a truncated pyramid.  A rather obscure term for this shape is a <newword>frustum</newword>.
+A perspective transformation can be set up with the <i>glFrustum</i> command:</p>
+
+<pre>glFrustum( xmin, xmax, ymin, ymax, near, far );</pre>
+
+<np>The last two parameters specify the <i>near</i> and <i>far</i> distances from the
+viewer, as already discussed.  The viewer is assumed to be at the origin, (0,0,0), facing
+in the direction of the negative z-axis.  (This is the eye coordinate system.)  So,
+the near clipping plane is at <i>z</i> = &minus;<i>near</i>, and the far clipping
+plane is at <i>z</i> = &minus;<i>far</i>.  (Notice the minus signs!)
+The first four parameters specify the sides of the pyramid: 
+ <i>xmin</i>, <i>xmax</i>, <i>ymin</i>, and <i>ymax</i> specify the
+horizontal and vertical limits of the view volume <b>at the near clipping plane</b>.
+For example, the coordinates of the upper-left corner of the small end of the
+pyramid are (<i>xmin</i>,&nbsp;<i>ymax</i>,&nbsp;-<i>near</i>).  The <i>x</i>
+and <i>y</i> limits at the far clipping plane are larger, usually much larger, than
+the limits specified in the <i>glFrustum</i> command.</np>
+
+<p>Note that <i>x</i> and <i>y</i> limits in <i>glFrustum</i> are usually symmetrical
+about zero.  That is, <i>xmin</i> is usually equal to the negative of <i>xmax</i> and <i>ymin</i> 
+is usually equal to the negative of <i>ymax</i>.  However, this is not required.  It is possible to have
+asymmetrical view volumes where the z-axis does not point directly down the center of the view.</p>
+
+<p>Since the matrix mode must be set to <i>GL_PROJECTION</i> to work on the projection transformation,
+<i>glFrustum</i> is often used in a code segment of the form</p>
+
+<pre>glMatrixMode(GL_PROJECTION);
+glLoadIdentity();
+glFrustum( xmin, xmax, ymin, ymax, near, far );
+glMatrixMode(GL_MODELVIEW);</pre>
+
+<np>The call to <i>glLoadIdentity</i> ensures that the starting point is the <word>identity transform</word>.
+This is important since <i>glFrustum</i> modifies the existing projection matrix rather than replacing
+it, and although it is theoretically possible, you don't even want to try to think about what would happen if you
+combine several projection transformations into one.</np>
+
+<break/>
+    
+<p>Compared to perspective projections, orthographic projections are easier to understand: 
+In an orthographic projection, the 3D world is projected onto
+a 2D image by discarding the <i>z</i>-coordinate of the eye-coordinate system.  This type of projection
+is unrealistic in that it is not what a viewer would see.  For example, the apparent size of
+an object does not depend on its distance from the viewer.  Objects in back of the viewer
+as well as in front of the viewer can be visible in the image.  
+Orthographic projections are still useful, however, especially in interactive modeling 
+programs where it is useful to see true sizes and angles, undistorted by perspective.</p>
+
+<p>In fact, it's not really clear what
+it means to say that there is a viewer in the case of orthographic projection.
+Nevertheless, for orthographic projection in OpenGL, there is considered to be a viewer.
+The viewer is located at the eye-coordinate 
+origin, facing in the direction of the negative z-axis.  Theoretically, a rectangular corridor
+extending infinitely in both directions, in front of the viewer and in back, would be in view.
+However, as with perspective projection, only a finite segment of this infinite corridor can
+actually be shown in an OpenGL image.  This finite view volume is a parallelepiped&mdash;a&nbsp;rectangular
+solid&mdash;that is cut out of the infinite corridor by a <i>near</i> clipping plane and a <i>far</i>
+clipping plane.  The value of <i>far</i> must be greater than <i>near</i>, but for an orthographic
+projection, the value of <i>near</i> is allowed to be negative, putting the "near" clipping plane
+behind the viewer, as shown in the lower section of this illustration: 
+</p>
+
+<img src="projection-parallelepiped.png" width="599" height="489"
+               tex="projection-parallelepiped.eps" texscale="0.75"/>
+
+<np>Note that a negative value for <i>near</i> puts the near clipping plane on the <b>positive</b>
+<i>z</i>-axis, which is behind the viewer.</np>
+
+<p>An orthographic projection can be set up in OpenGL using the <i>glOrtho</i> method, which is
+has the following form:
+</p>
+
+<pre>glOrtho( xmin, xmax, ymin, ymax, near, far );</pre>
+
+<np>The first four parameters specify the <i>x</i>- and <i>y</i>-coordinates of the left, right, bottom, and
+top of the view volume.  Note that the last two parameters are <i>near</i> and <i>far</i>,
+not <i>zmin</i> and <i>zmax</i>.  In fact, the minimum z-value for the view volume is
+&minus;<i>far</i> and the maximum z-value is &minus;<i>near</i>.  However, it is often
+the case that <i>near</i> = &minus;<i>far</i>, and if that is true then the minimum and
+maximum z-values turn out to be <i>near</i> and <i>far</i> after all!</np>
+
+<p>As with <i>glFrustum</i>, <i>glOrtho</i> should be called when the matrix mode is
+<i>GL_PROJECTION</i>.  As an example, suppose that we want the view volume to be the
+box centered at the origin containing <i>x</i>, <i>y</i>, and <i>z</i> values in
+the range from -10 to 10.  This can be accomplished with</p>
+
+<pre>glMatrixMode(GL_PROJECTION);
+glLoadIdentity();
+glOrtho( -10, 10, -10, 10, -10, 10 );
+glMatrixMode(GL_MODELVIEW);</pre>
+
+<np>Now, as it turns out, the effect of <i>glOrtho</i> in this simple case is exactly the
+same as the effect of <i>glScalef</i>(0.1,&nbsp;0.1,&nbsp;-0.1), since the projection
+just scales the box down by a factor of 10.  But it's usually better to think of projection
+as a different sort of thing from scaling.  (The minus sign on the <i>z</i> scaling
+factor is there because projection reverses the direction of the <i>z</i>-axis, transforming
+the conventionally right-handed eye coordinate system into OpenGL's left-handed default
+coordinate system.)</np>
+
+
+<break/>
+
+<p>The <i>glFrustum</i> method is not particularly easy to use.  There is a library
+known as <newword>GLU</newword> that contains some utility functions for use with OpenGL.
+The GLU library includes the method <i>gluPerspective</i> as an easier way to set up a perspective
+projection.  The command</p>
+
+<pre>gluPerspective( fieldOfViewAngle, aspect, near, far );</pre>
+
+<np>can be used instead of <i>glFrustum</i>.  The <i>fieldOfViewAngle</i> is the vertical
+angle, measured in degrees, between the upper side of the view volume pyramid and the lower side.  
+Typical values are in the range 30 to 60 degrees.  The <i>aspect</i> parameter is the
+aspect ratio of the view, that is, the width of a cross-section of the pyramid
+divided by its height.  The value of <i>aspect</i> should
+generally be set to the aspect ratio of the viewport.  The <i>near</i> and <i>far</i>
+parameters in <i>gluPerspective</i> have the same meaning as for <i>glFrustum</i>.</np>
+
+
+
+</subsection>
+
+
+
+<subsection title="The Modelview Transformation" id="gl1geom.3.4">
+
+
+<p>&leftquote;Modeling" and "viewing" might seem like very different things, conceptually, but OpenGL
+combines them into a single transformation.  This is because there is no way to distinguish
+between them in principle; the difference is purely conceptual.  That is,
+a given transformation can be considered to be either a modeling transformation or a
+viewing transformation, depending on how you think about it.  (One significant difference, conceptually,
+is that the same viewing transformation usually applies to every object in the 3D scene, while 
+each object can have its own modeling transformation.  But this is not a difference in principle.) 
+We have already seen something
+similar in 2D graphics (<localref href="graphics2d.3.1"/>), but let's think about how it works in 3D.</p>
+
+<p>For example, suppose that there is a model of a house at the origin, facing towards the
+direction of the positive <i>z</i>-axis.  Suppose the viewer is on the positive <i>z</i>-axis,
+looking back towards the origin.  The viewer is looking directly at the front of the
+house. Now, you might apply a modeling transformation to the house, to rotate it by
+90 degrees about the <i>y</i>-axis.  After this transformation, the house is facing in
+the positive direction of the <i>x</i>-axis, and  the viewer is looking directly
+at the <b>left</b> side of the house.  On the other hand, you might rotate the
+<b>viewer</b> by <b>minus</b> 90 degrees about the <i>y</i>-axis.  This would put the viewer on
+the negative <i>x</i>-axis, which would give it a view of the <b>left</b> side of the house.
+The net result after either transformation is that the viewer ends up with exactly the
+same view of the house.  Either transformation can be implemented in OpenGL with the
+command
+</p>
+
+<pre>glRotatef(90,0,1,0);</pre>
+
+<np>That is, this command represents either a modeling transformation that rotates
+an object by 90 degrees or a viewing transformation that rotates the viewer by -90
+degrees about the <i>y</i>-axis.  Note that the effect on the viewer is the inverse of the effect on the object.
+Modeling and viewing transforms are always related in this way.  For example, if you
+are looking at an object, you can move yourself 5 feet to the <b>left</b> (viewing transform), or you can move
+the object 5 feet to the <b>right</b> (modeling transform).  In either case, you end up with
+the same view of the object.  Both transformations would be represented in OpenGL as</np>
+
+<pre>glTranslatef(5,0,0);</pre>
+
+<np>This even works for scaling:  If the viewer <i>shrinks</i>, it will look to the
+viewer exactly the same as if the world is expanding, and vice-versa.</np>
+
+<break/>
+    
+<p>Although modeling and viewing transformations are the same in principle, they remain
+very different conceptually, and they are typically applied at different points in the code.
+In general when drawing a scene, you will do the following:  (1)&nbsp;Load the identity matrix,
+for a well-defined starting point; (2)&nbsp;apply the viewing transformation; and (3)&nbsp;draw
+the objects in the scene, each with its own modeling transformation.  Remember that OpenGL keeps
+track of several transformations, and that this must all be done while the modelview transform
+is current; if you are not sure of that then before step 
+(1), you should call <i>glMatrixMode</i>(<i>GL_MODELVIEW</i>).
+During step (3), you will probably use <i>glPushMatrix</i>() and <i>glPopMatrix</i>() to limit
+each modeling transform to a particular object.</p>
+
+<p>After loading the identity matrix, the viewer is in the default position, at the origin,
+looking down the negative <i>z</i>-axis, with the positive <i>y</i>-axis pointing upwards in the
+view.  Suppose, for example, that we would like to move the viewer from its
+default location at the origin back along the positive z-axis 
+to the point (0,0,20).  This operation has exactly the same effect as moving the world,
+and the objects that it contains, 20 units in the negative direction along the z-axis.  Whichever
+operation is performed, the viewer ends up in exactly the same position relative to the
+objects.  Both operations are implemented by the same OpenGL
+command, <i>glTranslatef</i>(0,0,-20).  For another example,
+suppose that we use two commands</p>
+
+<pre>glRotatef(90,0,1,0);
+glTranslatef(10,0,0);</pre>
+
+
+<np>to establish the viewing transformation.  As a modeling transform, these commands would
+first translate an object 10 units 
+in the positive <i>x</i>-direction, then rotate the object 90 degrees about the <i>y</i>-axis.  
+This would move an object originally at (0,0,0) to (0,0,-10), placing the object
+10 units directly in front of the viewer.  (Remember that
+modeling transformations are applied to objects in the order opposite to their order in the code.)
+What do these commands do as a viewing transformation?  The effect on the view is the inverse
+of the effect on objects.  The inverse of "translate 90 then rotate 10" is "rotate -10
+then translate -90."  That is, to do the inverse, you have to undo the rotation <b>before</b>
+you undo the translation.   The effect as a viewing transformation is first to rotate the view
+by -90 degrees about the <i>y</i>-axis (which would leave the viewer at the origin, but now
+looking along the positive <i>x</i>-axis), then to translate the viewer by -10 along the 
+<i>x</i>-axis (backing up the viewer to the point (-10,0,0)).  An object at the point
+(0,0,0) would thus be 10 units directly in front of the viewer.
+(You should think about how the two interpretations affect the view of a house that starts out
+at (0,0,0).  The transformation affects which side of the house the viewer is looking at,
+as well as how far away from the house the viewer is located).</np>
+  
+<p>Note, by the way, that the order in which viewing transformations are applied is the
+<b>same as</b> the order in which they occur in the code.</p>
+
+
+<demo src="c3/transform-equivalence-3d.html" width="700" height="750"><p>
+<web>Here is a demo that illustrates the equivalence between modeling and viewing.
+The translucent gray box in the lower images represents the view volume that is used
+to create the image that is shown in the upper left.  In this case, the projection
+is a perspective projection, and the view volume is a frustum.
+Read the help text in the demo for more information.</web>
+<tex>The on-line version of this section includes the live demo 
+<demoref href="c3/transform-equivalence-3d.html"/> that can help you to understand the 
+equivalence between modeling and viewing.  This picture, taken from that demo, visualizes
+the view volume as a translucent gray box.  The scene contains eight cubes, but not all of them
+are inside the view volume, so not all of them would appear in the rendered image:</tex>
+</p>
+<texdiv>
+
+<img tex="view-volume-from-transform-equivalence-3d.eps" texscale="0.6"/>
+
+<np>In this case, the projection is a perspective projection, and the view volume is a frustum.
+This picture might have been made either by rotating the frustum towards the right (viewing
+transformation) or by rotating the cubes towards the left (modeling transform).
+Read the help text in the demo for more information</np></texdiv>
+</demo>
+
+
+<p>It can be difficult to set up a view by combining rotations, scalings, and translations,
+so OpenGL provides an easier way to set up a typical view.
+The command is not part of OpenGL itself but is part of the GLU library.</p>
+
+<p>The GLU library provides the following convenient method for
+setting up a viewing transformation:</p>
+
+<pre>gluLookAt( eyeX,eyeY,eyeZ, refX,refY,refZ, upX,upY,upZ );</pre>
+
+<np>This method places the viewer at the point (<i>eyeX</i>,<i>eyeY</i>,<i>eyeZ</i>),
+looking towards the point (<i>refX</i>,<i>refY</i>,<i>refZ</i>).
+The viewer is oriented so that the vector (<i>upX</i>,<i>upY</i>,<i>upZ</i>)
+points upwards in the viewer's view.  For example, to position the viewer on the negative
+<i>x</i>-axis, 10 units from the origin, looking back at the origin, with the positive
+direction of the <i>y</i>-axis pointing up as usual, use</np>
+
+<pre>gluLookAt( -10,0,0,  0,0,0,  0,1,0 );</pre>
+
+<break/>
+
+    
+<p>With all this, we can give an outline for a typical display routine for drawing
+an image of a 3D scene with OpenGL&nbsp;1.1:</p>
+
+<pre>// possibly set clear color here, if not set elsewhere
+
+glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+// possibly set up the projection here, if not done elsewhere
+
+glMatrixMode( GL_MODELVIEW );
+
+glLoadIdentity();
+
+gluLookAt( eyeX,eyeY,eyeZ, refX,refY,refZ, upX,upY,upZ );  // Viewing transform
+
+glPushMatrix();
+  .
+  .   // apply modeling transform and draw an object
+  .
+glPopMatrix();
+
+glPushMatrix();
+  .
+  .   // apply another modeling transform and draw another object
+  .
+glPopMatrix();
+
+  .
+  .
+  .
+</pre>
+
+
+
+</subsection>
+
+
+
+
+
+<subsection title="A Camera Abstraction" id="gl1geom.3.5">
+
+<p>Projection and viewing are often discussed using the analogy of a <newword>camera</newword>.
+A real camera is used to take a picture of a 3D world.  For 3D graphics, it useful to
+imagine using a virtual camera to do the same thing.  Setting up the viewing transformation is like
+positioning and pointing the camera.  The projection transformation determines the properties
+of the camera:  What is its field of view, what sort of lens does it use?  
+(Of course, the analogy breaks for OpenGL in at least one respect,
+since a real camera doesn't do clipping in its <i>z</i>-direction.)</p>
+
+<p>I have written a camera utility to implement this idea.  The camera is meant to
+take over the job of setting the projection and view.  Instead of doing that by hand, you set
+properties of the camera.  The API is available for both C and Java.  The two versions are
+somewhat different because the Java version is object-oriented.  I will discuss the
+C implementation first. (See <localref href="gl1geom.6"/> for basic information about
+programming OpenGL in C and Java.  For an example of using a camera in a program, see
+the polyhedron viewer example in the <localref href="gl1geom.4">next section</localref>.
+Note also that there is a version of the camera for use with my JavaScript simulator for OpenGL;
+it is part of the simulator library <sourceref href="glsim/glsim.js"/> and has an API almost identical
+to the Java API.)</p>
+
+<p>In C, the camera is defined by the sample .c file, <sourceref href="glut/camera.c"/> and
+a corresponding header file, <sourceref href="glut/camera.h"/>.  Full documentation for the API can
+be found in the header file.  To use the camera, you should <code>#include&nbsp;"camera.h"</code> at
+the start of your program, and when you compile the program, you should include <i>camera.c</i> in
+the list of files that you want to compile.  The camera depends on the GLU library and on
+C's standard math library, so you have to make sure that those libraries are available
+when it is compiled.  To use the camera, you should call</p>
+
+<pre>cameraApply();</pre>
+
+<np>to set up the projection and viewing transform before drawing the scene.
+Calling this function replaces the usual code
+code for setting up the projection and viewing transformations. It leaves the
+matrix mode set to <i>GL_MODELVIEW</i>.</np>
+
+<p>The remaining functions in the API are used to configure the camera.  This would usually
+be done as part of initialization, but it is possible to change the configuration at any time.
+However, remember that the settings are not used until you call <i>cameraApply</i>().
+Available functions include:</p>
+
+<pre>cameraLookAt( eyeX,eyeY,eyeZ, refX,refY,refZ, upX,upY,upZ );
+    // Determines the viewing transform, just like gluLookAt
+    // Default is cameraLookAt( 0,0,30, 0,0,0, 0,1,0 );
+    
+cameraSetLimits( xmin, xmax, ymin, ymax, zmin, zmax );
+    // Sets the limits on the view volume, where zmin and zmax are
+    // given with respect to the view reference point, NOT the eye,
+    // and the xy limits are measured at the distance of the
+    // view reference point, NOT the near distance.
+    // Default is cameraSetLimits( -5,5, -5,5, -10,10 );
+    
+cameraSetScale( limit );
+    // a convenience method, which is the same as calling
+    // cameraSetLimits( -limit,limit, -limit,limit, -2*limit, 2*limit );
+    
+cameraSetOrthographic( ortho );
+    // Switch between orthographic and perspective projection.
+    // The parameter should be 0 for perspective, 1 for
+    // orthographic.  The default is perspective.
+    
+cameraSetPreserveAspect( preserve );
+    // Determine whether the aspect ratio of the viewport should
+    // be respected.  The parameter should be 0 to ignore and
+    // 1 to respect the viewport aspect ratio.  The default
+    // is to preserve the aspect ratio.</pre>
+
+
+<np>In many cases, the default settings are sufficient.  Note in particular how
+<i>cameraLookAt</i> and <i>cameraSetLimits</i> work together to set up the view and
+projection.  The parameters to <i>cameraLookAt</i> represent three points in
+world coordinates.  The view reference point, (<i>refX,refY,refZ</i>),
+should be somewhere in the middle of the scene that you want to render.
+The parameters to <i>cameraSetLimits</i> define a box about that view reference
+point that should contain everything that you want to appear in the image.</np>
+
+<break/>
+
+<p>For use with <word>JOGL</word> in Java, the camera API is implemented as
+a class named <classname>Camera</classname>, defined in the file
+<sourceref href="jogl/Camera.java"/>.  The camera
+is meant for use with a <classname>GLPanel</classname> or
+<classname>GLCanvas</classname> that is being used as an OpenGL drawing surface.
+To use a camera, create an object of type <classname>Camera</classname> as
+an instance variable:</p>
+
+<pre>camera = new Camera();</pre>
+
+<np>Before drawing the scene, call</np>
+
+<pre>camera.apply(gl2);</pre>
+
+<np>where <i>gl2</i> is the OpenGL drawing context of type <i>GL2</i>.
+(Note the presence of the parameter <i>gl2</i>, which was not necessary in&nbsp;C; it is
+required because the OpenGL drawing context in JOGL is implemented as an object.)
+As in the C version, this sets the viewing and projection transformations and
+can replace any other code that you would use for that purpose.
+The functions for configuring the camera are the same in Java as in C,
+except that they become methods in the <i>camera</i> object, and true/false
+parameters are <i>boolean</i> instead of <i>int</i>:</np>
+
+<pre>camera.lookAt( eyeX,eyeY,eyeZ, refX,refY,refZ, upX,upY,upZ );
+camera.setLimits( xmin,xmax, ymin,ymax, zmin,zmax );
+camera.setScale( limit );
+camera.setOrthographic( ortho );    // ortho is of type boolean
+camera.setPreserveAspect( preserve ); // preserve is of type boolean</pre>
+
+<break/>
+
+
+<p>The camera comes with a simulated "trackball."
+The trackball allows the user to rotate the view by clicking and dragging the mouse
+on the display.  To use it with <word>GLUT</word> in C, you just need to install a mouse function and
+a mouse motion function by calling</p>
+
+<pre>glutMouseFunc( trackballMouseFunction );
+glutMotionFunc( trackballMotionFunction );</pre>
+
+<np>The functions
+<i>trackballMouseFunction</i> and <i>trackballMotionFunction</i> are defined
+as part of the camera API and are declared and documented in <i>camera.h</i>.
+The trackball works by modifying the viewing transformation associated with
+the camera, and it only works if <i>cameraApply</i>() is called at the
+beginning of the display function to set the viewing and projection
+transformations.  To install a trackball for use with a <classname>Camera</classname>
+object in JOGL, call</np>
+
+<pre>camera.installTrackball(drawSurface);</pre>
+
+<np>where <i>drawSurface</i> is the component on which the camera
+is used.</np>
+
+</subsection>
+
+
+</section>

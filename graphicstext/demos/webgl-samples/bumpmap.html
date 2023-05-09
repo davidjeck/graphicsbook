@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>WebGL Example: Bumpmap</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+    }
+    select {
+        margin-left: 20px;
+    }
+    img {
+        margin-left: 10px;
+        border: thin solid black;
+    }
+</style>
+
+<!--
+     A mostly successful attempt to do bumpmapping.  Grayscale height
+     maps are used to perturb the normals to a surface, making the
+     surface look "bumpy".  The implementation requires tangent vectors
+     for the surface.  The three object models used here have tangent
+     vectors that can be passed as an attribute to the shader program.
+     (I haven't learned how to make the appropriate tangent vectors
+     in general.  It took some experimentation for me to get them
+     pointed in directions that seem to work.)
+ -->
+
+<script src="gl-matrix-min.js"></script>
+<script src="trackball-rotator.js"></script>
+
+<script>
+
+"use strict";
+ 
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    attribute vec3 a_tangent;
+    attribute vec2 a_texCoords;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    varying vec3 v_normal;
+    varying vec3 v_tangent;
+    varying vec3 v_eyeCoords;
+    varying vec2 v_texCoords;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        v_normal = normalize(a_normal);
+        v_tangent = normalize(a_tangent);
+        v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+        v_texCoords = a_texCoords;
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    struct MaterialProperties {
+        vec3 diffuseColor;
+        vec3 specularColor;
+        float specularExponent;
+    };
+    struct LightProperties {
+        bool enabled;
+        vec4 position;
+        vec3 color;
+    };
+    uniform MaterialProperties material;
+    uniform LightProperties lights[3];
+    uniform mat3 normalMatrix;
+    uniform sampler2D texture;
+    uniform bool useTexture;
+    uniform sampler2D bumpmap;
+    uniform vec2 bumpmapSize;
+    uniform float bumpmapStrength;
+    varying vec3 v_normal;
+    varying vec3 v_tangent;
+    varying vec3 v_eyeCoords;
+    varying vec2 v_texCoords;
+    vec3 lightingEquation( LightProperties light, vec3 diffuse, vec3 specular, float specularColor,
+                                vec3 eyeCoords, vec3 N, vec3 V ) {
+           // N is normal vector, V is direction to viewer.
+        vec3 L, R; // Light direction and reflected light direction.
+        if ( light.position.w == 0.0 ) {
+            L = normalize( light.position.xyz );
+        }
+        else {
+            L = normalize( light.position.xyz/light.position.w - v_eyeCoords );
+        }
+        if (dot(L,N) <= 0.0) {
+            return vec3(0.0);
+        }
+        vec3 reflection = dot(L,N) * light.color * diffuse;
+        R = -reflect(L,N);
+        if (dot(R,V) > 0.0) {
+            float factor = pow(dot(R,V),material.specularExponent);
+            reflection += factor * specular * light.color;
+        }
+        return reflection;
+    }
+    void main() {
+        vec3 normal = normalize( v_normal );
+        vec3 tangent = normalize( v_tangent );
+        vec3 binormal = cross(normal,tangent);
+        float bm0 = texture2D( bumpmap, v_texCoords ).r; 
+        float bmUp = texture2D( bumpmap, v_texCoords + vec2(0.0, 1.0/bumpmapSize.y) ).r; 
+        float bmRight = texture2D( bumpmap, v_texCoords + vec2(1.0/bumpmapSize.x, 0.0) ).r;
+        vec3 bumpVector = (bmRight - bm0)*tangent + (bmUp - bm0)*binormal;
+        normal += bumpmapStrength*bumpVector;
+        normal = normalize( normalMatrix*normal );
+        vec3 viewDirection = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        vec3 diffuse;
+        if (useTexture) {
+            diffuse = texture2D( texture, v_texCoords ).rgb;
+        }
+        else {
+            diffuse = material.diffuseColor;
+        }
+        vec3 color = vec3(0.0);
+        for (int i = 0; i < 3; i++) {
+            if (lights[i].enabled) {
+                color += lightingEquation( lights[i], diffuse, material.specularColor, material.specularExponent,
+                                              v_eyeCoords, normal, viewDirection);
+            }
+        }
+        gl_FragColor = vec4(color,1.0);
+    }`;
+
+    
+let gl;      // The webgl context.
+let canvas;  // Canvas on which gl draws.
+
+let a_coords_loc;       // Location of attributes
+let a_normal_loc;
+let a_tangent_loc;
+let a_texCoords_loc;
+
+let u_modelview;       // Locations for uniform matrices
+let u_projection;
+let u_normalMatrix;
+
+let u_material;  // Holds uniform locations for front material.
+let u_lights;    // Holds uniform locations for light properties.
+
+let u_texture;   // An image texture
+let u_useTexture;// Tells whether to use texture for diffuseColor
+
+let u_bumpmap;         // A bumpmap texture (grayscale)
+let u_bumpmapSize;     // A vec2 giving bumpmap texture size
+let u_bumpmapStrength; // A float telling how strong the bump effect is (can be negative)
+
+const projection = mat4.create();    // projection matrix
+let modelview;                       // modelview matrix; value comes from rotator
+const normalMatrix = mat3.create();  // matrix, derived from modelview matrix, for transforming normal vectors
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+const objects = [];  // array of objects, containing models created using createModel();
+                     // will contain a cube, a cylinder and a torus.
+              
+let texture;  // The image texture.
+let bumpmap;  // The bumpmap texture.
+
+let textureLoading = false;
+let bumpmapLoading = false;
+
+const colors = [
+     [ 1, 1, 1 ],
+     [ 1, 0.5, 0.5 ],
+     [ 1, 1, 0.5 ],
+     [ 0.5, 1, 0.5 ],
+     [ 0.5, 0.5, 1 ],
+];
+
+const bumpmapURLs = [
+        "textures/dimples-height-map.png",
+        "textures/marble-height-map.png",
+        "textures/brick-height-map.jpg",
+        "textures/metal-height-map.png",
+        "textures/random-height-map.png"
+];
+
+
+// --------------- functions copied from basic-object-models-IFS.js, with tangent vectors added -----------
+
+/**
+  * Create a model of a cube, centered at the origin.  (This is not
+  * a particularly good format for a cube, since an IFS representation
+  * has a lot of redundancy.)
+  * @side the length of a side of the cube.  If not given, the value will be 1.
+  */
+function cube(side) {
+   let s = (side || 1)/2;
+   let coords = [];
+   let normals = [];
+   let tangents = [];
+   let texCoords = [];
+   let indices = [];
+   function face(xyz, nrm, tang) {
+      let start = coords.length/3;
+      let i;
+      for (i = 0; i < 12; i++) {
+         coords.push(xyz[i]);
+      }
+      for (i = 0; i < 4; i++) {
+         normals.push(nrm[0],nrm[1],nrm[2]);
+      }
+      for (i = 0; i < 4; i++) {
+         tangents.push(tang[0],tang[1],tang[2]);
+      }
+      texCoords.push(0,0,1,0,1,1,0,1);
+      indices.push(start,start+1,start+2,start,start+2,start+3);
+   }
+   face( [-s,-s,s, s,-s,s, s,s,s, -s,s,s], [0,0,1], [1,0,0] );
+   face( [-s,-s,-s, -s,s,-s, s,s,-s, s,-s,-s], [0,0,-1], [0,1,0] );
+   face( [-s,s,-s, -s,s,s, s,s,s, s,s,-s], [0,1,0], [0,0,1] );
+   face( [-s,-s,-s, s,-s,-s, s,-s,s, -s,-s,s], [0,-1,0], [1,0,0] );
+   face( [s,-s,-s, s,s,-s, s,s,s, s,-s,s], [1,0,0], [0,1,0] );
+   face( [-s,-s,-s, -s,-s,s, -s,s,s, -s,s,-s], [-1,0,0], [0,0,1] );
+   return {
+      vertexPositions: new Float32Array(coords),
+      vertexNormals: new Float32Array(normals),
+      vertexTextureCoords: new Float32Array(texCoords),
+      vertexTangents: new Float32Array(tangents),
+      indices: new Uint16Array(indices)
+   };
+}
+
+/**
+ * Create a model of a torus (surface of a doughnut).  The z-axis goes through the doughnut hole,
+ * and the center of the torus is at (0,0,0).
+ * @param outerRadius the distance from the center to the outside of the tube, 0.5 if not specified.
+ * @param innerRadius the distance from the center to the inside of the tube, outerRadius/3 if not
+ *    specified.  (This is the radius of the doughnut hole.)
+ * @param slices the number of lines of longitude, default 32.  These are slices parallel to the
+ * z-axis and go around the tube the short way (through the hole).
+ * @param stacks the number of lines of latitude plus 1, default 16.  These lines are perpendicular
+ * to the z-axis and go around the tube the long way (arouind the hole).
+ */
+function uvTorus(outerRadius, innerRadius, slices, stacks) {
+   outerRadius = outerRadius || 0.5;
+   innerRadius = innerRadius || outerRadius/3;
+   slices = slices || 32;
+   stacks = stacks || 16;
+   let vertexCount = (slices+1)*(stacks+1);
+   let vertices = new Float32Array( 3*vertexCount );
+   let normals = new Float32Array( 3* vertexCount );
+   let tangents = new Float32Array( 3* vertexCount );
+   let texCoords = new Float32Array( 2*vertexCount );
+   let indices = new Uint16Array( 2*slices*stacks*3 );
+   let du = 2*Math.PI/slices;
+   let dv = 2*Math.PI/stacks;
+   let centerRadius = (innerRadius+outerRadius)/2;
+   let tubeRadius = outerRadius - centerRadius;
+   let i,j,u,v,cx,cy,sin,cos,x,y,z;
+   let indexV = 0;
+   let indexT = 0;
+   for (j = 0; j <= stacks; j++) {
+      v = -Math.PI + j*dv;
+      cos = Math.cos(v);
+      sin = Math.sin(v);
+      for (i = 0; i <= slices; i++) {
+         u = i*du;
+         cx = Math.cos(u);
+         cy = Math.sin(u);
+         x = cx*(centerRadius + tubeRadius*cos);
+         y = cy*(centerRadius + tubeRadius*cos);
+         z = sin*tubeRadius;
+         vertices[indexV] = x;
+         tangents[indexV] = -cy;
+         normals[indexV++] = cx*cos;
+         vertices[indexV] = y;
+         tangents[indexV] = cx;
+         normals[indexV++] = cy*cos;
+         vertices[indexV] = z;
+         tangents[indexV] = 0;
+         normals[indexV++] = sin;
+         texCoords[indexT++] = i/slices;
+         texCoords[indexT++] = j/stacks;
+      } 
+   }
+   let k = 0;
+   for (j = 0; j < stacks; j++) {
+      let row1 = j*(slices+1);
+      let row2 = (j+1)*(slices+1);
+      for (i = 0; i < slices; i++) {
+          indices[k++] = row1 + i;
+          indices[k++] = row2 + i + 1;
+          indices[k++] = row2 + i;
+          indices[k++] = row1 + i;
+          indices[k++] = row1 + i + 1;
+          indices[k++] = row2 + i + 1;
+      }
+   }
+   return {
+       vertexPositions: vertices,
+       vertexNormals: normals,
+       vertexTextureCoords: texCoords,
+       vertexTangents: tangents,
+       indices: indices
+   };
+}
+
+/**
+ * Defines a model of a cylinder.  The axis of the cylinder is the z-axis,
+ * and the center is at (0,0,0).
+ * @param radius the radius of the cylinder
+ * @param height the height of the cylinder.  The cylinder extends from -height/2
+ * to height/2 along the z-axis.
+ * @param slices the number of slices, like the slices of an orange.
+ * @param noTop if missing or false, the cylinder has a top; if set to true,
+ *   the cylinder has a top. The top is a disk at the positive end of the cylinder.
+ * @param noBottom if missing or false, the cylinder has a bottom; if set to true,
+ *   the cylinder has a bottom. The bottom is a disk at the negtive end of the cylinder.
+ */
+function uvCylinder(radius, height, slices, noTop, noBottom) {
+   radius = radius || 0.5;
+   height = height || 2*radius;
+   slices = slices || 32;
+   let vertexCount = 2*(slices+1);
+   if (!noTop)
+      vertexCount += slices + 2;
+   if (!noBottom)
+      vertexCount += slices + 2;
+   let triangleCount = 2*slices;
+   if (!noTop)
+      triangleCount += slices;
+   if (!noBottom)
+      triangleCount += slices; 
+   let vertices = new Float32Array(vertexCount*3);
+   let normals = new Float32Array(vertexCount*3);
+   let tangents = new Float32Array(vertexCount*3);
+   let texCoords = new Float32Array(vertexCount*2);
+   let indices = new Uint16Array(triangleCount*3);
+   let du = 2*Math.PI / slices;
+   let kv = 0;
+   let kt = 0;
+   let k = 0;
+   let i,u;
+   for (i = 0; i <= slices; i++) {
+      u = i*du;
+      let c = Math.cos(u);
+      let s = Math.sin(u);
+      vertices[kv] = c*radius;
+      tangents[kv] = -s;
+      normals[kv++] = c;
+      vertices[kv] = s*radius;
+      tangents[kv] = c;
+      normals[kv++] = s;
+      vertices[kv] = -height/2;
+      tangents[kv] = 0;
+      normals[kv++] = 0;
+      texCoords[kt++] = i/slices;
+      texCoords[kt++] = 0;
+      vertices[kv] = c*radius;
+      tangents[kv] = -s;
+      normals[kv++] = c;
+      vertices[kv] = s*radius;
+      tangents[kv] = c;
+      normals[kv++] = s;
+      vertices[kv] = height/2;
+      tangents[kv] = 0;
+      normals[kv++] = 0;
+      texCoords[kt++] = i/slices;
+      texCoords[kt++] = 1;
+   }
+   for (i = 0; i < slices; i++) {
+          indices[k++] = 2*i;
+          indices[k++] = 2*i+3;
+          indices[k++] = 2*i+1;
+          indices[k++] = 2*i;
+          indices[k++] = 2*i+2;
+          indices[k++] = 2*i+3;
+   }
+   let startIndex = kv/3;
+   if (!noBottom) {
+      vertices[kv] = 0;
+      tangents[kv] = -1;
+      normals[kv++] = 0;
+      vertices[kv] = 0;
+      tangents[kv] = 0;
+      normals[kv++] = 0;
+      vertices[kv] = -height/2;
+      tangents[kv] = 0;
+      normals[kv++] = -1;
+      texCoords[kt++] = 0.5;
+      texCoords[kt++] = 0.5; 
+      for (i = 0; i <= slices; i++) {
+         u = 2*Math.PI - i*du;
+         let c = Math.cos(u);
+         let s = Math.sin(u);
+         vertices[kv] = c*radius;
+         tangents[kv] = -1;
+         normals[kv++] = 0;
+         vertices[kv] = s*radius;
+         tangents[kv] = 0;
+         normals[kv++] = 0;
+         vertices[kv] = -height/2;
+         tangents[kv] = 0;
+         normals[kv++] = -1;
+         texCoords[kt++] = 0.5 - 0.5*c;
+         texCoords[kt++] = 0.5 + 0.5*s;
+      }
+      for (i = 0; i < slices; i++) {
+         indices[k++] = startIndex;
+         indices[k++] = startIndex + i + 1;
+         indices[k++] = startIndex + i + 2;
+      }
+   }
+   startIndex = kv/3;
+   if (!noTop) {
+      vertices[kv] = 0;
+      tangents[kv] = 1;
+      normals[kv++] = 0;
+      vertices[kv] = 0;
+      tangents[kv] = 0;
+      normals[kv++] = 0;
+      vertices[kv] = height/2;
+      tangents[kv] = 0;
+      normals[kv++] = 1;
+      texCoords[kt++] = 0.5;
+      texCoords[kt++] = 0.5; 
+      for (i = 0; i <= slices; i++) {
+         u = i*du;
+         let c = Math.cos(u);
+         let s = Math.sin(u);
+         vertices[kv] = c*radius;
+         tangents[kv] = 1;
+         normals[kv++] = 0;
+         vertices[kv] = s*radius;
+         tangents[kv] = 0;
+         normals[kv++] = 0;
+         vertices[kv] = height/2;
+         tangents[kv] = 0;
+         normals[kv++] = 1;
+         texCoords[kt++] = 0.5 + 0.5*c;
+         texCoords[kt++] = 0.5 + 0.5*s;
+      }
+      for (i = 0; i < slices; i++) {
+         indices[k++] = startIndex;
+         indices[k++] = startIndex + i + 1;
+         indices[k++] = startIndex + i + 2;
+      }
+   }
+   return {
+       vertexPositions: vertices,
+       vertexNormals: normals,
+       vertexTangents: tangents,
+       vertexTextureCoords: texCoords,
+       indices: indices
+   };
+}
+
+
+//----------------------------------------------------------------------------------------------------------
+
+function draw() {
+
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    if (textureLoading || bumpmapLoading) {
+        return;
+    }
+    
+    let strength = Number(document.getElementById("strength").value);
+    gl.uniform1f(u_bumpmapStrength, strength);
+    
+    modelview = rotator.getViewMatrix();
+    let objectNum = Number(document.getElementById("object").value);
+    objects[objectNum].render();
+
+} // end draw()
+
+
+/**
+ *  Create an object representing an IFS model.  The modelData holds the data for
+ *  an IFS using the structure from basic-objects-IFS.js.  This function
+ *  creates VBOs to hold the coordinates, normal vectors, tangent vectors, texture
+ *  coordinates and indices from the IFS, and it loads the data into those buffers.
+ *  The function creates a new object whose properties are the identifiers of the
+ *  VBOs.  The new object also has a function, render(), that can be called to
+ *  render the object, using all the data from the buffers.  That object
+ *  is returned as the value of the function.  
+ */
+function createModel(modelData) {
+    let model = {};
+    model.coordsBuffer = gl.createBuffer();
+    model.normalBuffer = gl.createBuffer();
+    model.tangentBuffer = gl.createBuffer();
+    model.texCoordsBuffer = gl.createBuffer();
+    model.indexBuffer = gl.createBuffer();
+    model.count = modelData.indices.length;
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.coordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexPositions, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexNormals, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.tangentBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexTangents, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.texCoordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexTextureCoords, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, modelData.indices, gl.STATIC_DRAW);
+    model.render = function() {  // This function will render the object.
+           // Since the buffer from which we are taking the coordinates and normals
+           // change each time an object is drawn, we have to use gl.vertexAttribPointer
+           // to specify the location of the data. And to do that, we must first
+           // bind the buffer that contains the data.  Similarly, we have to
+           // bind this object's index buffer before calling gl.drawElements.
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.coordsBuffer); 
+        gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+        gl.vertexAttribPointer(a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.tangentBuffer);
+        gl.vertexAttribPointer(a_tangent_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordsBuffer);
+        gl.vertexAttribPointer(a_texCoords_loc, 2, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(u_modelview, false, modelview );
+        mat3.normalFromMat4(normalMatrix, modelview);
+        gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);  
+        gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
+    };
+    return model;
+}
+
+function loadBumpmap() {
+    document.getElementById("message").innerHTML = "LOADING BUMPMAP TEXTURE";
+    let bumpmapNum = Number(document.getElementById("bumpmap").value);
+    bumpmapLoading = true;
+    draw();
+    let img = new Image();
+    img.onload = function() {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D,bumpmap);
+        try {
+           gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, gl.LUMINANCE, gl.UNSIGNED_BYTE, img);
+        }
+        catch (e) {
+           document.getElementById("message").innerHTML = "SORRY, COULD NOT ACCESS BUMPMAP TEXTURE IMAGE.";
+           return;
+        }
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        bumpmapLoading = false;
+        document.getElementById("message").innerHTML = "Drag on the object to rotate it.";
+        gl.uniform2f(u_bumpmapSize, img.width, img.height);
+        draw();
+    };
+    img.onerror = function() {
+        document.getElementById("message").innerHTML = "SORRY, COULDN'T LOAD BUMPMAP TEXTURE IMAGE";
+    };
+    img.src = bumpmapURLs[bumpmapNum];
+    document.getElementById("bumpimage").src = bumpmapURLs[bumpmapNum];
+}
+
+
+function setDiffuse() {
+    let colorNum = Number(document.getElementById("color").value);
+    gl.uniform1i( u_useTexture, 0);
+    gl.uniform3fv( u_material.diffuseColor, colors[colorNum] );  console.log(colorNum)
+    draw();
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram(gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    gl.enable(gl.DEPTH_TEST);
+    
+    /* Get attribute and uniform locations and create the buffers */
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    a_tangent_loc =  gl.getAttribLocation(prog, "a_tangent");
+    a_texCoords_loc =  gl.getAttribLocation(prog, "a_texCoords");
+    gl.enableVertexAttribArray(a_normal_loc);
+    gl.enableVertexAttribArray(a_tangent_loc);
+    gl.enableVertexAttribArray(a_coords_loc);
+    gl.enableVertexAttribArray(a_texCoords_loc);
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    
+    u_texture = gl.getUniformLocation(prog, "texture");
+    u_useTexture = gl.getUniformLocation(prog, "useTexture");
+    u_bumpmap = gl.getUniformLocation(prog, "bumpmap");
+    u_bumpmapSize = gl.getUniformLocation(prog, "bumpmapSize");
+    u_bumpmapStrength = gl.getUniformLocation(prog, "bumpmapStrength");
+    
+    gl.uniform1i( u_useTexture, 0 );
+    gl.uniform1i( u_texture, 0 );
+    gl.uniform1i( u_bumpmap, 1 );
+    texture = gl.createTexture();
+    bumpmap = gl.createTexture();
+    
+    u_material = {
+        diffuseColor: gl.getUniformLocation(prog, "material.diffuseColor"),
+        specularColor: gl.getUniformLocation(prog, "material.specularColor"),
+        specularExponent: gl.getUniformLocation(prog, "material.specularExponent")
+    };
+    u_lights = new Array(3);
+    for (let i = 0; i < 3; i++) {
+        u_lights[i] = {
+            enabled: gl.getUniformLocation(prog, "lights[" + i + "].enabled"),
+            position: gl.getUniformLocation(prog, "lights[" + i + "].position"),
+            color: gl.getUniformLocation(prog, "lights[" + i + "].color"),
+        };
+    }
+    
+    /* Set up values for material and light uniforms; these values don't change in this program. */
+    
+    gl.uniform3f( u_material.diffuseColor, 1, 1, 1 );
+    gl.uniform3f( u_material.specularColor, 0.2, 0.2, 0.2 );
+    gl.uniform1f( u_material.specularExponent, 32 );
+    for (let i = 0; i < 3; i++) {
+        gl.uniform1i( u_lights[i].enabled, 0 );
+    }
+    gl.uniform1i( u_lights[0].enabled, 1 );           // in the end, I decided to use only the viewpoint light
+    gl.uniform4f( u_lights[0].position, 0, 0, 1, 0 );
+    gl.uniform3f( u_lights[0].color, 0.6,0.6,0.6);
+    gl.uniform4f( u_lights[1].position, -1, -1, 1, 0 );
+    gl.uniform3f( u_lights[1].color, 0.3,0.3,0.3 );
+    gl.uniform4f( u_lights[2].position, 0, 3, -1, 0 );
+    gl.uniform3f( u_lights[2].color, 0.3,0.3,0.3 );
+    
+    mat4.perspective(projection, Math.PI/10, 1, 1, 10);
+    gl.uniformMatrix4fv(u_projection, false, projection);
+    
+    objects[0] = createModel( cube() );
+    objects[1] = createModel( uvCylinder() );
+    objects[2] = createModel( uvTorus(0.65,0.2,64,24) );
+ 
+    mat4.perspective(projection, Math.PI/10, 1, 1, 10);
+    gl.uniformMatrix4fv(u_projection, false, projection);
+    
+} // end initGL()
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("reset").onclick = function() {
+        rotator.setView(5,[2,2,3]);
+        draw();
+    };
+    document.getElementById("bumpmap").value = "0";
+    document.getElementById("bumpmap").onchange = loadBumpmap;
+    document.getElementById("object").value = "0";
+    document.getElementById("object").onchange = draw;
+    document.getElementById("color").value = "0";
+    document.getElementById("color").onchange = setDiffuse;
+    document.getElementById("strength").value = "2";
+    document.getElementById("strength").onchange = draw;
+    rotator = new TrackballRotator(canvas, draw, 5, [2,2,3]);
+    loadBumpmap();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<h2>WebGL Bumpmap Demo</h2>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p id="message">Drag on the object to rotate it.</p>
+
+<div id="canvas-holder" style="float:left">
+   <canvas width=500 height=500 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+<div style="float:left; margin-left:30px; border:medium solid black; background-color: white; padding:8px">
+<p><label><b>Bumpmap:</b><br> <select id="bumpmap">
+    <option value="0">Dimples</option>
+    <option value="1">Marble</option>
+    <option value="2">Brick</option>
+    <option value="4">Noise</option>
+    <option value="3">Metal</option>
+</select></label></p>
+
+
+<p><label><b>Bump Strength:</b><br> <select id="strength">
+    <option>5</option>
+    <option>4</option>
+    <option>3</option>
+    <option>2</option>
+    <option>1</option>
+    <option>0</option>
+    <option>-1</option>
+    <option>-2</option>
+    <option>-3</option>
+    <option>-4</option>
+    <option>-5</option>
+</select></label></p>
+<p><button id="reset">Reset Rotation</button></p>
+
+<p><label><b>Object:</b><br> <select id="object">
+    <option value="0">Cube</option>
+    <option value="2">Torus</option>
+    <option value="1">Cylinder</option>
+</select></label></p>
+
+<p><label><b>Diffuse Color:</b><br> <select id="color">
+    <option value="0">White</option>    
+    <option value="1">Pink</option>    
+    <option value="2">Yellow</option>    
+    <option value="3">Green</option>    
+    <option value="4">Blue</option>    
+</select></label></p>
+
+
+<p><b>Bumpmap Image:</b><br><br><img id="bumpimage" width="128" height="128" src="textures/dimples-height-map.png"></p>
+
+</div>
+
+
+</body>
+</html>
+

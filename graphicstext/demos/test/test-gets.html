@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>3D Axes</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../glsim-samples/glsim.js"></script>
+<script>
+    
+        
+function draw() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glViewport(10,10,100,200);
+    var array = new Array(16);
+    glGetFloatv(GL_MODELVIEW_MATRIX, array);
+    console.log("Modelview matrix: " + array);
+    glTranslatef(1,2,3);
+    glGetFloatv(GL_MODELVIEW_MATRIX, array);
+    console.log("Modelview matrix after translate: " + array);
+    console.log("GL_DEPTH_TEST enabled = " + glIsEnabled(GL_DEPTH_TEST));
+    console.log("GL_DEPTH_TEST enabled = " + glIsEnabled(GL_DEPTH_TEST));
+    console.log("GL_NORMALIZE enabled = " + glIsEnabled(GL_NORMALIZE));
+    array = new Array(4);
+    glGetMaterialfv(GL_FRONT, GL_DIFFUSE, array);
+    console.log("fron diffuse material: " + array);
+    glMaterialfv(GL_FRONT, GL_EMISSION, [1,0,1,0.5]);
+    glGetMaterialfv(GL_FRONT, GL_EMISSION, array);
+    console.log("front emission material: " + array);
+    glGetLightfv(GL_LIGHT0, GL_POSITION, array);
+    console.log("light0 position: " + array);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, [1,2,3,1]);
+    glGetLightfv(GL_LIGHT1, GL_DIFFUSE, array);
+    console.log("light1 diffuse: " + array);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, [-1,12,7,1]);
+    var array2 = new Array(4);
+    glGetLightfv(GL_LIGHT1, GL_DIFFUSE, array2);
+    console.log("light1 diffuse: " + array2);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, array);
+    glGetLightfv(GL_LIGHT1, GL_DIFFUSE, array);
+    console.log("light1 diffuse: " + array);
+    glGetIntegerv(GL_VIEWPORT, array);
+    console.log("Viewport: " + array);
+    array = [1];
+    glGetIntegerv(GL_LIGHT_MODEL_TWO_SIDE, array);
+    console.log("light model two side = " + array[0]);
+    glPointSize(3.7);
+    glGetFloatv(GL_POINT_SIZE, array);
+    console.log("point size = " + array[0]);
+}
+
+function initGL() {
+    glClearColor(0.5,0.5,0.5,1);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    glOrtho(-5,5,-5,5,-5,5);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas",null);
+        initGL();
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                 e + "</b></p>";
+                 return;
+    }
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Demo headline goes here</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="400" height="400"></canvas>
+</div>
+
+<div id="tools">
+<h3 style="margin-top:0pt">Tools</h3>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<!--
+    Draws a 2D scene using OpenGL, then copies that scene to a
+    texture image so that it can be applied as a texture to a
+    3D object.  The scene can be animated.
+-->
+<head>
+<meta charset="UTF-8">
+<title>Texture From Color Buffer</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/teapot-model-IFS.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script>
+
+var camera;
+
+var canvas;  // the canvas on which we will draw.
+
+var frameNumber = 0;  // frame number for the animation
+
+var sphere, cubeModel, cylinder, cone, torus, teapot;  // model data for six objects.
+
+
+/*  The display function, which draws the content of the canvas.
+ */
+function draw() {
+
+    var objectNumber = Number(document.getElementById("object").value);  // which object to draw.
+
+    /* First, draw the 2D scene, using a 256-by256 viewport to get a power-of-two texture. */
+    
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_TEXTURE_2D);
+    glViewport(0,0,256,256);  // Note that canvas must be at least 256-by-256.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho( 0,7, -1,5, -1,1 );  // Limits requied by 2D scene
+    glMatrixMode(GL_MODELVIEW);
+    
+    draw2DScene();
+    
+    if (objectNumber == 6) {
+        return;   // Just show the 2D scene as the image in the canvas.
+    }
+    
+    /* Copy the image into the texture. */
+    
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, 256, 256, 0);
+    
+    /* Since we do not have mipmaps for the texture, we MUST set the texture
+       minimication filter to GL_NEAREST or GL_LINEAR, since the default
+       filter requires mipmaps. */
+       
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    /* Now, draw the shape, with the texture */    
+    
+    glEnable(GL_LIGHTING);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_TEXTURE_2D);
+    glViewport(0,0,canvas.width,canvas.height);  // restore full viewport!
+    
+    camera.apply(); // (Sets up projection and viewing transforms.)
+
+    glClearColor( 0, 0, 0, 1 );
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    switch(objectNumber) {
+    case 0:
+        glRotatef(-90,1,0,0);
+	glScalef(1.5,1.5,1.5);
+        drawModel(sphere);
+        break;
+    case 1:
+	glScalef(1.2,1.2,1.2);
+         drawModel(cubeModel);
+         break;
+    case 2:
+	glRotatef(-90,1,0,0);
+	glScalef(1.3,1.3,1.3);
+	drawModel(cylinder);
+	break;
+    case 3:
+	glRotatef(-90,1,0,0);
+	glScalef(1.3,1.3,1.3);
+	drawModel(cone);
+	break;
+    case 4:
+	glScalef(1.6,1.6,1.6);
+	drawModel(torus);
+	break;
+    case 5:
+	glScalef(0.06, 0.06, 0.06);
+	drawModel(teapot);
+	break;
+    }
+
+}
+
+/**
+ *  Draws a model using glDrawElements.  The model data must be in the format produced by
+ *  the functions in basic-object-models-IFS.js.
+ */
+function drawModel(model) {
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3,GL_FLOAT,0,model.vertexPositions);
+    glEnableClientState(GL_NORMAL_ARRAY);
+    glNormalPointer(GL_FLOAT, 0, model.vertexNormals);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2,GL_FLOAT,0,model.vertexTextureCoords);
+    glDrawElements(GL_TRIANGLES, model.indices.length, GL_UNSIGNED_BYTE, model.indices);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);    
+}
+
+
+function initGL() {
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [ 1, 1, 1,1 ]);// white material for texturing.
+}
+
+//----------------- Drawing the 2D scene ----------------------------------------
+
+/*
+ * Draw a 32-sided regular polygon as an approximation for a circular disk.
+ * (This is necessary since OpenGL has no commands for drawing ovals, circles,
+ * or curves.)  The disk is centered at (0,0) with a radius given by the 
+ * parameter.
+ */
+function drawDisk(radius) {
+    var d;
+    glBegin(GL_POLYGON);
+    for (d = 0; d < 32; d++) {
+        var angle = 2*Math.PI/32 * d;
+        glVertex2d( radius*Math.cos(angle), radius*Math.sin(angle));
+    }
+    glEnd();
+}
+
+/*
+ * Draw a wheel, centered at (0,0) and with radius 1. The wheel has 15 spokes
+ * that rotate in a clockwise direction as the animation proceeds.
+ */
+function drawWheel() {
+    var i;
+    glColor3f(0,0,0);
+    drawDisk(1);
+    glColor3f(0.75, 0.75, 0.75);
+    drawDisk(0.8);
+    glColor3f(0,0,0);
+    drawDisk(0.2);
+    glRotatef(frameNumber*20,0,0,1);
+    glBegin(GL_LINES);
+    for (i = 0; i < 15; i++) {
+        glVertex2f(0,0);
+        glVertex2d(Math.cos(i*2*Math.PI/15), Math.sin(i*2*Math.PI/15));
+    }
+    glEnd();
+}
+
+/*
+ * Draw a cart consisting of a rectangular body and two wheels.  The wheels
+ * are drawn by the drawWheel() method; a different translation is applied to each
+ * wheel to move them into position under the body.  The body of the cart
+ * is a red rectangle with corner at (0,-2.5), width 5, and height 2.  The
+ * center of the bottom of the rectangle is at (0,0).
+ */
+function drawCart() {
+    glPushMatrix();
+    glTranslatef(-1.5, -0.1, 0);
+    glScalef(0.8,0.8,1);
+    drawWheel();
+    glPopMatrix();
+    glPushMatrix();
+    glTranslatef(1.5, -0.1, 0);
+    glScalef(0.8,0.8,1);
+    drawWheel();
+    glPopMatrix();
+    glColor3f(1,0,0);
+    glBegin(GL_POLYGON);
+    glVertex2f(-2.5,0);
+    glVertex2f(2.5,0);
+    glVertex2f(2.5,2);
+    glVertex2f(-2.5,2);
+    glEnd();
+}
+
+/*
+ * Draw a sun with radius 0.5 centered at (0,0).  There are also 13 rays which
+ * extend outside from the sun for another 0.25 units.
+ */
+function drawSun() {
+    var i;
+    glColor3f(1,1,0);
+    for (i = 0; i < 13; i++) { // Draw 13 rays, with different rotations.
+        glRotatef( 360 / 13, 0, 0, 1 ); // Note that the rotations accumulate!
+        glBegin(GL_LINES);
+        glVertex2f(0, 0);
+        glVertex2f(0.75, 0);
+        glEnd();
+    }
+    drawDisk(0.5);
+    glColor3f(0,0,0);
+}
+
+/*
+ * Draw a windmill, consisting of a pole and three vanes.  The pole extends from the
+ * point (0,0) to (0,3).  The vanes radiate out from (0,3).  A rotation that depends
+ * on the frame number is applied to the whole set of vanes, which causes the windmill
+ * to rotate as the animation proceeds.  Note that this method changes the current
+ * transform in the GL context gl!  The caller of this subroutine should take care
+ * to save and restore the original transform, if necessary.
+ */
+function drawWindmill() {
+    var i;
+    glColor3f(0.8, 0.8, 0.9);
+    glBegin(GL_POLYGON);
+    glVertex2f(-0.05, 0);
+    glVertex2f(0.05, 0);
+    glVertex2f(0.05, 3);
+    glVertex2f(-0.05, 3);
+    glEnd();
+    glTranslatef(0, 3, 0);
+    glRotated(frameNumber * (180.0/46), 0, 0, 1);
+    glColor3f(0.4, 0.4, 0.8);
+    for (i = 0; i < 3; i++) {
+        glRotated(120, 0, 0, 1);  // Note: These rotations accumulate.
+        glBegin(GL_POLYGON);
+        glVertex2f(0,0);
+        glVertex2f(0.5, 0.1);
+        glVertex2f(1.5,0);
+        glVertex2f(0.5, -0.1);
+        glEnd();
+    }
+}
+
+/*  Draws the entire 2D scene.
+ */
+function draw2DScene() {
+
+    glClearColor( 0.7, 0.8, 1.0, 1.0 );
+    glClear(GL_COLOR_BUFFER_BIT); // Fills the scene with blue.
+    glLoadIdentity();
+
+    /* Draw three green triangles to form a ridge of hills in the background */
+
+    glColor3f(0, 0.6, 0.2);
+    glBegin(GL_POLYGON);
+    glVertex2f(-3,-1);
+    glVertex2f(1.5,1.65);
+    glVertex2f(5,-1);
+    glEnd();
+    glBegin(GL_POLYGON);
+    glVertex2f(-3,-1);
+    glVertex2f(3,2.1);
+    glVertex2f(7,-1);
+    glEnd();
+    glBegin(GL_POLYGON);
+    glVertex2f(0,-1);
+    glVertex2f(6,1.2);
+    glVertex2f(20,-1);
+    glEnd();
+
+    /* Draw a bluish-gray rectangle to represent the road. */
+
+    glColor3f(0.4, 0.4, 0.5);
+    glBegin(GL_POLYGON);
+    glVertex2f(0,-0.4);
+    glVertex2f(7,-0.4);
+    glVertex2f(7,0.4);
+    glVertex2f(0,0.4);
+    glEnd();
+
+    /* Draw a white line to represent the stripe down the middle
+     * of the road. */
+
+    glLineWidth(4);  // Set the line width to be 6 pixels.
+    glColor3f(1,1,1);
+    glBegin(GL_LINES);
+    glVertex2f(0,0);
+    glVertex2f(7,0);
+    glEnd();
+    glLineWidth(1);  // Reset the line width to be 1 pixel.
+
+    /* Draw the sun.  The drawSun method draws the sun centered at (0,0).  A 2D translation
+     * is applied to move the center of the sun to (5,3.3).   A rotation makes it rotate*/
+
+    glPushMatrix();
+    glTranslated(5.8,3,0);
+    glRotated(-frameNumber*0.7,0,0,1);
+    drawSun();
+    glPopMatrix();
+
+    /* Draw three windmills.  The drawWindmill method draws the windmill with its base 
+     * at (0,0), and the top of the pole at (0,3).  Each windmill is first scaled to change
+     * its size and then translated to move its base to a different paint.  In the animation,
+     * the vanes of the windmill rotate.  That rotation is done with a transform inside the
+     * drawWindmill method. */
+
+    glPushMatrix();
+    glTranslated(0.75,1,0);
+    glScaled(0.6,0.6,1);
+    drawWindmill();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslated(2.2,1.6,0);
+    glScaled(0.4,0.4,1);
+    drawWindmill();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslated(3.7,0.8,0);
+    glScaled(0.7,0.7,1);
+    drawWindmill();
+    glPopMatrix();
+
+    /* Draw the cart.  The drawCart method draws the cart with the center of its base at
+     * (0,0).  The body of the cart is 5 units long and 2 units high.  A scale is first
+     * applied to the cart to make its size more reasonable for the picture.  Then a
+     * translation is applied to move the cart horizontally.  The amount of the translation
+     * depends on the frame number, which makes the cart move from left to right across
+     * the screen as the animation progresses.  The cart animation repeats every 300 
+     * frames.  At the beginning of the animation, the cart is off the left edge of the
+     * screen. */
+
+    glPushMatrix();
+    glTranslated(-3 + 13*(frameNumber % 300) / 300.0, 0, 0);
+    glScaled(0.3,0.3,1);
+    drawCart();
+    glPopMatrix();
+    
+
+}  // end display
+
+
+//-------------------------------------------------------------------------------
+
+var animating = false;
+
+function frame() {
+    if (animating) {
+	frameNumber++;
+	draw();
+	setTimeout(frame,30);
+    }
+}
+
+function doAnimate() {
+    animating = document.getElementById("animate").checked;
+    if (animating) {
+	frame();
+    }
+}
+
+function init() {
+    try {
+       canvas = document.getElementById("maincanvas");
+           glsimUse(canvas,null); // ( The "null" gives an RGBA color buffer instead of RGB.
+		                          //   It is needed here because the call to copyTexImage2D
+								  //   uses the RGBA format. )
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    initGL();
+    document.getElementById("object").value = "1";
+    document.getElementById("object").onchange = draw;
+    document.getElementById("animate").checked = false;
+    document.getElementById("animate").onchange = doAnimate;
+    camera = new Camera();
+    camera.setScale(1);
+	camera.lookAt(2,2,5, 0,0,0, 0,1,0);
+    camera.installTrackball(draw);
+    sphere = uvSphere();
+    cubeModel = cube();
+    cylinder = uvCylinder();
+    cone = uvCone();
+    torus = uvTorus();
+    teapot = teapotModel;  // (This one is just a variable, defined in teapot-model-IFS.js)
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Drawing a Texture</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="400" height="350"></canvas>
+</div>
+
+<br clear=all>
+
+<p style="text-indent:30px"><b>Object</b>:
+<select id="object">
+   <option value="0">Sphere</option>
+   <option value="1">Cube</option>
+   <option value="2">Cylinder</option>
+   <option value="3">Cone</option>
+   <option value="4">Torus</option>
+   <option value="5">Teapot</option>
+   <option value="6">SHOW 2D SCENE</option>
+</select>
+<label><input type="checkbox" id="animate" style="margin-left:30px"><b>Animate</b></label></p>
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This program demonstrates the use of the OpenGL function <i>glCopyTexImage2D</i>,
+which  copies an image from the color buffer (where OpenGL draws its images) into
+a texture.  This makes it possible to draw an image with OpenGL and then use
+the image as a texture on other objects.</p>
+<p>A pop-up menu lets you select the object on which the texture image is
+used.  The last entry in the menu is "SHOW 2D SCENE."  In that case,
+you see the color buffer just after the 2D scene has been drawn, instead of
+seeing a 3D object with the scene as a texture.  Note that the 2D scene
+does not fill the canvas.  In fact, it is drawn in a 256-by-256 viewport, since
+the width and height of a texture image should be powers of two.</p>
+<p>If you turn on animation, the scene shown in the texture image is animated.
+A new version of the scene is drawn and copied to the texture for each frame.
+In this case, the texture image is a 2D cart-and-windmill animation that should
+be familiar from other examples.</p>
+<p>As usual, you can rotate the 3D objects using your mouse.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

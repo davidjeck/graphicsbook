@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="The C Programming Language" id="proglang.2">
+
+<p1>C is the oldest programming language that we will encounter in this book.
+Its basic syntax has been adopted by many other languages, including Java,
+JavaScript and the OpenGL <word>shader</word> language.  C&nbsp;is not object-oriented.
+It was the basis for the object-oriented language C++, but C is almost as different from
+C++ as it is from Java.  While a large part of C will be familiar to any reader of
+this book, to really master C, you need to know something about its less familiar
+parts.</p1>
+
+<p>My own experience with C is mostly limited to using it on Linux, where I can use
+the <i>gcc</i> command to compile C programs.  If you want to use <i>gcc</i> on Windows,
+you might consider installing the Linux Subsystem for Windows 
+(<a href="https://docs.microsoft.com/en-us/windows/wsl/">https://docs.microsoft.com/en-us/windows/wsl/</a>)
+or Cygwin (<a href="https://cygwin.com/">https://cygwin.com/</a>). 
+For Mac&nbsp;OS, you can write C programs using Apple's XCode development tools.
+Using Cygwin or XCode tools for OpenGL programming is briefly covered in
+<localref href="gl1geom.6.1"/>. </p>
+
+
+<subsection title="Language Basics" id="proglang.2.1">
+
+
+<p>A C program consists of a collection of functions and global variables, which
+can be spread across multiple files.  (All subroutines in C are referred to as
+"functions," whether or not they return a value.)
+Exactly one of those functions must be a <i>main</i>() routine, whose 
+definition generally takes the form</p>
+
+<pre>int main(int argc, char **argv) {
+   // main program code
+}</pre>
+
+<np>Execution of the program begins in the <i>main</i>() function.
+As in Java, the parameters to <i>main</i>() contain information about
+command line arguments from the command that was used to execute the program.
+(The "**" has to do with C's implementation of pointers and arrays, which I
+will discuss later.) The parameters can be omitted from the definition of <i>main</i> if the
+program has no need for them.  The return value of <i>main</i>() is sent to the
+operating system to indicate whether or not the program succeeded; a value of 0
+indicates success, and any other value indicates that an error occurred.</np>
+
+<p>C makes a distinction between "defining" a variable or function and
+"declaring" it.  A&nbsp;variable or function can have only one definition, but it
+can be declared any number of times.  A variable or function should be <b>declared</b> before
+it is used, but does not have to be <b>defined</b> before it is used.  Any definition is
+also a declaration.  A&nbsp;C&nbsp;compiler
+will not look ahead to search for a declaration.  (More precisely, if it encounters
+an undeclared variable, it will assume that it is of type <ptype>int</ptype>,
+and if it encounters an undeclared function, it will try to deduce a declaration.
+However, this is almost never what you want.)</p>
+
+
+<p>A&nbsp;function definition takes a form similar to a method definition in Java.
+The return type for the function must be specified, and a return type of <i>void</i>
+is used for a function that does not return a value.  The type of each parameter must
+be specified.  For example,</p>
+
+<pre>int square( int x ) {
+    return x * x;
+}</pre>
+
+<np>Since a definition is also a declaration, this also declares <i>square</i>().
+To declare a function without defining it, leave out the body of the function.  
+This is called a "prototype" for the function:</np>
+
+<pre>int square(int x);</pre>
+
+<np>For variables, a typical variable declaration, such as "<i>int&nbsp;x;</i>", is also a definition of the variable.
+To get a variable declaration that is not a definition, add the word "extern".  For example:
+"<i>extern&nbsp;int&nbsp;x;</i>".  You probably won't need to know this.</np>
+
+<p>One reason for the distinction between declaration and definition is that, although C programs can consist
+of several files, each file is compiled independently.  That is, when C is compiling a file,
+it looks only at that file.  This is true even if several files are compiled with a single
+command.  If file&nbsp;A wants to use a
+function or variable that is <i>defined</i> in file&nbsp;B, then file&nbsp;A must include a <i>declaration</i>
+of that function or variable.  
+This type of cross-file reference is usually handled using
+"header files" and the <i>#include</i> directive.  An include directive 
+in a file tells the compiler to include a copy of the text from the included file
+in the code that it compiles.  
+A header file typically has a name that ends with&nbsp;".h" and contains only declarations.
+For example, a C source file that wants to use standard input/output
+will use the following directive at the beginning of the file:</p>
+
+<pre>#include &lt;stdio.h&gt;</pre>
+
+<np>The <i>stdio.h</i> header file is one of several standard header files that should
+be installed with any C compiler.  Other standard headers include <i>math.h</i> for common
+mathematical functions, <i>string.h</i> for string manipulation functions, and
+<i>stdlib.h</i> for some miscellaneous functions including memory management functions.</np>
+
+<p>The compiler will also look in the current directory for header files.  In an include
+directive, the name of such a header file should be enclosed in quotation marks instead of
+angle brackets.  For example,</p>
+
+<pre>#include "my-header.h"</pre>
+
+<p>If you write a .c file that contains functions meant for use in other files, 
+you will usually write a matching .h file containing declarations of those functions.</p>
+
+<p>After all the files that make up a program have been compiled, they still have to
+be "linked" together into a complete program.  The <i>gcc</i> compiler does the
+linking automatically by default.  Even if all of the files have compiled successfully,
+there can still be link errors.  A link error occurs if no definition is found for
+a variable or function that has been declared, or if two definitions for the same thing
+are found in different files.
+For functions defined in standard
+libraries, you might need to link the program with the appropriate libraries using the
+"-l" option on the <i>gcc</i> compiler.  For example, a program that uses functions
+from the <i>math.h</i> header file must be linked with the library named "m", like this:</p>
+
+<pre>gcc my-program.c my-utils.c -lm</pre>
+
+<np>It can be difficult to know what libraries need to be linked.  Most of my sample C
+programs, such as <sourceref href="glut/first-triangle.c"/>, have a comment that tells
+how to compile and link the program.</np>
+
+<p>One more note about compiling with gcc.  By default, the name of the compiled program
+will be <i>a.out</i>.  The "-o" option on the <i>gcc</i> command is used to specify a
+different name for the compiled program.  For example,</p>
+
+<pre>gcc  -o my-program  my-program.c my-utils.c -lm</pre>
+
+<np>Here, the name of the compiled program will be <i>my-program</i>.
+The name of the compiled program can be used like
+any other command.  In Linux or MacOS, you can run the program on the command line
+using a command such as</np>
+
+<pre>./my-program</pre>
+
+<np>The "./" in front of the name is needed to run a command from the current
+directory.  You could also use a full path name to the command.</np>
+
+
+<break/>
+
+<p>C has most of the same basic types as Java:  <ptype>char</ptype>, 
+<ptype>short</ptype>, <ptype>int</ptype>, <ptype>long</ptype>, <ptype>float</ptype>, <ptype>double</ptype>.
+There is no <ptype>boolean</ptype> type, but
+but integers can be used as booleans, with 0 representing <i>false</i> and any
+non-zero value representing <i>true</i>.
+There is no "byte" data type, but <ptype>char</ptype> is essentially an 8-bit integer type
+that can be used in place of <ptype>byte</ptype>.  
+There are no guarantees about the number of bits used for the other numerical data types,
+but usually <ptype>int</ptype> means 32-bit integers and <ptype>long</ptype> means 64-bit.
+The integer types, including <ptype>char</ptype>, can 
+be marked "signed" or "unsigned", where the unsigned types have
+only positive values.  For example, <i>signed&nbsp;char</i> has values in the range
+&minus;128 to 127, while <i>unsigned&nbsp;char</i> has values in the range 0 to 255.
+Except for <ptype>char</ptype> the default for the integer types is <i>signed</i>.
+(For <ptype>char</ptype>, the default is not specified in the standard.)
+Since C is very profligate about converting one numeric type to another, we don't
+have to worry too much about this.  (I should note that to avoid the ambiguities of
+C data types, <word>OpenGL</word> defines its own set of data types such as <i>GLfloat</i> and
+<i>GLint</i>, and to be completely correct, you can use them in your OpenGL programs
+in place of C's usual type names.)</p>
+
+<p>Operators and expressions are similar in C, Java, and JavaScript.  As in Java, integer
+division in C produces an integer result, so that 17/3 is 5.  C&nbsp;does not use
+"+" as a string concatenation operator; in fact, C has no such operator for strings.
+String concatenation can be done using a function, <i>strcat</i>, from the
+<i>string.h</i> header file.  We will see that some operators can be also used with pointers
+in&nbsp;C, in ways that have no analog in Java or JavaScript.</p>
+
+<p>The header file <i>stdio.h</i> declares C's standard input/output functions.  I mention
+it here mostly for the function <i>printf</i>(), which outputs text to the command line
+and is useful for writing debugging messages.  It is essentially the same function as
+<i>System.out.printf</i> in Java.  For example:</p>
+
+<pre>printf("The square root of %d is %f\n", x, sqrt(x));</pre>
+
+<np>The function <i>sqrt</i>(x), by the way, is defined in the header file,
+<i>math.h</i>, along with other mathematical functions such as <i>sin</i>(x), <i>cos</i>(x),
+and <i>abs</i>(x).  (In C, <i>abs</i>(x) is always an <ptype>int</ptype>. For a floating-point
+absolute value, use <i>fabs</i>(x).)</np>
+
+<p>Control structures in C are similar to those in Java and JavaScript,
+with a few exceptions.  The <i>switch</i>
+statement in C works only with integer or character values.  There is no <i>try</i><code>..</code><i>catch</i>
+statement.  Depending on your C compiler, you might not be able to declare variables in
+<i>for</i> loops, as in <i>for&nbsp;(int&nbsp;i&nbsp;=&dots;</i>.
+The original version of C had only one type of comment, starting with <code>/*</code>
+and ending with <code>*/</code>.  Modern C also allows single line comments starting
+with <code>//</code>, so your compiler should accept comments of either form.</p>
+
+</subsection>
+
+
+
+<subsection title="Pointers and Arrays" id="proglang.2.2">
+
+<p>For programmers who have experience with Java or JavaScript, one of the
+hardest things to get used to in C is its use of explicit pointers.  
+For our purposes, you mostly need to know a little about how the unary operators "*" and
+"&amp;" are used with pointers.  But if you want to use dynamic data structures in C,
+you need to know quite a bit more.</p>
+
+<p>In C, there is a data type <i>int*</i> that represents "pointer to int."  A value of type
+<i>int*</i> is a memory address, and the memory location at that address is
+assumed to hold a value of type <i>int</i>.  If <i>ptr</i> is a variable of
+type <i>int*</i>, then <i>*ptr</i> represents the integer stored at
+the address to which <i>ptr</i> points.  <i>*ptr</i> works like a variable of type
+<i>int</i>:  You can use it in an expression to fetch the value of the integer from
+memory, and you can assign a value to it to change the value in memory (for example,
+"<i>*ptr&nbsp;=&nbsp;17;</i>").</p>
+
+<p>Conversely, if <i>num</i> is a variable of type <i>int</i>, then
+&amp;<i>num</i> represents a pointer that points to <i>num</i>.  That is,
+the value of &amp;<i>num</i> is the address in memory where <i>num</i> is stored.
+Note that &amp;<i>num</i> is an expression of type <i>int*</i>, and <i>*</i><code>&amp;</code><i>num</i>
+is another name for <i>num</i>.  The expression
+&amp;<i>num</i> can be read as "pointer to num" or "address of num."</p>
+
+<p>Of course, the operators &amp; and * work with any types, not just with <ptype>int</ptype>.
+There is also a data type named <i>void*</i> that represents untyped pointers.  A value of
+type <i>void*</i> is a pointer that can point anywhere in memory, regardless of what is
+stored at that location.</p>
+
+<p>Pointer types are often used for function parameters.  If a pointer
+to a memory location is passed to a function as a parameter, then the
+function can change the value stored in that memory location.  For
+example, consider</p>
+
+<pre>void swap ( int *a, int *b ) {
+   int temp = *a;
+   *a = *b;
+   *b = temp;
+}</pre>
+
+<np>The parameters <i>a</i> and <i>b</i> are of type <i>int*</i>, so any actual
+values passed into the function must be of type pointer-to-int.  Suppose that
+<i>x</i> and <i>y</i> are variables of type <ptype>int</ptype>:</np>
+
+<pre>int x,y;</pre>
+
+<np>Then &amp;<i>x</i> and &amp;<i>y</i> are pointers to int, so they can be passed
+as parameters to <i>swap</i>:</np>
+
+<pre>swap( &amp;x, &amp;y );</pre>
+
+<np>Inside the function, <i>a</i> is a pointer to <i>x</i>, which makes
+<i>*a</i> another name for <i>x</i>.  Similarly, <i>*b</i> is another name for <i>y</i>.
+So, for example, the statement <i>*a&nbsp;=&nbsp;*b;</i> copies the value of <i>y</i>
+into <i>x</i>.  The net result is to swap, or interchange, the values stored in <i>x</i> and in <i>y</i>.
+In Java or JavaScript, it is impossible to write a similar method that swaps the
+values of two integer variables.</np>
+
+<p>Note, by the way, that in the declaration <i>int&nbsp;*a</i>, the * is associated with
+<i>a</i> rather than with <i>int</i>.  The intent of the declaration is to say that
+<i>*a</i> represents an <ptype>int</ptype>, which makes <i>a</i> a pointer to int.  It is
+legal, but misleading, to write the declaration as <i>int*&nbsp;a</i>.  It is misleading
+because</p>
+
+<pre>int* a, b;</pre>
+
+<np>declares <i>a</i> to be a pointer to int and b to be an int.  To declare two pointers,
+you have to say</np>
+
+<pre>int *a, *b;</pre>
+
+<break/>
+
+<p>Arrays and pointers are very closely related in C.  However, it is possible to use arrays
+without worrying about pointers.  For example, to create an array of 5 <ptype>ints</ptype>,
+you can say</p>
+
+<pre>int A[5];</pre>
+
+<np>(Note that the "[5]" is associated with the variable name, <i>A</i>, rather than with
+the type name, "int".)
+With this declaration, you can use the array elements A[0] through A[4] as integer variables.  Arrays in
+C are not automatically initialized.  The contents of a new array are unknown.  You can provide
+initial values for an array when you declare it.  For example, the statement</np>
+
+<pre>int B[] = { 2, 3, 5, 7, 9, 11, 13, 17, 19 };</pre>
+
+<np>creates an array of length 9 containing the numbers listed between {&nbsp;and&nbsp;}.
+If you provide initial values for the array, you do not have to specify the array size;
+it is taken from the list of values.  An array does not remember its length, and there is
+no protection against trying to access array elements that actually lie outside of the array.</np>
+
+<p>The address operator, &amp;, can be applied to array elements.  For example, if <i>B</i>
+is the array from the above declaration, then &amp;<i>B</i>[3] is the address of the
+location in memory where <i>B</i>[3] is stored.  The values of <i>B</i>[3] and <i>B</i>[4]
+could be swapped by calling</p>
+
+<pre>swap( &amp;B[3], &amp;B[4] );</pre>
+
+<np>An array variable is considered to be a pointer to the array.   That is, the value of
+an array variable <i>B</i> is the address of the array in memory.  This means that
+<i>B</i> and &amp;<i>B</i>[0] are the same.  Furthermore, a pointer variable can be used
+as if it is an array.  For example, if <i>p</i> is of type <i>int*</i>, then
+<i>p</i>[3] is the third integer in memory after the integer to which <i>p</i> points.
+And if we define</np>
+
+<pre>int *p = &amp;B[3];</pre>
+
+<np>then <i>p</i>[0] is the same as <i>B</i>[3], <i>p</i>[1] is the same as <i>B</i>[4], 
+and so on.</np>
+
+<p>An expression of the form <i>p</i>+<i>n</i>, where <i>p</i> is a pointer and
+<i>n</i> is an integer represents a pointer. Its value is a pointer that points to the <i>n</i>-th item
+after <i>p</i> in memory.  The type of "item" that is referred to here is the type to which
+<i>p</i> points. For example, if <i>p</i> is a pointer-to-int, then
+<i>p</i>+3 points to the third integer after the integer to which
+<i>p</i> refers.  And the value of <i>*</i>(<i>p</i>+3) is that integer.
+Note that the same integer can be referred to as <i>p</i>[3].  In fact, 
+<i>p</i>[<i>n</i>] can be considered to be nothing more than shorthand for
+<i>*</i>(<i>p</i>+<i>n</i>). (Although it probably takes us  farther into C than you want to go, 
+I'll also mention that the operators <code>++</code> and <code>--</code> can be applied to pointer variables.
+The effect is to advance the pointer one item forwards or backwards in memory.)</p>
+
+<break/>
+
+<p>A string in C is essentially an array of <i>char</i> but is usually thought of
+as being of type <i>char*</i>, that is, pointer to <ptype>char</ptype>.  
+By convention, a string always ends with a null
+character (ASCII code&nbsp;0) to mark the end of the string.  This is necessary because
+arrays do not have a defined length.  The null character is inserted automatically for
+string literals.  You can initialize a variable of type <i>char*</i> with a
+string literal:</p>
+
+<pre>char *greet = "Hello World";</pre>
+
+<np>The characters in the string are then given by <i>greet</i>[0], <i>greet</i>[1], &dots;,
+<i>greet</i>[10].  The value of <i>greet</i>[11] is zero, to mark the end of the string.</np>
+
+<p>String manipulation is done using functions that are defined in the standard header file
+<i>string.h</i>.  For example, to test whether two strings are equal, you can use
+<i>strcmp</i>(<i>s1,s2</i>).  And for copying strings, there is a function
+<i>strcpy</i>(<i>s1,s2</i>).  Working with strings in C can be quite tricky,
+because strings are represented as pointers or arrays, and 
+C does no error checking for null pointers, bad pointers, or array indices out of bounds.</p>
+
+<p>By the way, I can now explain the parameters to the <i>main</i>() routine,
+<i>int&nbsp;argc</i> and <i>char&nbsp;**argv</i>.
+The parameter <i>argv</i> of type <i>char**</i> is an array of strings (one * to mean array and
+one * to mean string).  This array holds the command that was used to run the program, with
+<i>argv</i>[0] holding the name of the program and the rest of the array holding any command line
+arguments. The value of the first parameter, <i>argc</i>, is the length of the array.</p>
+
+
+
+</subsection>
+
+
+
+<subsection title="Data Structures" id="proglang.2.3">
+
+<p>C does not have classes or objects.  However, it does have a way to represent complex
+data types:  a <i>struct</i>.  A struct is similar to a class that contains only variables,
+with no methods.  It is a way of grouping several variables into a unit.  For example,</p>
+
+<pre>struct color {
+   float r;
+   float g;
+   float b;
+};</pre>
+
+<np>With this definition, <i>struct color</i> becomes a type that can be used to declare
+variables, parameters, and return types of functions.  For example,</np>
+
+<pre>struct color bg;</pre>
+
+<np>With this declaration, <i>bg</i> is a struct made up of three <ptype>float</ptype> variables that
+can be referred to as <i>bg.r</i>, <i>bg.g</i>, and <i>bg.g</i>.  To avoid having the word "struct" as
+part of the type name, a struct datatype can be declared using <i>typedef</i>:</np>
+
+<pre>typedef struct {
+   float r;
+   float g;
+   float b;
+} color;</pre>
+
+<np>This defines <i>color</i>, rather than <i>struct color</i>, to be the name of the
+type, so that a variable can be declared as</np>
+
+<pre>color bg;</pre>
+
+<np>It is sometimes useful to work with pointers to structs.  For example, we can make a pointer
+to the struct <i>bg</i>:</np>
+
+<pre>color *ptr = &amp;bg;</pre>
+
+<np>When this definition, <i>*ptr</i> is another name for <i>bg</i>.  The variables
+in the struct can be referred to as <i>(*ptr).r</i>, <i>(*ptr).g</i>, and <i>(*ptr).b</i>.  The
+parentheses are necessary because the operator "." has a higher precedence than&nbsp;&leftquote;*".
+But the variables can also be referred to as <i>ptr</i><code>-&gt;</code><i>r</i>, 
+<i>ptr</i><code>-&gt;</code><i>g</i>, and <i>ptr</i><code>-&gt;</code><i>b</i>.
+When a pointer-to-struct is used to access the variables in a struct,
+the operator <code>-&gt;</code> is used instead of the period (.) operator.</np>
+
+<break/>
+
+<p>To implement dynamic data structures in C, you need to be able to allocate memory dynamically.
+In Java and JavaScript, that can be done using the <i>new</i> operator, but C does not use
+<i>new</i>.  Instead, it has a function, <i>malloc</i>(<i>n</i>), which is declared in the standard
+header file <i>stdlib.h</i>.  The parameter to <i>malloc</i> is an integer that specifies the number
+of bytes of memory to be allocated. The return value is a pointer of type <i>void*</i> that points to the
+newly allocated block of memory.  (A&nbsp;<i>void*</i> pointer can be assigned to any pointer variable.)
+Furthermore, since C does not have "garbage collection," you are responsible for freeing any
+memory that you allocate using <i>malloc</i>.  That can be done using <i>free</i>(<i>ptr</i>),
+where <i>ptr</i> is a pointer to the block of memory that is being freed.  Rather than
+discuss dynamic data structures in detail, I present a short program to show how they can
+be used.  The program uses a linked list to represent a stack of integers:</p>
+
+<pre>#include &lt;stdio.h&gt;   // for the printf function
+#include &lt;stdlib.h&gt;  // for the malloc and free functions
+
+typedef struct node listnode; // Predeclare the listnode type, so it
+                              // can be used for the type of next.
+struct node {
+   int item;       // An item in the list.
+   listnode *next; // Pointer to next item in list.
+};
+
+listnode *list = 0;  // Pointer to head of list, initially null.
+
+void push( int item ) {  // Add item to head of list
+   listnode *newnode;  // Pointer to a new node to hold the item.
+   newnode = malloc( sizeof(listnode) ); // Allocate memory for the node.
+     // (sizeof(listnode) is the number of bytes for a value of type listnode)
+   newnode-&gt;item = item;
+   newnode-&gt;next = list;  
+   list = newnode;  // Makes list point to the new node.
+}
+
+int pop() {  // Remove and return first item from list
+   int item = list-&gt;item; // The item to be returned.
+   listnode *oldnode = list;  // Save pointer to node that will be deleted.
+   list = list-&gt;next;  // Advance list pointer to next item.
+   free(oldnode); // Free the memory used by deleted node.
+   return item;
+}
+
+int main() {
+    int i;
+    for (i = 1; i &lt; 1000000; i *= 2) {
+           // Push powers of two onto the list.
+        push(i);
+    }
+    while (list) {
+          // Pop and print list items (in reverse order).
+       printf("%d\n", pop());
+    }
+}</pre>
+
+<p>A more complex data structure, such as a <word>scene graph</word> can contain several
+different kinds of nodes.  For such structures, you need even more advanced techniques.
+One approach is to design a struct that includes the following: data common to all nodes in the data
+structure; an integer code number to say which of the several possible kinds of node it is; and
+a <i>void*</i> pointer to link to the extra data needed by nodes of that type.  Using a <i>void*</i>
+pointer means it can point to any kind of data structure, and the code number will tell
+how to interpret the data that it points to.  A better alternative to using a <i>void*</i>
+pointer is to learn about "union", something similar to a struct but more useful for
+representing multiple data types.
+But perhaps the real solution, if you want to work with complex data structures, is to
+use C++ instead of&nbsp;C.</p>
+
+</subsection>
+
+
+</section>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<!--
+     This page is a rather pointless WebGL 2.0 demo using
+     multiple draw buffers attached to a framebuffer.  The
+     program extracts the red, green, and blue color components
+     into three textures that are attached to a framebuffer.
+     Then the three textures are drawn to the screen as
+     grayscale images.
+
+     (The Mona Lisa texture image comes from Wikimedia and is in
+     the public domain.)
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGL 2.0 Multiple Draw Buffers Example</title>
+
+
+<script>
+
+"use strict";
+
+
+// The same vertex shader is used for two shader programs.  The input is
+// 2D coordinates in the range 0 to 1, which are simply passed to the
+// fragment shader for use as texture coordinates.  The input coordinates
+// are transfromed from the range 0 to 1 to the clip coordinate range, -1 to 1.
+// The shader programs are only used to draw the unit square with vertices
+// at (0,0), (1,0), (1,1), and (0,1).
+
+const  vertexShaderSource = `#version 300 es
+layout(location = 0) in vec2 a_coords; // Coordinates in the range 0.0 to 1.0
+uniform sampler2D u_picture;   // The Mona Lisa texture
+out vec2 v_coords;  // pass coordinates to fragment shader for use as texture coordinates
+void main() {
+   float x = -1.0 + 2.0*a_coords.x;  // transform to clip coordinates
+   float y = -1.0 + 2.0*a_coords.y;
+   gl_Position = vec4(x, y, 0.0, 1.0);
+   v_coords = a_coords;
+}`;
+
+
+// The fragment shader for drawing to three color buffers attached to a framebuffer.
+// The color buffers use format gl.R8, that is, they have one 8-bit unsigned integer
+// color component (but treated as a scaled float in the range 0.0 to 1.0).
+// So the output to each texture can be a single float.
+
+const fragmentShaderSourceFB = `#version 300 es
+precision mediump float;
+uniform sampler2D u_picture;
+in vec2 v_coords;
+layout(location = 0) out float red;   // write to draw buffer 0
+layout(location = 1) out float green; // write to draw buffer 1
+layout(location = 2) out float blue;  // write to draw buffer 2
+void main() {
+    vec4 color = texture(u_picture, v_coords);
+    red = color.r;
+    green = color.g;
+    blue = color.b;
+}`;
+
+// The fragment shader for drawing to the screen.  It simply outputs
+// a color from a texture, and uses the red component of that color
+// as a grayscale value.  This is just used to draw each of the
+// three textures, containing the color components from the Mona Lisa
+// image, to the screen.  (Note that since the textures use format
+// gl.R8, their colors are treated as read when read by a sampler.)
+
+const fragmentShaderSourceScreen = `#version 300 es
+precision mediump float;
+uniform sampler2D u_texture;
+in vec2 v_coords;
+out vec4 color;
+void main() {
+    vec2 texCoords = vec2( v_coords.x, 1.0 - v_coords.y );
+    float red = texture(u_texture, texCoords).r;
+    color = vec4(red, red, red, 1.0);
+}`;
+
+//--------------------------------------------------------------------
+
+let gl;      // The WebGL graphics context.
+
+let progFB;  // Shader program for drawing to the framebuffer.
+
+let uniformPicture;  // Location of the uniform sampler varible "u_picture" in progFB
+
+const attributeCoords = 0;  // Location of the attribute "a_coords" in shader programs
+let  bufferCoords;     // A vertex buffer object to hold the values for coords.
+
+let progScreen;  // Shader program for drawing to the screen.
+let uniformTexture;   // Location of the attribute "u_texture" in progScreen.
+
+let framebuffer;   // The frame buffer.
+let texture0, texture1, texture2;  // textures that will be attached to the framebuffer.
+
+
+/**
+ *  Draws the color components from the Mona Lisa image to three textures
+ *  that are attached to a framebuffer as draw buffers.  Then copies those
+ *  three textures to the screen as grayscale images.  This method is
+ *  called by loadMondaLisaTexture() after the image has been successfully
+ *  loaded.  It is only called (at most) once in this program.
+ */
+function draw() {
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer); // Draw to framebuffer.
+    gl.useProgram(progFB);
+    gl.viewport(0,0,320,399);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);  // Draw to screen.
+    gl.useProgram(progScreen);
+    
+    gl.bindTexture(gl.TEXTURE_2D, texture0);  // Draw image from texture0.
+    gl.viewport(0,0,320,399); // This is the left third of the canvas.
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+        
+    gl.bindTexture(gl.TEXTURE_2D, texture1); // Draw image from texture1.
+    gl.viewport(330,0,320,399); // This is the middle third of the canvas.
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+        
+    gl.bindTexture(gl.TEXTURE_2D, texture2); // Draw image from texture2.
+    gl.viewport(660,0,320,399);  // This is the rightmost third of the canvas.
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+        
+}
+
+/**
+ * Initialize the WebGL graphics context.  Sets up the framebuffer, textures,
+ * and coordinate buffer.  
+ */
+function initGL() {
+    gl.clearColor(0,0,0,1);  // background will be opaque black
+    
+    // Create the shader program for drawing to the framebuffer.
+
+    progFB = createProgram( gl, vertexShaderSource, fragmentShaderSourceFB );
+    
+    gl.useProgram(progFB);
+    let attributeCoordsActual = gl.getAttribLocation(progFB, "a_coords"); // should be  zero!
+    if (attributeCoordsActual !== 0)
+       throw new Error("I don't understand layout modifier for attribute variables");
+       
+    uniformPicture = gl.getUniformLocation(progFB, "u_picture");
+    gl.uniform1i(uniformPicture, 0);
+    
+    // Create the frame buffer and three textures, and attach the textures to
+    // the framebuffer draw buffers.  For each texture, memory is allocated for
+    // a 320-by-399 texture of type gl.R8. This texture type represents values
+    // in the range 0.0 to 1.0 as unsigned integers in the range 0 to 255.
+    
+    framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);
+    texture0 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture0);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, 320, 399);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture0, 0);
+    texture1 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture1);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, 320, 399);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, texture1, 0);
+    texture2 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture2);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, 320, 399);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, texture2, 0);
+    
+    // Specify which draw buffers are to be used for the three outputs from
+    // the fragment shader.  (Using consecutive COLOR_ATTACHMENTx values seems like
+    // maybe it should be the default, but you have to do soemthing like this to tell gl
+    // to draw to three buffers, since it won't just inspect the fragment shader and
+    // figure that out on its own.)
+    
+    gl.drawBuffers( [
+        gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2
+    ] );
+    
+    // Create the shader program for drawing to the screen.
+    
+    progScreen = createProgram( gl, vertexShaderSource, fragmentShaderSourceScreen );
+    uniformTexture = gl.getUniformLocation(progScreen, "u_texture");
+    
+    // Configure the attributeCoords vertex attribute for drawing a square.
+    
+    bufferCoords = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 0,0, 1,0, 1,1, 0,1 ] ), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(attributeCoords);
+    gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+            
+    // Load the Mona Lisa image; this will call draw() when finished.
+            
+    let textureObject = gl.createTexture();
+    loadMondaLisaTexture(textureObject);
+}
+
+
+/**
+ *  Loads the MonaLisa texture image asynchronously.  The parameter is the
+ *  texture object into which the image is to be loaded.  When the image
+ *  has finished loading, draw() will be called.  If an error occurs during loading,
+ *  an error message is displayed on the page, and draw() is never called.)
+ */
+function loadMondaLisaTexture(textureObject ) {
+    const  img = new Image();  //  A DOM image element to represent the image.
+    img.onload = function() { 
+        // This function will be called after the image loads successfully.
+        // We have to bind the texture object to the TEXTURE_2D target before
+        // loading the image into the texture object. 
+        gl.bindTexture(gl.TEXTURE_2D, textureObject);
+        try {
+           gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+        }
+        catch (e) { // Probably a security exception, because this page has been
+                    // loaded through a file:// URL.
+            document.getElementById("canvas-holder").innerHTML =
+              "Sorry, couldn't load texture.<br>" +
+              "Some web browsers won't use images from a local disk";
+            animating = false;
+            document.getElementById("animateCheckbox").checked = true
+        }
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,gl.LINEAR);  // no mipmaps
+        draw();  // Draw the canvas, with the texture.  
+    };
+    img.onerror = function(e) { 
+        // This function will be called if an error occurs while loading.
+        document.getElementById("canvas-holder").innerHTML =
+                        "<p>Sorry, textures/mona-lisa.jpg could not be loaded.</p>";
+        animating = false;
+        document.getElementById("animateCheckbox").checked = false;
+    };
+    img.src = "textures/mona-lisa.jpg";  // Start loading of the image.
+}
+
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+
+/*----------------------------------------------------------------*/
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        let  options = {
+            depth: false
+        };
+        gl = canvas.getContext("webgl2", options);
+              // Note: this page requires webgl2.
+        if ( ! gl ) {
+            throw "Browser does not support WebGL 2.0";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL 2.0 graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        return;
+    }
+}
+
+window.onload = init;  // Arrange for init() to be called after page has loaded.
+
+</script>
+</head>
+<body style="background-color: #CCD0FF">
+
+<h2>WebGL2 Multiple Draw Buffers -- a silly demo with Mona Lisa</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="980" height="399" style="background-color:white"></canvas>
+</div>
+
+<p style="width:900px">
+<img style="float:left; margin: 0 10px 0 0" src="textures/mona-lisa.jpg" width="320" height="399">
+The three images above show the red, green, and blue components of the Mona Lisa image that is shown at the left,
+as grayscale images.
+The three images were created as textures in WebGL 2.0 by attaching three texture objects
+as draw buffers to the same framebuffer.  A single drawing pass reads from the original image and
+writes the three color components to the three textures.  Then the three textures are drawn
+to the screen.  This is only done as a demonstration of using multiple draw buffers in WebGL&nbsp;2.0.
+</p>
+
+</body>
+</html>

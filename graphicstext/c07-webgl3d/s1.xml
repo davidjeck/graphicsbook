@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Transformations in 3D" id="webgl3d.1">
+
+<p1>We have already seen in <localref href="webgl"/> how to draw <word term="geometric primitive">primitives</word>
+using WebGL, and how to implement 2D transformations.  Drawing primitives is the same in 3D,
+except that there are three coordinates per vertex instead of two.  Transformations in 3D are also
+ similar
+to 2D, but for transformations the increase in complexity that comes with the third dimension is
+substantial.  This section covers the geometric side of 3D graphics with WebGL.  In the
+<localref href="webgl3d.2">next section</localref>, we will move on to the question of 
+lighting and materials.</p1>
+
+<subsection title="About Shader Scripts" id="webgl3d.1.1">
+
+<p>But before we begin working more seriously with WebGL, it will be nice to have a better
+way to include shader source code on a web page.  Up until now, I have created the source code
+strings by concatenating a bunch of JavaScript string literals, one for each line of code.
+That format is hard to read and very hard to edit.
+There are at least two other techniques that are often used. One is to put the GLSL shader source code inside
+<tag>script</tag> elements.  Here is an example for a vertex shader:</p>
+
+<pre>&lt;script type="x-shader/x-vertex" id="vshader">
+    attribute vec3 a_coords;
+    uniform mat4 modelviewProjection;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        gl_Position = modelviewProjection * coords;
+    }
+&lt;/script&gt;</pre>
+
+<np>This relies on the fact that a web browser will not recognize the <i>type</i> listed in
+the <tag>script</tag> element, so it will not try to execute the script.  However,
+it does store the content of the <tag>script</tag> element in the <word>DOM</word> data structure that
+represents the web page.  The content can be retrieved as a string using the standard 
+DOM API.  I won't explain the API functions that are used, but
+here is a function that takes the <i>id</i> of the script element as its parameter and returns a
+string containing the text from inside the element:
+</np>
+
+<pre>function getTextContent( elementID ) {
+    let element = document.getElementById(elementID);
+    let node = element.firstChild;
+    let str = "";
+    while (node) {
+        if (node.nodeType == 3) // this is a text node
+            str += node.textContent;
+        node = node.nextSibling;
+    }
+    return str;
+}</pre>
+
+<np>The sample program <sourceref href="webgl/glmatrix-cube-unlit.html"/> uses this
+technique.  The other idea is to define the source code as a JavaScript template string.
+(See <localref href="proglang.3.1"/>).
+A template string is enclosed between single backquote characters and can span
+multiple lines.  (The "backquote" is also called a "backtick.")
+Template strings were only introduced into JavaScript as part of
+<word>ES6</word>.  They can include the values of JavaScript expressions,
+but we don't need that capability here.  Here is how the above shader could
+be defined as a template string:</np>
+
+<pre>const vertexShaderSource = `
+attribute vec3 a_coords;
+uniform mat4 modelviewProjection;
+void main() {
+    vec4 coords = vec4(a_coords,1.0);
+    gl_Position = modelviewProjection * coords;
+}`;</pre>
+
+<np>This technique is used in many of the sample programs in this chapter.
+Note that if you define a GLSL&nbsp;ES&nbsp;3.00 shader as a template string,
+you should be sure to include the required first line, #version&nbsp;3.00&nbsp;es,
+immediately after the opening backquote, since that line cannot be preceded
+by a blank line.</np>
+
+</subsection>
+
+
+<subsection title="Introducing glMatrix" id="webgl3d.1.2">
+
+<p>Transformations are essential to computer graphics.  The WebGL API does not 
+provide any functions for working with transformations.  In <localref href="webgl.5"/>,
+we used a simple JavaScript class to represent modeling transformations in 2D.
+Things get more complex in three dimensions.  For 3D graphics with WebGL,
+the JavaScript side will usually have to create both a <word term="modelview transformation">modelview transform</word>
+and a <word term="projection transformation">projection transform</word>, and it will have to apply rotation, scaling, and
+translation to the modelview matrix, all without help from WebGL.  Doing so is much
+easier if you have a JavaScript library to do the work.  One commonly used library
+is <newword>glMatrix</newword>, a free JavaScript library for vector and
+matrix math written by Brandon Jones and Colin MacKenzie IV.  It
+is available from <a href="https://glmatrix.net">https://glmatrix.net</a>.
+This textbook uses Version&nbsp;2.3 of the library, from 2015, although newer
+versions are available. According to its license,
+this file can be freely used and distributed. My programs use
+the script <i>gl-matrix-min.js</i>. You can find a copy in the
+<i>source</i> folder in the web site download of this book. This file
+is a "minified" JavaScript file, which is not meant to be human-readable.
+(You can also read the full source for version 2.2, in
+human-readable form including comments, in the file <sourceref href="webgl/gl-matrix.js"/><tex>, which
+can be found in the directory <i>source/webgl</i> in the web-site download of this book</tex>,
+and more information can be found on the glmatrix web site.)</p>
+
+<p>The <i>glMatrix</i> API can be made available for use
+on a web page with a script element such as</p>
+
+<pre>&lt;script src="gl-matrix-min.js"&gt;&lt;/script&gt;</pre>
+
+<np>This assumes that <i>gl-matrix-min.js</i> is in the same directory as
+the web page.</np>
+
+
+<p>The <i>glMatrix</i> library defines what it calls "classes" named <classname>vec2</classname>, <classname>vec3</classname>, and <classname>vec4</classname>
+for working with vectors of 2, 3, and 4 numbers.  It defines <classname>mat3</classname> for working with
+3-by-3 matrices and <classname>mat4</classname> for 4-by-4 matrices.  The names should not be confused
+with the <word>GLSL</word> types of the same names; <i>glMatrix</i> in entirely on the JavaScript side.
+However, a <i>glMatrix</i> <classname>mat4</classname> can be passed to a <word>shader</word> program
+to specify the value of a GLSL <i>mat4</i>, and similarly for the other vector and matrix types.
+</p>
+
+<p>Each <i>glMatrix</i> class defines a set of functions for working with vectors and matrices.
+In fact, however, although the documentation uses the term "class,"
+<i>glMatrix</i> is not object-oriented.  Its classes are really just JavaScript objects, 
+and the functions in its classes are what would be called static methods in Java.  Vectors and matrices
+are represented in <i>glMatrix</i> as arrays, and the functions in classes like <classname>vec4</classname>
+and <classname>mat4</classname> simply operate on those arrays.  There are no objects of type
+<classname>vec4</classname> or <classname>mat4</classname> as such, just arrays of length 4 or 16 respectively.
+The arrays can be either ordinary JavaScript arrays or <word term="typed array">typed arrays</word>
+of type <classname>Float32Array</classname>.  If you let <i>glMatrix</i> create the
+arrays for you, they will be <classname>Float32Arrays</classname>, but all <i>glMatrix</i>
+functions will work with either kind of array.  For example, if the <i>glMatrix</i> documentation
+says that a parameter should be of type <classname>vec3</classname>, it is OK to pass either a <classname>Float32Array</classname>
+or a regular JavaScript array of three numbers as the value of that parameter.</p>
+
+<p>Note that it is also the case
+that either kind of array can be used in WebGL functions such as <i>gl.uniform3fv</i>()
+and <i>gl.uniformMatrix4fv</i>().  <i>glMatrix</i> is designed to work with those functions.
+For example, a <classname>mat4</classname> in <i>glMatrix</i> is an array of length 16 that holds the
+elements of a 4-by-4 array in <word>column-major order</word>, the same format that
+is used by <i>gl.uniformMatrix4fv</i>.</p>
+
+<break/>
+
+<p>Each <i>glMatrix</i> class has a <i>create</i>() function which creates an array of
+the appropriate length and fills it with default values.  For example,</p>
+
+<pre>transform = mat4.create();</pre>
+
+<np>sets <i>transform</i> to be a new <classname>Float32Array</classname> of length 16,
+initialized to represent the identity matrix.  Similarly,</np>
+
+<pre>vector = vec3.create();</pre>
+
+<np>creates a <classname>Float32Array</classname>  of length 3, filled with
+zeros.  Each class also has a function <i>clone</i>(<i>x</i>) that creates a copy of its
+parameter&nbsp;<i>x</i>.  For example:</np>
+
+<pre>saveTransform = mat4.clone(modelview);</pre>
+
+<p>Most other functions do <b>not</b> create new arrays.  Instead, they modify the contents of their
+first parameter.  For example, <i>mat4.multiply</i>(<i>A,B,C</i>) will modify <i>A</i> so that
+it holds the matrix product of <i>B</i> and <i>C</i>.  Each parameter must be a <classname>mat4</classname>
+(that is, an array of length 16) that already exists.  It is OK for some of the arrays
+to be the same.  For example, <i>mat4.multiply</i>(<i>A,A,B</i>) has the effect of
+multiplying <i>A</i> times <i>B</i> and modifying <i>A</i> so that it contains the answer.</p>
+
+<p>There are functions for multiplying a matrix by standard transformations such as
+scaling and rotation.  For example if <i>A</i> and <i>B</i> are <classname>mat4s</classname> and <i>v</i> is a 
+<classname>vec3</classname>,
+then <i>mat4.translate</i>(<i>A,B,v</i>) makes <i>A</i> equal to the product of <i>B</i> and
+the matrix that represents translation by the vector&nbsp;<i>v</i>.  In practice, we will
+use such operations mostly on a matrix that represents the modelview transformation.
+So, suppose that we have a <classname>mat4</classname> named <i>modelview</i> that holds the current modelview
+transform.  To apply a translation by a vector <code>[dx,dy,dz]</code>, we can say</p>
+
+<pre>mat4.translate( modelview, modelview, [dx,dy,dz] );</pre>
+
+<np>This is equivalent to calling <i>glTranslatef</i>(<i>dx,dy,dz</i>) in
+OpenGL.  That is, if we draw some geometry after this statement, using <i>modelview</i>
+as the modelview transformation, then the geometry will first be translated by
+<code>[dx,dy,dz]</code> and then will be transformed by whatever was the previous value
+of <i>modelview</i>.  Note the use of a vector to specify the translation in this
+command, rather than three separate parameters; this is typical of <i>glMatrix</i>.
+To apply a scaling transformation with scale factors <i>sx</i>, <i>sy</i>, and <i>sz</i>,
+use</np>
+
+<pre>mat4.scale( modelview, modelview, [sx,sy,sz] );</pre>
+
+<np>For rotation, <i>glMatrix</i> has four functions, including three for the common
+cases of rotation about the <i>x</i>, <i>y</i>, or <i>z</i> axis.  The fourth rotation function
+specifies the axis of rotation as the line from (0,0,0) to a point (<i>dx,dy,dz</i>).
+This is equivalent to <i>glRotatef(angle,dx,dy,dz)</i>
+Unfortunately, the angle of rotation in these functions
+is specified in radians rather than in degrees:</np>
+
+<pre>mat4.rotateX( modelview, modelview, radians );
+mat4.rotateY( modelview, modelview, radians );
+mat4.rotateZ( modelview, modelview, radians );
+mat4.rotate( modelview, modelview, radians, [dx,dy,dz] );</pre>
+
+<p>These functions allow us to do all the basic modeling and viewing transformations that we
+need for 3D graphics.  To do hierarchical graphics, we also need to save and restore the
+transformation as we traverse the scene graph.  For that, we need a stack. We
+can use a regular JavaScript array, which already has <i>push</i> and <i>pop</i> operations.  
+So, we can create the stack as an empty array:</p>
+
+<pre>const matrixStack = [];</pre>
+
+<np>We can then push a copy of the current modelview matrix onto the stack by saying</np>
+
+<pre>matrixStack.push( mat4.clone(modelview) );</pre>
+
+<np>and we can remove a matrix from the stack and set it to be the current modelview matrix with</np>
+
+<pre>modelview = matrixStack.pop();</pre>
+
+<np>These operations are equivalent to <i>glPushMatrix</i>() and <i>glPopMatrix</i>()
+in OpenGL.</np>
+
+<break/>
+
+<p>The starting point for the modelview transform is usually a <word term="viewing transformation">viewing transform</word>.
+In OpenGL, the function <i>gluLookAt</i> is often used to set up the viewing transformation  
+(<localref href="gl1geom.3.4"/>).  The <i>glMatrix</i> library has a "lookAt" function to do the same thing:</p>
+
+<pre>mat4.lookAt( modelview, [eyex,eyey,eyez], [refx,refy,refz], [upx,upy,upz] );</pre>
+
+<np>Note that this function uses three <classname>vec3's</classname> in place of the nine separate parameters
+in <i>gluLookAt</i>, and it places the result in its first parameter instead of in a global variable.
+This function call is actually equivalent to the two OpenGL commands</np>
+
+<pre>glLoadIdentity();
+gluLookAt( eyex,eyey,eyez,refx,refy,refz,upx,upy,upz );</pre>
+
+<np>So, you don't have to set <i>modelview</i> equal to the identity matrix before calling
+<i>mat4.lookAt</i>, as you would usually do in OpenGL.  However, you do have to create
+the <i>modelview</i> matrix at some point before using <i>mat4.lookAt</i>, such as by calling</np>
+
+<pre>let modelview = mat4.create();</pre>
+
+<np>If you do want to set an existing <classname>mat4</classname> to the identity matrix,
+you can do so with the <i>mat4.identity</i> function.  For example,</np>
+
+<pre>mat4.identity( modelview );</pre>
+
+<np>You could use this as a starting point if you wanted to compose the view transformation out of
+basic scale, rotate, and translate transformations.</np>
+
+<p>Similarly, <i>glMatrix</i> has functions for setting up projection transformations.
+It has functions equivalent to <i>glOrtho</i>, <i>glFrustum</i>, and <i>gluPerspective</i>
+(<localref href="gl1geom.3.3"/>),
+except that the field-of-view angle in <i>mat4.perspective</i> is given in radians rather
+than degrees:</p>
+
+<pre>mat4.ortho( projection, left, right, bottom, top, near, far );
+
+mat4.frustum( projection, left, right, bottom, top, near, far );
+
+mat4.perspective( projection, fovyInRadians, aspect, near, far );</pre>
+
+<np>As with the modelview transformation, you do not need to load <i>projection</i> with the identity before calling one
+of these functions, but you must create <i>projection</i> as a <classname>mat4</classname> (or an array of length 16).</np>
+
+</subsection>
+
+<subsection title="Transforming Coordinates" id="webgl3d.1.3">
+
+<p>Of course, the point of making a projection and a modelview transformation is to use
+them to transform coordinates while drawing primitives.  In WebGL, the transformation
+is usually done in the vertex shader.  The coordinates for a primitive are specified
+in <word>object coordinates</word>.  They are multiplied by the modelview transformation
+to covert them into <word>eye coordinates</word> and then by the projection matrix
+to covert them to the final <word>clip coordinates</word> that are actually used for
+drawing the primitive.  Alternatively, the modelview and projection matrices can
+be multiplied together to get a matrix that represents the combined transformation;
+object coordinates can then be multiplied by that matrix to transform them
+directly into clip coordinates.</p>
+
+<p>In the shader program, coordinate transforms are ususally represented as
+GLSL <word term="uniform variable">uniform variables</word> of type <classname>mat4</classname>.
+The shader program can use either separate projection and modelview matrices or
+a combined matrix (or both).  Sometimes, a separate modelview transform matrix is
+required, because certain lighting calculations are done in eye coordinates,
+but here is a minimal GLSL&nbsp;ES&nbsp;1.00 vertex shader that uses a combined matrix:</p>
+
+<pre>attribute vec3 a_coords;           // (x,y,z) object coordinates of vertex.
+uniform mat4 modelviewProjection;  // Combined transformation matrix.
+void main() {
+    vec4 coords = vec4(a_coords,1.0);   // Add 1.0 for the w-coordinate.
+    gl_Position = modelviewProjection * coords;  // Transform the coordinates.
+}</pre>
+
+<np>This shader is from the sample program <sourceref href="webgl/glmatrix-cube-unlit.html"/>.
+That program lets the user view a colored cube, using just basic color with no lighting applied.
+The user can select either an orthographic or a perspective projection and can rotate the
+cube using the keyboard.  The rotation is applied as a modeling transformation consisting
+of separate rotations about the <i>x</i>-, <i>y</i>-, and <i>z</i>-axes. 
+For transformation matrices on 
+the JavaScript side, the program uses the <classname>mat4</classname> class from the <i>glMatrix</i> library
+to represent the projection, modelview, and combined transformation matrices:</np>
+
+<pre>const projection = mat4.create();  // projection matrix
+const modelview = mat4.create();   // modelview matrix
+const modelviewProjection = mat4.create();  // combined matrix</pre>
+
+<np>(These variables can be <i>const</i> since the same matrix objects will be used throughout
+the program, even though the numbers in the objects will change.)
+Only <i>modelviewProjection</i> corresponds to a shader variable.  The location of
+that variable in the shader program is obtained during initialization using</np>
+
+<pre>u_modelviewProjection = gl.getUniformLocation(prog, "modelviewProjection");</pre>
+
+<np>The transformation matrices are computed in the <i>draw</i>() function, using
+functions from the <i>glMatrix</i> <classname>mat4</classname> class.  The
+value for <i>modelviewProjection</i> is sent to the shader program using
+<i>gl.uniformMatrix4fv</i> before the primitives that make up the cube are drawn.
+Here is the code that does it:</np>
+
+<pre>/* Set the value of projection to represent the projection transformation */
+
+if (document.getElementById("persproj").checked) {
+     mat4.perspective(projection, Math.PI/5, 1, 4, 8);
+}
+else {
+     mat4.ortho(projection, -2, 2, -2, 2, 4, 8);
+}
+
+/* Set the value of modelview to represent the viewing transform. */
+
+mat4.lookAt(modelview, [2,2,6], [0,0,0], [0,1,0]);
+
+/* Apply the modeling tranformation to modelview. */
+
+mat4.rotateX(modelview, modelview, rotateX);
+mat4.rotateY(modelview, modelview, rotateY);
+mat4.rotateZ(modelview, modelview, rotateZ);
+
+/* Multiply the projection matrix times the modelview matrix to give the
+   combined transformation matrix, and send that to the shader program. */
+   
+mat4.multiply( modelviewProjection, projection, modelview );
+gl.uniformMatrix4fv(u_modelviewProjection, false, modelviewProjection );</pre>
+
+<p>If separate modelview and projection matrices are used in the shader program,
+then the modelview matrix can be applied to transform object coordinates to
+eye coordinates, and the projection can then be applied to the eye coordinates
+to compute <i>gl_Position</i>.  Here is a minimal vertex shader that does that:</p>
+
+<pre>attribute vec3 a_coords;  // (x,y,z) object coordinates of vertex.
+uniform mat4 modelview;   // Modelview transformation.
+uniform mat4 projection;  // Projection transformation
+void main() {
+    vec4 coords = vec4(a_coords,1.0);      // Add 1.0 for w-coordinate.
+    vec4 eyeCoords = modelview * coords;   // Apply modelview transform.
+    gl_Position = projection * eyeCoords;  // Apply projection transform.
+}</pre>
+
+</subsection>
+
+
+<subsection title="Transforming Normals" id="webgl3d.1.4">
+
+<p><word term="normal vector">Normal vectors</word> are essential for 
+lighting calculations (<localref href="gl1light.1.3"/>).  When a surface
+is transformed in some way, it seems that the normal vectors to that
+surface will also change.  However, that is not true if the transformation is a translation.
+A normal vector tells what direction a surface is facing.  Translating
+the surface does not change the direction in which the surface is facing, so
+the nomal vector remains the same.
+Remember that a vector doesn't have a position, just a length and
+a direction.  So it doesn't even make sense to talk about moving or
+translating a vector.</p>
+
+<p>Your first guess might be that the normal vector should be transformed
+by just the rotation/scaling part of the transformation.  The guess is that 
+the correct transformation is represented by the 3-by-3 matrix that is
+obtained by dropping the right column and the bottom row
+from the 4-by-4 coordinate transformation matrix. 
+(The right column represents the translation part of the transformation,
+and the bottom row is only there because implementing translation in a matrix
+requires the use of <word>homogeneous coordinates</word> to represent vectors.
+Normal vectors, where translation is not an issue, do not use homogeneous coordinates.)
+But that can't be correct in all cases.  Consider, for example, a <word>shear transform</word>.
+As this illustration shows, if the normal vectors to an object are subjected
+to the same shear transformation as the object, the resulting vectors
+will not be perpendicular to the object:</p>
+
+<img src="normal-transform.png" width="488" height="168" tex="normal-transform.eps" texscale="0.75"/>
+
+<p>Nevertheless, it is possible to get the correct transformation matrix for normal
+vectors from the coordinate transformation matrix.  It turns out that you need to
+drop the fourth row and the fourth column and then take something called the
+"inverse transpose" of the resulting 3-by-3 matrix.  You don't need to know
+what that means or why it works. The <i>glMatrix</i> library will compute it
+for you.  The function that you need is <i>normalFromMat4</i>, and it is
+defined in the <classname>mat3</classname> class:</p>
+
+<pre>mat3.normalFromMat4( normalMatrix, coordinateMatrix );</pre>
+
+<np>In this function call, <i>coordinateMatrix</i> is the <classname>mat4</classname> that
+represents the transformation that is applied to coordinates, and <i>normalMatrix</i> is
+a <classname>mat3</classname> that already exists.  This function computes the inverse transpose
+of the rotation/scale part of <i>coordinateMatrix</i> and places the answer in
+<i>normalMatrix</i>.  Since we need normal vectors for lighting calculations, and
+lighting calculations are done in eye coordinates, the coordinate transformation that
+we are interested in is usually the modelview transform.</np>
+
+<p>The normal matrix should be sent to the shader program, where it is needed to
+transform normal vectors for use in lighting calculations.  Lighting requires unit
+normal vectors, that is, normal vectors of length one.  The normal matrix does not
+in general preserve the length of a vector to which it is applied, so it will
+be necessary to normalize the transformed vector.  GLSL has a built-in function for
+normalizing vectors.  A vertex shader that implements lighting might take the form:</p>
+
+<pre>attribute vec3 a_coords;   // Untransformed object coordinates.
+attribute vec3 normal;     // Normal vector.
+uniform mat4 projection;   // Projection transformation matrix.
+uniform mat4 modelview;    // Modelview transformation matrix.
+uniform mat3 normalMatrix; // Transform matrix for normal vectors.
+  .
+  .  // Variables to define light and material properties.
+  .
+void main() {
+    vec4 coords = vec4(a_coords,1.0);  // Add a 1.0 for the w-coordinate.
+    vec4 eyeCoords = modelview * coords;  // Transform to eye coordinates.
+    gl_Position = projection * eyeCoords;  // Transform to clip coordinates.
+    vec3 transformedNormal = normalMatrix*normal;  // Transform normal vector.
+    vec3 unitNormal = normalize(transformedNormal);  // Normalize.
+       .
+       .  // Use eyeCoords, unitNormal, and light and material
+       .  // properties to compute a color for the vertex.
+       .
+}</pre>
+
+<np>We will look at several specific examples in the <localref href="webgl3d.2">next section</localref>.</np>
+
+<p>I will note that GLSL&nbsp;ES&nbsp;3.00 (but not GLSL&nbsp;ES&nbsp;1.00)
+has built-in functions for computing the
+inverse and the transpose of a matrix, making it fairly easy to compute the normal matrix
+in the shader.  However, it might still be more efficient to compute the matrix
+once on the JavaScript side, rather than computing it in every execution of the
+vertex shader.</p>
+
+</subsection>
+
+
+<subsection title="Rotation by Mouse" id="webgl3d.1.5">
+
+<p>Computer graphics is a lot more interesting when there is user interaction.  The 3D
+experience is enhanced considerably just by letting the user rotate the scene, to view
+it from various directions.  The <sourceref href="webgl/glmatrix-cube-unlit.html">unlit cube</sourceref>
+example lets the user rotate the scene using the keyboard.  But using the mouse for rotation
+gives the user much better control.  I have written two JavaScript classes,
+<classname>SimpleRotator</classname> and <classname>TrackballRotator</classname>,
+to implement two different styles of rotation-by-mouse.</p>
+
+<p>The <classname>SimpleRotator</classname> class is defined in the file 
+<sourceref href="webgl/simple-rotator.js"/>.  To use it on a web page, you need to include that file
+in a <tag>script</tag> tag, and you need to create an object of type <classname>SimpleRotator</classname>:</p>
+
+<pre>rotator = new SimpleRotator( canvas, callback, viewDistance );</pre>
+
+<np>The first parameter must be a <word>DOM</word> <tag>canvas</tag> element.  It should be the
+canvas where WebGL renders the scene. The <classname>SimpleRotator</classname> constructor
+adds a listener
+for mouse events to the canvas; it also handles touch events on a touchscreen. 
+The second parameter to the constructor is optional.  
+If it is defined, it must be a function.  The function is called, with no parameters, each time the rotation
+changes.  Typically, the callback function is the function that renders the image in the
+canvas.  The third parameter is also optional.  If defined, it must be a non-negative number.
+It gives the distance of the viewer from the center of rotation.  The default value is zero,
+which can be OK for an orthographic projection but is usually not correct.</np>
+
+<p>A <classname>SimpleRotator</classname> keeps track of a viewing transformation that changes as
+the user rotates the scene.  The most important function is <i>rotator.getViewMatrix</i>().
+This function returns an array of 16 numbers representing the matrix for the viewing transformation 
+in column-major order.  The matrix can be sent directly to the shader program using <i>gl.uniformMatrix4fv</i>,
+or it can be used with functions from the <i>glMatrix</i> library as
+the initial value of the modelview matrix.</p>
+
+<p>The sample program <sourceref href="webgl/cube-with-simple-rotator.html"/> is an example
+of using a <classname>SimpleRotator</classname>.  The program uses a perspective projection defined by the
+<i>glMatrix</i> function</p>
+
+<pre>mat4.perspective(projection, Math.PI/8, 1, 8, 12);</pre>
+
+<np>The <i>viewDistance</i> for the rotator has to be between the <i>near</i> and <i>far</i>
+distances in the projection.  Here, <i>near</i> is 8 and <i>far</i> is 12, and the
+<i>viewDistance</i> can be set to 10.  The rotator is created during initialization using the statement</np>
+
+<pre>rotator = new SimpleRotator(canvas, draw, 10);</pre>
+
+<np>In the <i>draw</i>() function, the viewing transformation is obtained from the rotator
+before drawing the scene.  There is no modeling transformation in this program, so the
+view matrix is also the modelview matrix.  That matrix
+is multiplied by the projection matrix using a <i>glMatrix</i> function, and the
+combined transformation matrix is sent to the shader program:</np>
+
+<pre>let modelview = rotator.getViewMatrix();
+
+mat4.multiply( modelviewProjection, projection, modelview );
+gl.uniformMatrix4fv(u_modelviewProjection, false, modelviewProjection );</pre>
+
+<p>That's really all that you need to know if you just want to use <classname>SimpleRotator</classname>
+in your own programs.  I have also written an alternative rotator class,
+<classname>TrackballRotator</classname>, which is defined in the JavaScript file
+<sourceref href="webgl/trackball-rotator.js"/>.  A <classname>TrackballRotator</classname>
+can be used in the same way as a <classname>SimpleRotator</classname>.
+The main difference is that a <classname>TrackballRotator</classname> allows completely
+free rotation while a <classname>SimpleRotator</classname> has the constraint that
+the <i>y</i>-axis will always remain vertical in the image.</p>
+
+<demo src="c7/rotators.html" width="660" height="380"><p>The sample program <sourceref href="webgl/cube-with-trackball-rotator.html"/> uses a
+<classname>TrackballRotator</classname>, but is otherwise identical to the <classname>SimpleRotator</classname>
+example. <web>The following demo lets you try out both types of rotator.  A <classname>SimpleRotator</classname>
+is used for the cube on the left, and a <classname>TrackballRotator</classname> 
+is used on the right:</web><tex>Also, the demo <demoref href="c7/rotators.html"/> in the online version
+of this section lets you try out both kinds of rotator.</tex></p></demo>
+
+<p>By default, the center of rotation for either type of rotator is the origin, 
+even if the origin is not at the center of the image.  However, you can change the 
+center of rotation to be the point (<i>a,b,c</i>) by calling <i>rotation.setRotationCenter</i>([a,b,c]).  
+The parameter must be an array of three numbers.  Typically, (<i>a,b,c</i>) would be the
+point displayed at the center of the image (the point that would be the view reference
+point in <i>gluLookAt</i>).</p>
+
+
+<break/>
+
+<p>You don't need to understand the mathematics that is used to implement a
+rotator.  In fact, <classname>TrackballRotator</classname> uses some advanced
+techniques that I don't want to explain here.  However, <classname>SimpleRotator</classname>
+is, well, more simple, and it's nice to know how it works. So, I will explain how the
+view transformation is computed for a <classname>SimpleRotator</classname>.
+Actually, it will be easier to think in terms of the corresponding modeling
+transformation on the scene as a whole.  (Recall the equivalence between
+modeling and viewing (<localref href="gl1geom.3.4"/>).)</p>
+
+<p>The modeling transformation includes a rotation about the <i>y</i>-axis followed by a rotation about
+the <i>x</i>-axis.  The sizes of the rotations change as the user drags the mouse.  
+Left/right motion controls the rotation about the <i>y</i>-axis, while up/down motion
+controls the rotation about the <i>x</i>-axis.  The rotation
+about the <i>x</i>-axis is restricted to lie in the range &minus;85 to 85 degrees.  Note that
+a rotation about the <i>y</i>-axis followed by a rotation about the <i>x</i>-axis always leaves the
+<i>y</i>-axis pointing in a vertical direction when projected onto the screen.</p>
+
+<p>Suppose the center of rotation is (<i>tx,ty,tz</i>) instead of (0,0,0).  To implement that,
+before doing the rotations, we need to translate the scene to move the point (<i>tx,ty,tz</i>) 
+to the origin.  We can do that with a translation by (<i>-tx,-ty,-tz</i>).
+Then, after doing the rotation, we need to translate the origin back to the
+point (<i>tx,ty,tz</i>).</p>
+
+<p>Finally, if the <i>viewDistance</i> is not zero, we need to push the scene <i>viewDistance</i>
+units away from the viewer.  We can do that with a translation by (0,0,<i>-viewDistance</i>).
+If <i>d</i> is the view distance, <i>ry</i> is the rotation about the <i>y</i>-axis,
+and <i>rx</i> is the rotation about the <i>x</i>-axis, then the sequence of modeling transformations
+that we need to apply to the scene is as follows:</p>
+
+<ol>
+<li>Move the view center to the origin:  Translate by (<i>-tx,-ty,-tz</i>).</li>
+<li>Rotate the scene by <i>ry</i> radians about the <i>y</i>-axis.</li>
+<li>Rotate the scene by <i>rx</i> radians about the <i>x</i>-axis.</li>
+<li>Move the origin back to view center:  Translate by (<i>tx,ty,tz</i>).</li>
+<li>Move the scene away from the viewer: Translate by (0,0,<i>-d</i>).</li>
+</ol>
+
+<np>Keeping in mind that modeling transformations are applied to objects in the opposite
+of the order in which they occur in the code, the view matrix could be created by
+the following <i>glMatrix</i> commands:</np>
+
+<pre>viewmatrix = mat4.create();
+mat4.translate(viewmatrix, viewmatrix, [0,0,-d]);
+mat4.translate(viewmatrix, viewmatrix, [tx,ty,tz]);
+mat4.rotateX(viewmatrix, viewmatrix, rx);
+mat4.rotateY(viewmatrix, viewmatrix, ry);
+mat4.translate(viewmatrix, viewmatrix, [-tx,-ty,-tz]);</pre>
+
+<np>In fact, in my code, I create the view matrix directly, based on the matrices for the individual
+transformations.  The 4-by-4 matrices for rotation and translation are given in 
+<localref href="gl1geom.5.2"/>.  The view matrix for a <classname>SimpleRotator</classname>
+is the matrix product of five translation and rotation matrices:</np>
+
+<img src="matrices-for-simple-rotator.png" width="631" height="154" tex="matrices-for-simple-rotator.eps" texscale="0.75"/>
+
+<np>It's actually not too difficult to implement the multiplication. See the JavaScript file,
+<sourceref href="webgl/simple-rotator.js"/>, if you are curious.</np>
+
+</subsection>
+
+
+
+</section>
+

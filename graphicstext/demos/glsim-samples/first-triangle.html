@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+   As a first example of using OpenGL 1.1, this page draws the
+   classic red/green/blue triangle.  It uses the default OpenGL
+   coordinate system, in which x, y, and z are limited to the range
+   -1 to 1, and the positive z-axis points into the screen.  Note
+   that this coordinate system is hardly ever used in practice.
+   
+   To implement OpenGL 1.1 functions, this page uses glsim.js, which
+   simulates a subset of the OpenGL 1.1 API in JavaScript by translating
+   the OpenGL functions into WebGL.  In particular WebGL support is
+   requried.  The purpose of glsim.js is to make it possible to try
+   out some basic OpenGL 1.1 commands.  It does not attempt to be efficient,
+   and it covers only a limited subset of OpenGL 1.1.  The subset is
+   approximately the one covered in Chapters 2 and 3 of the on-line
+   computer graphics textbook at http://math.hws.edu/graphicsbook
+-->
+
+<head>
+<meta charset="UTF-8">
+<title>OpenGL RGB Triangle</title>
+
+<script src="glsim.js"></script>  <!-- load the OpenGL 1.1 simulation code -->
+
+<script>
+
+    function display() {  // Called by init() to draw the image.
+
+        glClearColor( 0, 0, 0, 1 );
+        glClear( GL_COLOR_BUFFER_BIT );
+        
+        glBegin(GL_TRIANGLES);
+        glColor3f( 1, 0, 0 ); // red
+        glVertex2f( -0.8, -0.8 );
+        glColor3f( 0, 1, 0 ); // green
+        glVertex2f( 0.8, -0.8 );
+        glColor3f( 0, 0, 1 ); // blue
+        glVertex2f( 0, 0.9 );
+        glEnd();
+        
+    }
+    
+    function init() {  // Called by <body onload="init()">, when the page has loaded.
+        try {
+            glsimUse("glcanvas"); // OpenGL will draw to the canvas with id="glcanvas".
+        }
+        catch (e) {
+            document.getElementById("canvas-holder").innerHTML =
+                "Sorry, an error occured:<br>" + e;
+            return;
+        }
+        display();
+    }
+
+</script>
+
+</head>
+
+<body onload="init()">
+
+<h3>First OpenGL Example: The RGB Triangle</h3>
+
+<noscript>
+<p><b>Sorry, this page requires JavaScript!</b></p>
+</noscript>
+
+<div id="canvas-holder">
+<canvas id="glcanvas" width="500" height="500"></canvas>
+</div>
+
+</body>
+</html>

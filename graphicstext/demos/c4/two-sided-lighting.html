@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Two-sided Lighting</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script>
+
+var camera;
+
+/*  Draws a cylinder with height 2 and radius 1, centered at the origin, with its axis
+ *  along the z-axis.  It has no top, but does have a bottom, at z = -1.  No material
+ *  is applied
+ */
+function drawCylinder() {
+    var i;
+    glBegin(GL_TRIANGLE_STRIP);
+    for (i = 0; i <= 64; i++) {
+        var angle = 2*Math.PI/64 * i;
+        var x = Math.cos(angle);
+        var y = Math.sin(angle);
+        glNormal3d( x, y, 0 );  // Normal for both vertices at this angle.
+        glVertex3d( x, y, 1 );  // Vertex on the top edge.
+        glVertex3d( x, y, -1 ); // Vertex on the bottom edge.
+    }
+    glEnd();
+    glNormal3f( 0, 0, -1 );  
+    glBegin(GL_TRIANGLE_FAN);  // Draw the bottom, in the plane z = -1
+    glColor3d(1,1,1);  // ambient and diffuse for center
+    glVertex3d( 0, 0, -1);
+    for (i = 64; i >= 0; i--) {
+        var angle = 2*Math.PI/64 * i;
+        var x = Math.cos(angle);
+        var y = Math.sin(angle);
+        glVertex3d( x, y, -1 );
+    }
+    glEnd();    
+}
+
+function draw() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    camera.apply();
+
+    if (document.getElementById("twosided").checked) {
+        glLightModeli( GL_LIGHT_MODEL_TWO_SIDE, 1 ); // Turn on two-sided lighting.
+    }
+    else {
+        glLightModeli( GL_LIGHT_MODEL_TWO_SIDE, 0 ); // Turn off two-sided lighting.
+    }
+
+    var purple =  [ 0.6, 0, 0.6, 1 ];
+    var yellow = [ 0.6, 0.6, 0, 1 ];
+    var white = [ 0.4, 0.4, 0.4, 1 ]; // For specular highlights.
+    var black = [ 0, 0, 0, 1 ];
+    
+    glMaterialfv( GL_FRONT, GL_AMBIENT_AND_DIFFUSE, purple );  // front material
+    glMaterialfv( GL_FRONT_AND_BACK, GL_SPECULAR, white );
+    glMaterialf( GL_FRONT, GL_SHININESS, 64 );
+    
+    glMaterialfv( GL_BACK, GL_AMBIENT_AND_DIFFUSE, yellow );  // back material
+    glMaterialfv( GL_BACK, GL_SPECULAR, black );
+    
+    glRotatef(-90, 1, 0, 0);
+    glScalef(1,1,0.3);
+    drawCylinder();
+}
+
+function initGL() {
+    glClearColor(0, 0, 0, 1);  
+    glEnable(GL_DEPTH_TEST); 
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, 1);
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [ 0.15, 0.15, 0.15, 1]);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [ 1, 1, 1, 1 ]);
+    
+    //glLightfv(GL_LIGHT0, GL_POSITION, [ -2, -2, 3 ]);   // (I used this setting to get a better picture.)
+    //glEnable(GL_LIGHT1);
+    //glLightfv(GL_LIGHT1, GL_DIFFUSE, [ 0.3, 0.3, 0.3, 1] );
+    //glLightfv(GL_LIGHT1, GL_POSITION, [ 0, 5, 2 ]);
+}
+
+function init() {
+    try {
+	GLSim.lightCount = 2;
+	glsimUse("maincanvas");
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+	return;
+    }
+    initGL();
+    camera = new Camera();
+    camera.lookAt(5, 10, 20);
+    camera.setScale(1.5);
+    camera.installTrackball(draw);
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Two-sided Lighting</h3>
+
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="350" height="350"></canvas>
+</div>
+
+<br clear=all>
+
+<p style="margin-left:60px">
+<label><input type="checkbox" id="twosided" onchange="draw()" checked><b>Use Two-Sided Lighting</b></label>
+</p>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This little demo just shows an open-topped cylinder with different materials on its
+front and back faces.  Two-sided lighting must be turned on to see the effect.
+When it is on, the cylinder is purple on the outside and yellow on the inside.
+With two-sided lighting off, the inside is also purple, but because the incorrect
+normal vector is used in the lighting equations, it is not correctly illuminated.  In this
+case, only the rather dim ambient light is visible on the interior.</p>
+<p>As usual, you can use your mouse to rotate the image.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

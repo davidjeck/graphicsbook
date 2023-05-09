@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<!--
+   This page is an example of creating an image texture from color values
+   that have been stored in an array of type Uint8Array.
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Basic Texturing in WebGL</title>
+
+<script>
+
+"use strict";
+
+const vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "attribute vec2 a_texCoords;\n" +
+       "varying vec2 v_texCoords;\n" +
+       "void main() {\n" +
+       "   v_texCoords = a_texCoords;\n" +
+       "   gl_Position = vec4( 0.4*a_coords.x - 1.0, 2.0*a_coords.y - 1.0, 0.0, 1.0);\n" +
+                               // The object coordinates have x ranging from 0 to 5 and y from 0 to 1;
+                               // this converts those ranges to the clip coordinate range, -1 to 1.
+       "}\n";
+
+const fragmentShaderSource =
+       "precision mediump float;\n" +
+       "uniform sampler2D u_texture;\n" +  // A sampler variable to represent the texture.
+       "varying vec2 v_texCoords;\n" +   // The texture coordinates for this pixel.
+       "void main() {\n" +
+       "   vec4 color = texture2D( u_texture, v_texCoords );\n" +  // Sample the texture.
+       "   gl_FragColor = color;\n" +   // Just use the color from the texture as the pixel color.
+       "}\n";
+
+let  gl;  // The WebGL graphics context.
+
+let  a_coords_location;      // location of the "a_coords" attribute variable
+let  a_coords_buffer;        // a VBO to hold the vertex coordinates
+let  a_texCoords_location;   // location of the "a_texCoords" attribute variable
+let  a_texCoords_buffer;     // a VBO to hold the texture coordinates
+
+let  u_texture_location;     // the location of the "u_texture" uniform variable
+
+let  textureObject;          // A texture object to hold the texture image.
+
+
+function draw() {
+
+    gl.clearColor(0.4,0.4,0.4,1);  // glClear will fill the canvas with gray
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas
+
+    let  pixels;  // This will be used for a Uint8Array that holds pixel data
+                 // for the textures that will be used on the squares.
+                 
+    /* Set the texture to use gl.LINEAR as the minification filter.  It won't be
+       used for the objects drawn in this program, but since there are no mipmaps,
+       the default minification filter has to be changed, or the texture will
+       come out as all black. */
+       
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    
+    /* Load the coord/texCoord data for the first square,
+       then create and load the first texture, and draw the square.
+       The texture uses gl.LINEAR magnification filter (the default).*/
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 0.1,0.1, 0.9,0.1, 0.9,0.9, 0.1,0.9 ] ), gl.STREAM_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_texCoords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 0,0, 1,0, 1,1, 0,1 ] ), gl.STREAM_DRAW);
+    
+    pixels = new Uint8Array( 16*16*4 );  // Space for RGBA colors for a texture that is 16-by-16 pixels.
+    
+    for (let  i = 0; i < 16; i++) {
+        for (let  j = 0; j < 16; j++) {
+            let  offset = 64*i + 4*j ;  // starting point of data for this pixel in the array
+            pixels[offset + 3] = 255;    // alpha value for the pixel
+            if ( i < 8 && j < 8) {  // lower left corner of texture
+                pixels[ offset ] = 255;  // set red component of pixel to maximum, blue and green are 0
+            }
+            else if ( i >= 8 && j >= 8 ) {  // upper right corner of texture
+                pixels[offset + 2] = 255; // set blue component of pixel to maximum, red and green are 0
+            }
+            else {  // upper left or lower right corner of the texture
+                pixels[offset] = 255;     // set red, blue, and green components to maxium; color is white
+                pixels[offset + 1] = 255;
+                pixels[offset + 2] = 255;
+            }
+        }
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    /* For the second square, use the same texture, but with the mag filter set to gl.NEAREST */
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 1.1,0.1, 1.9,0.1, 1.9,0.9, 1.1,0.9 ] ), gl.STREAM_DRAW);
+    
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    /* For the third square use a 2-by-2 texture using the gl.LUMINANCE format, to get a black/white
+       checkerboard.  Note that each row of the texture must begin at an index in the Uint8Array
+       that is a multiple of 4, so two extra numbers are needed to pad the data for the first row.
+       The texture is repeated 10 times over the square.  For this square, the mag filter is gl.LINEAR. */
+    
+    pixels = new Uint8Array([ 255, 0, 0, 0, 0, 255 ]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, 2, 2, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, pixels);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 2.1,0.1, 2.9,0.1, 2.9,0.9, 2.1,0.9 ] ), gl.STREAM_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_texCoords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 0,0, 10,0, 10,10, 0,10 ] ), gl.STREAM_DRAW);
+        
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    /* The fourth square is the same as the fourth, except the mag filter is gl.NEAREST. */
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 3.1,0.1, 3.9,0.1, 3.9,0.9, 3.1,0.9 ] ), gl.STREAM_DRAW);
+    
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    /* For the fifth square, a 256-by-1 LUMINANCE texture representing a gradient from black to white is used.
+       The texture coordinates map it just once to the square. */
+       
+    pixels = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+        pixels[i] = i;
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, 256, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, pixels);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 4.1,0.1, 4.9,0.1, 4.9,0.9, 4.1,0.9 ] ), gl.STREAM_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_texCoords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array( [ 0,0, 1,0, 1,1, 0,1 ] ), gl.STREAM_DRAW);
+    
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    const prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    
+    /* Get the locations for the attribute and uniform variables in the shader,
+       and create VBOs to hold the attribute values. */
+    
+    a_coords_location = gl.getAttribLocation(prog, "a_coords");
+    a_coords_buffer = gl.createBuffer();
+    a_texCoords_location = gl.getAttribLocation(prog, "a_texCoords");
+    a_texCoords_buffer = gl.createBuffer();
+    
+    u_texture_location = gl.getUniformLocation(prog, "u_texture");
+    
+    /* Create a texture object to hold the texture, and bind it.
+       This is the only texture object used by this program.
+       It is bound to the default texture unit, gl.TEXTURE0.
+       The value for the uniform sampler variable is set to
+       0, to match the texture unit. */
+    
+    textureObject = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, textureObject);
+    gl.uniform1i( u_texture_location, 0 );
+
+    
+    /* Set up attribute pointers for a_coords and a_texCoords.
+       These are the only attribute buffers used in this program. */
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    gl.vertexAttribPointer(a_coords_location, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords_location); 
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_texCoords_buffer);
+    gl.vertexAttribPointer(a_texCoords_location, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_texCoords_location);
+}
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        let  canvas = document.getElementById("webglcanvas");
+        let  options = {  // no need for depth buffer in this 2D program
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        return;
+    }
+    draw();
+}
+
+window.onload = init;  // Arrange for init() to be called after page has loaded.
+
+</script>
+</head>
+<body>
+
+<h2 id="headline">WebGL Textures from Pixel Data</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="600" height="120"></canvas>
+</div>
+
+<div style="width: 600px">
+
+<p>This image shows four squares that have been drawn using
+textures that were created from pixel data. That is, the color
+values for the textures were stored in an <i>Uint8Array</i>, and the
+array was used to create the texture using a version of <i>gl.texImage2D</i>
+that takes the image data from an array.</p>
+
+<p>The square on the left uses a 16-by-16 texture, made up of four 8-by-8 squares of different colors.
+The square is covered by one copy of the texture.  Note the blending of colors along the edges between
+the subsquares.  The blending is cause by the magnification filter, which is set to <i>gl.LINEAR</i>.
+There is blending even along the outer edges of the square because the texture repeat mode is
+<i>gl.REPEAT</i>.</p>
+
+<p>The next square uses the same texture, but with the magnification filter set to <i>gl.NEAREST</i>.
+This eliminates the blending.</p>
+
+<p>The third and fourth squares use a tiny 2-by-2 texture with the <i>gl.LUMINANCE</i> format, which requires
+only one byte per pixel.  The texture is repeated ten times horizontally and ten times vertically
+on the square.  The third square uses <i>gl.LINEAR</i> as the magnification filter.  The fourth
+uses <i>gl.NEAREST</i>.</p>
+
+<p>For the final square, a 256-by-1 <i>gl.LUMINANCE</i> texture was uses.  The texture is given
+by an array of 256 bytes, with values increasing from 0 to 255.  One copy of the texture is
+used on the square, giving a gradient effect.</p>
+
+
+</div>
+
+</body>
+</html>

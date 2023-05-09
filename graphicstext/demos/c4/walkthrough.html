@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Walkthrough</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    button {
+	margin-left: 0px;
+	margin-right: 2px;
+	margin-top: 2px;
+    }
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script src="../script/teapot-model-IFS.js"></script>
+<script>
+
+var cubeModel,
+    coneModel,
+    cylinderModel,
+    sphereModel,
+    torusModel;
+
+var mainCanvas, overviewCanvas;
+
+var x = 0, z = 0;   // position of viewer
+var facing = 0;      // facing of viewer to negative z-axis;
+var headTilt = 0;  // facing of direction of view, up or down from horizontal
+
+
+function drawModelIFS(model) {
+        // Draws a model, represented in the data structure used in ../script/basic-object-models-IFS.js
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3,GL_FLOAT,0,model.vertexPositions);
+    glEnableClientState(GL_NORMAL_ARRAY);
+    glNormalPointer(GL_FLOAT, 0, model.vertexNormals);
+    glDrawElements(GL_TRIANGLES, model.indices.length, GL_UNSIGNED_BYTE, model.indices);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_NORMAL_ARRAY);    
+}
+
+function drawArrow() {
+       // draws a white arrow with a black outline in the xz-plane, with lighting, depth test disabled.
+    var points = new Float32Array([ 0,1, -2,0, -5,0, 0,5, 5,0, 2,0, 2,-5, -2,-5, -2,0 ]);
+    glPushAttrib(GL_LIGHTING_BIT | GL_ENABLE_BIT);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+    glPushMatrix();
+    glRotatef(-90,1,0,0);  // rotate arrow from xy-plan into the xz-plane
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(2,GL_FLOAT,0,points);
+    glColor3f(1,1,1);
+    glDrawArrays(GL_TRIANGLE_FAN,0,9);
+    glColor3f(0,0,0);
+    glDrawArrays(GL_LINE_STRIP,1,8);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glPopMatrix();
+    glPopAttrib();
+}
+
+
+function draw() {
+         // Draws the objects that are in the world;
+	 // transforms are set up in drawMain() and drawOverview();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glPushMatrix();
+    glTranslatef(0,-0.5,-0);
+    glRotatef(-90,1,0,0);
+    glScalef(100,100,1);
+    glColor3f(0,0.6,0);
+    drawModelIFS(cylinderModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(0,2,-20);
+    glScalef(5,5,5);
+    glColor3f(1,0,0.6);
+    drawModelIFS(torusModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(0,5,-40);
+    glRotatef(-90,1,0,0);
+    glScalef(4,4,10);
+    glColor3f(1,1,0);
+    drawModelIFS(coneModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(20,4,-10);
+    glScalef(10,10,10);
+    glColor3f(0.5,0.7,1);
+    drawModelIFS(sphereModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(-10,4,30);
+    glScalef(10,10,10);
+    glColor3f(1,0.5,0);
+    drawModelIFS(sphereModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(20,4,-10);
+    glScalef(10,10,10);
+    glColor3f(0.5,0.7,1);
+    drawModelIFS(sphereModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(-15,1,-15);
+    glScalef(12,12,12);
+    glColor3f(1,1,1);
+    drawModelIFS(sphereModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(15,3.5,-30);
+    glScalef(7,7,7);
+    glColor3f(1,0,0);
+    drawModelIFS(cubeModel);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(-35,2.5,0);
+    glRotatef(30,0,1,0);
+    glScalef(6,6,15);
+    glColor3f(1,1,0);
+    drawModelIFS(cylinderModel);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(8,2,5);
+    glRotatef(-90,1,0,0);
+    glScalef(6,6,4);
+    glColor3f(0,0,1);
+    drawModelIFS(coneModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(10,1,40);
+    glRotatef(-90,1,0,0);
+    glScalef(10,10,2);
+    glColor3f(0.5,0.5,0.7);
+    drawModelIFS(cylinderModel);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glTranslatef(30,4,20);
+    glScalef(8,8,8);
+    glColor3f(1,0,0);
+    glRotatef(45,0,1,0);
+    drawModelIFS(torusModel);
+    glPopMatrix();
+    
+}
+
+function drawMain() {
+        // Draw the main view.
+    glsimUse(mainCanvas); // draw this in the main canvas.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective( 45, 400/350, 0.1, 100); // fovy, aspect, near, far
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glRotatef(-headTilt,1,0,0);
+    glRotatef(-facing,0,1,0);
+    glTranslatef(-x,-2,-z);
+    draw();
+}
+
+function drawOverview() {
+         // Draw the overhead view.
+    glsimUse(overviewCanvas); // draw this in the secondary canvas.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(-55,55,-55,55,-20,20);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(0,1,0, 0,0,0, 0,0,-1);
+    draw();
+    glTranslatef(x,0,z);
+    glRotatef(facing,0,1,0);
+    drawArrow();
+}
+
+function initGL() {
+    glsimUse(mainCanvas);  // initialize GL in the main canvas
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0,GL_DIFFUSE,[0.8,0.8,0.8]);
+    glEnable(GL_LIGHT1);  // (needs some extra light from above)
+    glLightfv(GL_LIGHT1,GL_DIFFUSE,[0.4,0.4,0.4]);
+    glLightfv(GL_LIGHT1,GL_POSITION,[0,1,0,0]);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_COLOR_MATERIAL);
+    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 1); // (so you can see the interiors when you move into the objects)
+    glClearColor(0,0,0,1);
+    
+    glsimUse(overviewCanvas);  // initialize GL in the secondary canvas
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_COLOR_MATERIAL);
+    glClearColor(0,0,0,1);
+}
+
+function forward(dist) {  // move forward dist units (or backward if dist is less than zero)
+    dx = dist*Math.sin(facing/180*Math.PI);
+    dz = dist*Math.cos(facing/180*Math.PI);
+    x -= dx;
+    z -= dz;
+    drawMain();
+    drawOverview();
+}
+
+function turn(a) {  // turn left by a degrees (or right if z is negative)
+    facing += a;
+    drawMain();
+    drawOverview();
+}
+
+function headUp(a) {  // tilt the head up by a degrees (or down by -a), clamped to the range -15 to 15
+    headTilt += a;
+    headTilt = Math.max(-15, Math.min(15, headTilt));
+    drawMain();
+}
+
+function reset() {  // reset the four variables that define the view to zero.
+    x = z = headTilt = facing = 0;
+    drawMain();
+    drawOverview();
+}
+
+function init() {
+    try {
+	mainCanvas = document.getElementById("maincanvas");
+	overviewCanvas = document.getElementById("overview");
+    glsimUse(mainCanvas);
+	glsimUse(overviewCanvas);
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+	return;
+    }
+    cubeModel = cube();
+    coneModel = uvCone();
+    cylinderModel = uvCylinder();
+    sphereModel = uvSphere();
+    torusModel = uvTorus();
+    initGL();
+    drawMain();
+    drawOverview();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">A Walkthrough: Moving around in the world</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="400" height="350"></canvas>
+</div>
+
+
+<div style="float:left; margin-left:15px">
+
+<p style="margin-top:0">
+
+<button onclick="forward(1)">Forward</button>
+<button onclick="forward(-1)">Back</button>
+<button onclick="reset()" style="margin-left:40px">RESET</button><br>
+
+<button onclick="turn(7)">Turn Left</button>
+<button onclick="turn(-7)">Turn Right</button><br>
+
+<button onclick="headUp(1)">Look Up</button>
+<button onclick="headUp(-1)">Look Down</button>
+
+</p>
+
+<canvas id="overview" width=250 height=250></canvas>
+
+</div>
+
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>In this demo, you move around on the top of a large
+green disk.  The top of the disk lies in the <i>xz</i>-plane.
+Various objects are scattered about the disk
+for you to look at.  You can turn left and right.  You can
+move forward and backward in the direction that you are facing.
+You can tilt your gaze upwards and downwards (but only to
+a limited extent).</p>
+<p>The display area on the left shows your view of the world.
+The display area on the bottom right shows the view from above,
+with your position marked with a white arrow.</p>
+<p>Your view is determined by four variables:  The variables <i>x</i> and
+<i>z</i> give the x- and z-coordinates of your position.  (Your
+y-coordinate is always 2, which is meant to be the height of your
+eyes above the plane of the disk.  That's 2 meters; you are rather
+tall.)  The variable <i>facing</i> gives the angle that your gaze
+makes with the negative direction of the <i>z</i>-axis.  The
+variable <i>headTilt</i> gives that angle that your gaze makes with
+the horizontal.  The viewing transformation is then given by
+setting up a modelview transform as follows, before drawing the world:</p>
+<pre>
+    glLoadIdentity();
+    glRotatef(-headTilt,1,0,0);
+    glRotatef(-facing,0,1,0);
+    glTranslatef(-x,-2,-z);
+</pre>
+<p style="text-indent: 0">Remember that viewing transforms are applied
+in the order in which they occur in the code, so the view is first rotated to
+account for the tilt of your head, then rotated to the direction that you are facing,
+then translated to the position of your eyes.
+Also remember that the effect of a viewing transform is the
+inverse of the effect that it would have on objects as a modeling transform.
+This accounts for all the negative values in the commands.  As a modeling
+transform, the effect would be to translate the world by (<i>&minus;x,&minus;2,&minus;z</i>), then
+rotate it by <i>&minus;facing</i>, then tilt it by <i>&minus;headTilt</i>.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Per-pixel vs per-vertex lighting</title>
+<link rel="stylesheet" href="../demo.css">
+
+<script type="x-shader/x-vertex" id="vshader-lambert">
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    uniform mat3 normalMatrix;
+    uniform vec4 lightPosition;
+    uniform vec4 diffuseColor;
+    uniform vec3 specularColor;
+    uniform float specularExponent;
+    varying vec4 v_color;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        vec3 N, L, R, V;  // vectors for lighting equation
+        N = normalize( normalMatrix*a_normal );
+        if ( lightPosition.w == 0.0 ) {
+            L = normalize( lightPosition.xyz );
+        }
+        else {
+            L = normalize( lightPosition.xyz/lightPosition.w - eyeCoords.xyz );
+        }
+        R = -reflect(L,N);
+        V = normalize( -eyeCoords.xyz);  // (Assumes a perspective projection.)
+        if ( dot(L,N) <= 0.0 ) {
+            v_color = vec4(0,0,0,1);
+        }
+        else {
+            vec3 color = 0.8*dot(L,N) * diffuseColor.rgb;
+            if (dot(R,V) > 0.0) {
+                color += 0.4*pow(dot(R,V),specularExponent) * specularColor;
+            }
+            v_color = vec4(color, diffuseColor.a);
+        }
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-lambert">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    varying vec4 v_color;
+    void main() {
+        gl_FragColor = v_color;
+    }
+</script>
+
+<script type="x-shader/x-vertex" id="vshader-phong">
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        v_normal = a_normal;
+        v_eyeCoords = eyeCoords.xyz;
+    }
+</script>
+
+<script type="x-shader/x-fragment" id="fshader-phong">
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    uniform mat3 normalMatrix;
+    uniform vec4 lightPosition;
+    uniform vec4 diffuseColor;
+    uniform vec3 specularColor;
+    uniform float specularExponent;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec3 N, L, R, V;  // vectors for lighting equation
+        N = normalize( normalMatrix*v_normal );
+        if ( lightPosition.w == 0.0 ) {
+            L = normalize( lightPosition.xyz );
+        }
+        else {
+            L = normalize( lightPosition.xyz/lightPosition.w - v_eyeCoords );
+        }
+        R = -reflect(L,N);
+        V = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        if ( dot(L,N) <= 0.0 ) {
+            gl_FragColor = vec4(0,0,0,1);
+        }
+        else {
+            vec3 color = 0.8*dot(L,N) * diffuseColor.rgb;
+            if (dot(R,V) > 0.0) {
+                color += 0.4*pow(dot(R,V),specularExponent) * specularColor;
+            }
+            gl_FragColor = vec4(color, diffuseColor.a);
+        }
+    }
+</script>
+
+
+
+<script src="../script/demo-core.js"></script>
+<script src="../script/webgl/gl-matrix-min.js"></script>
+<script src="../script/webgl/trackball-rotator-syncable.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+
+
+
+
+<script>
+
+
+var gl1, gl2; // WebGL contexts for two canvases.
+
+var progData1, progData2; // Objects containing shader programs locations and buffers for the two canvases.
+                          // Fields of the objects are the same, but are for different WebGL contexts.
+
+
+var lightPositions = [  // values for light position, selected by popup menu
+    [0,0,0,1], [0,0,1,0], [0,1,0,0], [0,0,-10,1], [2,3,5,0]
+];
+
+var objects = [  // Objects for display, selected by popup menu
+    cube(4.5),
+    uvTorus(3,1,64,32),
+    uvCylinder(1.5,5.5),
+    uvCone(2.5,5.5),
+    uvSphere(3),
+    uvSphere(3,12,6)
+];
+
+var currentModelNumber;  // contains data for the current object
+
+
+function draw( gl, progData, rotator ) { 
+    gl.clearColor(0.15,0.15,0.3,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    modelview = rotator.getViewMatrix();
+    
+    if (currentModelNumber > 1) {
+        mat4.rotateX(modelview,modelview,-Math.PI/2);
+    }
+    
+    var normalMatrix = mat3.create();
+
+    mat3.normalFromMat4(normalMatrix, modelview);
+    
+    gl.uniformMatrix3fv(progData.u_normalMatrix, false, normalMatrix);
+    gl.uniformMatrix4fv(progData.u_modelview, false, modelview );
+
+   
+    gl.drawElements(gl.TRIANGLES, objects[currentModelNumber].indices.length, gl.UNSIGNED_SHORT, 0);
+}
+
+function drawBoth() {
+    draw(gl1,progData1, rotator1);
+    draw(gl2,progData2, rotator2);
+}
+
+function createProgram(gl, vertexShaderID, fragmentShaderID) {
+    function getTextContent( elementID ) {
+            // This nested function retrieves the text content of an
+            // element on the web page.  It is used here to get the shader
+            // source code from the script elements that contain it.
+        var element = document.getElementById(elementID);
+        var node = element.firstChild;
+        var str = "";
+        while (node) {
+            if (node.nodeType == 3) // this is a text node
+                str += node.textContent;
+            node = node.nextSibling;
+        }
+        return str;
+    }
+    try {
+        var vertexShaderSource = getTextContent( vertexShaderID );
+        var fragmentShaderSource = getTextContent( fragmentShaderID );
+    }
+    catch (e) {
+        throw "Error: Could not get shader source code from script elements.";
+    }
+    var vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vertexShaderSource);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw "Error in vertex shader:  " + gl.getShaderInfoLog(vsh);
+     }
+    var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw "Error in fragment shader:  " + gl.getShaderInfoLog(fsh);
+    }
+    var prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+    }
+    return prog;
+}
+
+
+/* Called when the user changes the selection in the model-selection pop-up.
+ * The data for the model are copied into the appropriate buffers, and the
+ * scene is redrawn.
+ */
+function installModel(gl,progData,modelData) {
+     gl.bindBuffer(gl.ARRAY_BUFFER, progData.a_coords_buffer);
+     gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexPositions, gl.STATIC_DRAW);
+     gl.vertexAttribPointer(progData.a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+     gl.enableVertexAttribArray(progData.a_coords_loc);
+     gl.bindBuffer(gl.ARRAY_BUFFER, progData.a_normal_buffer);
+     gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexNormals, gl.STATIC_DRAW);
+     gl.vertexAttribPointer(progData.a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+     gl.enableVertexAttribArray(progData.a_normal_loc);
+     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,progData.index_buffer);
+     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, modelData.indices, gl.STATIC_DRAW);
+}
+
+
+function initContext(gl,progData,sourceSuffix) {
+    var prog = createProgram(gl,"vshader-"+sourceSuffix,"fshader-"+sourceSuffix);
+    gl.useProgram(prog);
+    progData.a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    progData.a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    progData.u_modelview = gl.getUniformLocation(prog, "modelview");
+    progData.u_projection = gl.getUniformLocation(prog, "projection");
+    progData.u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    progData.u_lightPosition=  gl.getUniformLocation(prog, "lightPosition");
+    progData.u_diffuseColor =  gl.getUniformLocation(prog, "diffuseColor");
+    progData.u_specularColor =  gl.getUniformLocation(prog, "specularColor");
+    progData.u_specularExponent = gl.getUniformLocation(prog, "specularExponent");
+    progData.a_coords_buffer = gl.createBuffer();
+    progData.a_normal_buffer = gl.createBuffer();
+    progData.index_buffer = gl.createBuffer();
+    gl.enable(gl.DEPTH_TEST);
+    gl.uniform3f(progData.u_specularColor, 0.6, 0.6, 0.6);
+    gl.uniform4f(progData.u_diffuseColor, 1, 1, 1, 1);
+    gl.uniform1f(progData.u_specularExponent, 16);
+    gl.uniform4fv(progData.u_lightPosition, lightPositions[3]);
+    var projection = mat4.create();
+    mat4.perspective(projection,Math.PI/6,1,10,20);
+    gl.uniformMatrix4fv(progData.u_projection, false, projection);
+}
+
+function initGL() {
+    progData1 = {};
+    initContext(gl1,progData1,"lambert");
+    progData2 = {};
+    initContext(gl2,progData2,"phong");
+}
+
+
+function init() {
+    var canvas1, canvas2;
+    try {
+        canvas1 = document.getElementById("webglcanvas1");
+        gl1 = canvas1.getContext("webgl") || 
+                         canvas1.getContext("experimental-webgl");
+        canvas2 = document.getElementById("webglcanvas2");
+        gl2 = canvas2.getContext("webgl") || 
+                         canvas2.getContext("experimental-webgl");
+        if ( ! gl1 || ! gl2 ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("table-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("table-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    document.getElementById("object").value = "2";
+    document.getElementById("light").value = "3";
+    document.getElementById("object").onchange = function() {
+        var val = Number(this.value);
+        currentModelNumber = val;
+        installModel(gl1,progData1,objects[val]); 
+        installModel(gl2,progData2,objects[val]); 
+        drawBoth();
+    };
+    document.getElementById("light").onchange = function() {
+        var val = Number(this.value);
+        gl1.uniform4fv(progData1.u_lightPosition, lightPositions[val]);
+        gl2.uniform4fv(progData2.u_lightPosition, lightPositions[val]);
+        drawBoth();
+    };
+    document.getElementById("reset").onclick = function() {
+        rotator1.setView(15);
+        rotator2.setView(15);
+        drawBoth();
+    };
+    installModel(gl1,progData1,objects[2]);
+    installModel(gl2,progData2,objects[2]);
+    currentModelNumber = 2;
+    rotator1 = new TrackballRotator(canvas1, function() {
+           rotator2.takeData(rotator1);  // synchronize rotators
+           drawBoth();
+       }, 15);
+    rotator2 = new TrackballRotator(canvas2, function() {
+           rotator1.takeData(rotator2);  // synchronize rotators
+           drawBoth();
+       }, 15);
+    drawBoth();
+}
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Per-vertex vs. Per-pixel Lighting</h3>
+
+<p>Drag on either object to rotate both. <button id="reset">Reset Rotation</button></p>
+
+<div id="table-holder">
+<table border=1 cellpadding=5 cellspacing=0 bgcolor=white>
+<tr align=center>
+<td colspan=2 align=center>
+<label><b>Object:</b> <select id="object">
+    <option value="0">Cube</option>
+    <option value="1">Torus</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Sphere</option>
+    <option value="5">Rough Sphere</option>
+</select></label>
+<label style="margin-left: 20px"><b>Light:</b> <select id="light">
+    <option value="0">[0,0,0,1] (Viewpoint light)</option>
+    <option value="1">[0,0,1,0] (Directional, into screen)</option>
+    <option value="2">[0,1,0,0] (Directional, from above)</option>
+    <option value="3">[0,0,-10,1] (On z-axis, close to object)</option>
+    <option value="4">[2,3,5,0] (Directional offset up &amp; right)</option>
+</select></label>
+</td>
+</tr>
+<tr align=center>
+<td><b>Per-vertex</b></td>
+<td><b>Per-pixel (Phong)</b></td>
+</th>
+</tr>
+<tr>
+<td><canvas id="webglcanvas1" width="300" height="300"></canvas></td>
+<td><canvas id="webglcanvas2" width="300" height="300"></canvas></td>
+</tr>
+</table>
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo lets you compare OpenGL&nbsp;1.1-style lighting to Phong shading.  In
+OpenGL 1.1, lighting calculations are done at the vertices, and the result is
+interpolated to interior pixels.  In Phong shading, lighting calculations are
+done at each pixel, using interpolated normal vectors.  The demo shows two
+identical objects with identical lighting, one doing lighting calculations at
+the vertices and one doing them at each pixel.  </p>
+<p>The initial view is chosen to be one where the difference is clear: a cylinder
+illuminated by a light that is close to the cylinder.  All of the vertices of the
+cylinder are located along the top and bottom edges, so per-vertex calculations
+do not give good results.  Try rotating the cylinders around the x-axis and
+observer how the specular highlights change.</p>
+<p>You can try other lights and other objects. The cube and the "rough sphere" are
+other cases where the per-vertex approximation gives especially bad results.
+For the torus, which is made of very small triangles, the approximation is pretty good.
+It can be instructive to look at the (regular) sphere, which has medium-sized
+triangles.
+</p>
+<p>Specular highlights are not the only thing that is improved by per-pixel lighting.
+For example, compare the different amounts of "striping" on the cylinder for the two lighting
+techniques.
+</p>
+
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

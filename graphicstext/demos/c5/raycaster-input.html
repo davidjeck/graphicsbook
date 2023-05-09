@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    label {
+        margin-left:20px;
+    }
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/three.min.js"></script>
+<script>
+
+var canvas, scene, renderer, camera;
+
+var raycaster;  // A THREE.Raycaster for user mouse input.
+
+var ground; // A square base on which the cylinders stand.
+var cylinder;  // A cylinder that will be cloned to make the visible cylinders.
+
+var world;  // An Object3D that contains all the mesh objects in the scene.
+            // Rotation of the scene is done by rotating the world about its
+            // y-axis.  (I couldn't rotate the camera about the scene since
+            // the Raycaster wouldn't work with a camera that was a child
+            // of a rotated object.)
+
+var ROTATE = 1, DRAG = 2, ADD = 3, DELETE = 4;  // Possible mouse actions
+var mouseAction;  // currently selected mouse action
+var dragItem;  // the cylinder that is being dragged, during a drag operation
+
+var targetForDragging;  // An invisible object that is used as the target for raycasting while
+                        // dragging a cylinder.  I use it to find the new location of the
+                        // cylinder.  I tried using the ground for this purpose, but to get
+                        // the motion right, I needed a target that is at the same height
+                        // above the ground as the point where the user clicked the cylinder.
+
+function render() {  
+    renderer.render(scene,camera);
+}
+
+function createWorld() {
+    scene = new THREE.Scene();
+    renderer.setClearColor(0x333333);
+    camera = new THREE.PerspectiveCamera(27,canvas.width/canvas.height,10,100);
+    camera.position.z = 60;
+    camera.position.y = 30;
+    camera.lookAt( new THREE.Vector3(0,0,0) );
+    camera.add(new THREE.PointLight(0xffffff,0.7)); // point light at camera position
+    scene.add(camera);
+    scene.add(new THREE.DirectionalLight(0xffffff,0.5)); // light shining from above.
+    
+    world = new THREE.Object3D();
+    scene.add(world);
+    
+    ground = new THREE.Mesh(
+        new THREE.BoxGeometry(40,1,40),
+        new THREE.MeshLambertMaterial( {color:"green"})
+    );
+    ground.position.y = -0.5;  // top of base lies in the plane y = -5;
+    world.add(ground);
+    
+    targetForDragging = new THREE.Mesh(
+        new THREE.BoxGeometry(100,0.01,100),
+        new THREE.MeshBasicMaterial()
+    );
+    targetForDragging.material.visible = false;
+    
+    //targetForDragging.material.transparent = true;  // This was used for debugging
+    //targetForDragging.material.opacity = 0.1;
+    //world.add(targetForDragging);
+    
+    cylinder = new THREE.Mesh(
+        new THREE.CylinderGeometry(1,2,6,16,32),
+        new THREE.MeshLambertMaterial( {color:"yellow"} )
+    );
+    cylinder.position.y = 3;  // places base at y = 0;
+    
+    addCylinder(10,10);
+    addCylinder(0,15);
+    addCylinder(-15,-7);
+    addCylinder(-8,5);
+    addCylinder(5,-12);
+
+}
+
+function addCylinder(x,z) {
+    var obj = cylinder.clone();
+    obj.position.x = x;
+    obj.position.z = z;
+    world.add(obj);
+}
+
+function doMouseDown(x,y) {
+    if (mouseAction == ROTATE) {
+        return true;
+    }
+    if (targetForDragging.parent == world) {
+        world.remove(targetForDragging);  // I don't want to check for hits on targetForDragging
+    }
+    var a = 2*x/canvas.width - 1;
+    var b = 1 - 2*y/canvas.height;
+    raycaster.setFromCamera( new THREE.Vector2(a,b), camera );
+    var intersects = raycaster.intersectObjects( world.children );  // no need for recusion since all objects are top-level
+    if (intersects.length == 0) {
+        return false;
+    }
+    var item = intersects[0];
+    var objectHit = item.object;
+    switch (mouseAction) {
+    case DRAG:
+        if (objectHit == ground) {
+            return false;
+        }
+        else {
+            dragItem = objectHit;
+            world.add(targetForDragging);
+            targetForDragging.position.set(0,item.point.y,0);
+            render();
+            return true;
+        }
+    case ADD:
+        if (objectHit == ground) {
+            var locationX = item.point.x;  // Gives the point of intersection in world coords
+            var locationZ = item.point.z;
+            var coords = new THREE.Vector3(locationX, 0, locationZ);
+            world.worldToLocal(coords);  // to add cylider in correct position, neew local coords for the world object
+            addCylinder(coords.x, coords.z);
+            render();
+        }
+        return false;
+    default: // DELETE
+        if (objectHit != ground) {
+            world.remove(objectHit);
+            render();
+        }
+        return false;
+    }
+}
+
+function doMouseMove(x,y,evt,prevX,prevY) {
+    if (mouseAction == ROTATE) {
+        var dx = x - prevX;
+        world.rotateY( dx/200 );
+        render();
+    }
+    else {  // drag
+        var a = 2*x/canvas.width - 1;
+        var b = 1 - 2*y/canvas.height;
+        raycaster.setFromCamera( new THREE.Vector2(a,b), camera );
+        var intersects = raycaster.intersectObject( targetForDragging ); 
+        if (intersects.length == 0) {
+            return;
+        }
+        var locationX = intersects[0].point.x;
+        var locationZ = intersects[0].point.z;
+        var coords = new THREE.Vector3(locationX, 0, locationZ);
+        world.worldToLocal(coords);
+        a = Math.min(19,Math.max(-19,coords.x));  // clamp coords to the range -19 to 19, so object stays on ground
+        b = Math.min(19,Math.max(-19,coords.z));
+        dragItem.position.set(a,3,b);
+        render();
+    }
+}
+
+function doChangeMouseAction() {
+    if (document.getElementById("mouseRotate").checked) {
+        mouseAction = ROTATE;
+    }
+    else if (document.getElementById("mouseDrag").checked) {
+        mouseAction = DRAG;
+    }
+    else if (document.getElementById("mouseAdd").checked) {
+        mouseAction = ADD;
+    }
+    else {
+        mouseAction = DELETE;
+    }
+}
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true
+        });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    document.getElementById("mouseDrag").checked = true;
+    mouseAction = DRAG;
+    document.getElementById("mouseRotate").onchange = doChangeMouseAction;
+    document.getElementById("mouseDrag").onchange = doChangeMouseAction;
+    document.getElementById("mouseAdd").onchange = doChangeMouseAction;
+    document.getElementById("mouseDelete").onchange = doChangeMouseAction;
+    createWorld();
+    setUpMouseHander(canvas,doMouseDown,doMouseMove);
+    setUpTouchHander(canvas,doMouseDown,doMouseMove);
+    raycaster = new THREE.Raycaster();
+    render();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Using a Raycaster for Input</h3>
+
+<p><b>Mouse Action:</b>
+    <label><input type="radio" name="action" id="mouseRotate">Rotate</label>
+    <label><input type="radio" name="action" id="mouseDrag">Drag</label>
+    <label><input type="radio" name="action" id="mouseAdd">Add</label>
+    <label><input type="radio" name="action" id="mouseDelete">Delete</label>
+</p>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="550" height="300"></canvas>
+</div>
+
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo uses an object of type <i>THREE.Raycaster</i> to get input
+from the user.  A Raycaster can find intersections of a ray with objects in
+the scene.  By using the camera and mouse to specify the ray, a
+Raycaster can tell you which object the user clicks.  It also gives
+the coordinates of the point at which the ray intersects the clicked
+object.</p>
+<p>The scene shows a square, green base, and some tapered, yellow
+cylinders standing on the base.  Cylinders can intersect; no attempt
+is made to treat them like real solid objects.  The user can interact with the scene
+using the mouse.  Four radio buttons let the user select
+the action that they want to perform with the mouse.</p>
+<p>When "Rotate" is selected, dragging the
+mouse will rotate the world about the <i>y</i>-axis.  Only the
+horizontal motion of the mouse is taken into account.</p>
+<p>When "Drag" is selected, the mouse can be used to drag
+the yellow cylinders.  The cylinder is constrained to stay on the base.
+An interesting point is that as the cylinder is dragged, its new position
+is determined using the Raycaster.</p>
+<p>When "Add" is selected, a mouse click at a point on the green base
+will add a new cylinder at that point.  Clicking a cylinder will have
+no effect.</p>
+<p>When "Delete" is selected, clicking on one of the yellow cylinders
+will remove it from the scene.  Clicking the ground will have no effect.</p>
+
+
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

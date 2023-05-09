@@ -1,0 +1,1004 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="The JavaScript Programming Language" id="proglang.3">
+
+<p1>JavaScript is a programming language that was created for use on Web pages.
+More recently, a version known as <i>node</i> has made it possible to use
+JavaScript for server-side programs, and even for general programming.
+JavaScript was first developed by Netscape (the predecessor of the Firefox web browser) at about the
+same time that Java was introduced, and the name JavaScript was chosen
+to ride the tide of Java's increasing popularity.  In spite of the similar
+names, the two languages are quite different.  Actually, there is no
+standardized language named JavaScript. The standardized language is
+officially called ECMAScript, but the name is not widely used in practice,
+and versions of JavaScript in actual web browsers don't necessarily
+implement the standard exactly.</p1>
+
+<p>Traditionally, it has been difficult for
+programmers to deal with the differences among JavaScript implementations
+in different web browsers.  But almost all modern browsers now implement
+the features discussed in this section, which are specified by
+ECMAScript&nbsp;6, also known as <newword>ES6</newword>.  A notable exception is 
+Internet Explorer, the predecessor of Microsoft's Edge browser, which really should no longer be used.</p>
+
+<p>This page is a short overview of JavaScript.  If you really want to learn JavaScript in detail,
+you might consider the book <i>JavaScript: The Definitive Guide</i>, seventh edition,
+by David Flanagan.</p>
+
+
+<subsection title="The Core Language" id="proglang.3.1">
+
+<p>JavaScript is most closely associated with web pages, but it
+is a general purpose language that is used in other places too.  There is
+a core language that has nothing to do with web pages in particular, and
+we begin by looking at that core.</p>
+
+<p>JavaScript has  a looser syntax than either Java or C.  One example is the use
+of semicolons, which are not required at the end of a statement, unless another
+statement follows on the same line.  Like many cases of loose syntax rules, this
+can lead to some unexpected bugs.  If a line is a legal statement, it is considered to
+be a complete statement, and the next line is the start of a new statement&mdash;even if
+you meant the next line to be a continuation of the same statement.  I have been 
+burned by this fact with code of the form</p>
+
+<pre>return
+       "very long string";</pre>
+       
+<np>The "return" on the first line is a legal statement, so the value on the next line
+is not considered to be part of that statement.  The result was a function that returned
+without returning a value.  This also depends on the fact that JavaScript will accept
+any expression, such as the string on the second line, as a statement, even if evaluating
+the expression doesn't have any effect.</np>
+
+<p>Variables in JavaScript are not typed.  That is, when you declare a variable, you
+don't declare what type it is, and the variable can refer to data
+of any type.  Variables are usually declared using the keyword <b>let</b>, and they
+can optionally be initialized when they are declared:</p>
+
+<pre>let x, y;
+let name = "David";</pre>
+
+<np>A variable whose value will not be changed after it is initialized can be declared
+using <b>const</b> instead of <b>var</b>:</np>
+
+<pre>const name = "David";</pre>
+
+<np>Before ES6, variables could only be declared with the keyword <b>var</b>
+(as in "var&nbsp;x,y;").  It is still possible to declare variables using <b>var</b>,
+but <b>let</b> and <b>const</b> are now preferred.
+(One peculiarity of using <b>var</b> is that it is OK in JavaScript to use it to declare 
+the same variable more than once; a declaration
+just says that the variable exists.)</np>
+
+<p>JavaScript also allows you to use variables without declaring them.  However, doing
+so is not a good idea.  You can prevent the use of undeclared variables,
+as well as certain other unsafe practices, by including the following statement
+at the beginning of your program:</p>
+
+<pre>"use strict";</pre>
+
+<p>Although variables don't have types, values do.  A value can be a number, a string,
+a boolean, an object, a function, or a couple more exotic things.  
+A variable that has never been assigned a value
+has the special value <i>undefined</i>.  (The fact that a function can be used as a
+data value might be a surprise to you; more  on that later.)  You can determine
+the type of a value, using the <i>typeof</i> operator:
+The expression <code>typeof&nbsp;x</code> returns a string that tells the type of
+the value of <i>x</i>.  The string can be "undefined", "number", "string",
+"boolean", "object", "function", "bigint", or "symbol".  (Bigints and symbols are
+not discussed in this section.)
+Note that <i>typeof</i> returns "object" 
+for objects of any type, including arrays.  Also, <i>typeof&nbsp;null</i> is "object".</p>
+
+<p>In JavaScript, "string" is considered to be a primitive data type
+rather than an object type. When two strings are compared  using the
+== or != operator, the contents of the strings are compared.
+There is no <ptype>char</ptype> type.  To represent a char, use a string
+of length&nbsp;1.  Strings can be concatenated with
+the + operator, like in Java.</p>
+
+<p>String literals can be enclosed either
+in double quotes or in single quotes. Starting in ES6, there is also a
+kind of string literal known as a "template string."   A template string
+is enclosed in single backquote characters.  When a template string
+includes a JavaScript expression between <code>${</code>&nbsp;and&nbsp;<code>}</code>,
+the value of that expression is inserted into the string.  For example, if
+<i>x</i> is 5 and <i>y</i> is 12, then the statement</p>
+
+<pre>result = `The product of ${x} and ${y} is ${x*y}`;</pre>
+
+<np>assigns the string "The product of 5 and 12 is 60" to <i>result</i>.
+Furthermore, a template string can include line feeds, so they provide
+an easy way to make long, multiline strings.  (The backquote, or backtick,
+key might be in the top left corner of your keyboard.)</np>
+
+<p>There is not a strict distinction between integers and
+real numbers.  Both are of type "number".  In JavaScript, unlike Java and C, 
+division of integers produces a real number, so that 1/2 in
+JavaScript is 0.5, not 0 as it would be in Java.</p>
+
+<p>Although there is a boolean type, with literal values <i>true</i> and <i>false</i>,
+you can actually use any type of value in a boolean context.
+So, you will often see tests in JavaScript such as</p>
+
+<pre>if (x) { ... }</pre>
+
+<np>The value of <i>x</i> as a boolean is considered to be false if
+ <i>x</i> is the number zero or is the empty string or is <i>null</i>
+or is <i>undefined</i>.
+Effectively, any type of value can be converted implicitly to boolean</np>
+
+<p>In fact, JavaScript does many implicit conversions that you might not expect.
+For example, when comparing a number to string using the == operator, JavaScript will
+try to convert the string into a number.  So, the value of <i>17&nbsp;==&nbsp;&leftquote;17"</i> is
+<i>true</i>.  The value of <i>""&nbsp;==&nbsp;0</i> is also <i>true</i>, since in this case
+JavaScript converts both operands to boolean.  Since this behavior is not always what you
+want, JavaScript has operators === and !== that are similar to == and != except that they
+never do type conversion on their operands.  So, for example, <i>17&nbsp;===&nbsp;&leftquote;17"</i>
+is <i>false</i>.  In general, === and !== are the preferred operators for equality tests.</p>
+
+<p>JavaScript will also try to convert a string to a number if you multiply, 
+divide, or subtract a string and a number&mdash;but not if you add them, since 
+in that case it interprets the + operator as string concatenation, and it converts 
+the number into to a string.</p>
+
+<p>JavaScript does not have type-casting as it exists in Java.  However,
+you can use <i>Number</i>, <i>String</i>, and <i>Boolean</i> as conversion
+functions.  For example,</p>
+
+<pre>x = Number(y);</pre>
+
+<np>will attempt to convert <i>y</i> to a number.  You can apply this,
+for example, when <i>y</i> is a string.  If the conversion fails, the value of
+<i>x</i> will be <i>NaN</i>, a special number value indicating "Not a Number."
+The <i>Number</i> function converts the empty string to zero.</np>
+
+<p>Mathematical functions in JavaScript are defined in a <i>Math</i> object, which is similar 
+to the <classname>Math</classname> class in Java.  For example, there are
+functions <i>Math.sin</i>(<i>x</i>), <i>Math.cos</i>(<i>x</i>), <i>Math.abs</i>(<i>x</i>), 
+and <i>Math.sqrt</i>(<i>x</i>).  <i>Math.PI</i> is the mathematical constant &pi;.
+<i>Math.random</i>() is a function that returns a random number in the range 0.0 to
+1.0, including 0.0 but excluding 1.0.</p>
+
+<break/>
+
+<p>JavaScript control structures are similar to those in Java or C,
+including <i>if</i>, <i>while</i>, <i>for</i>, <i>do</i><code>..</code><i>while</i>,
+and <i>switch</i>.  JavaScript has a <i>try</i><code>..</code><i>catch</i> statement
+for handling exceptions that is similar to Java's, but since variables are untyped, there is
+only one <i>catch</i> block, and it does not declare a type for
+the exception.  (That is, you say, "catch&nbsp;(e)" rather than
+"catch(Exception&nbsp;e)".)  For an example, see the <i>init</i>() function in
+the sample program <sourceref href="canvas2d/GraphicsStarter.html"/>.
+An error can be generated using the <i>throw</i>
+statement.  Any type of value can be thrown.  You might,
+for example, throw a string that represents an error message:</p>
+
+<pre>throw "Sorry, that value is illegal.";</pre>
+
+<np>However, it is preferable to throw an object belonging to the class
+<classname>Error</classname> or one of its subclasses:</np>
+
+<pre>throw new Error("Sorry, that value is illegal.");</pre>
+
+<p>Functions in JavaScript can be defined using the <i>function</i> keyword.
+Since variables are untyped, no return type is declared and
+parameters do not have declared types.  Here is a typical
+function definition:</p>
+
+<pre>function square(x) {
+    return x * x;
+}</pre>
+
+<np>A function can return any type of value, or it can return nothing
+(like a <i>void</i> method in Java).  In fact, the same function might sometimes
+return a value and sometimes not, although that would not be good style.
+JavaScript does not require the number of parameters in a function call to
+match the number of parameters in the definition of the function.  If you provide too
+few parameters in the function call, then the extra parameters in the function
+definition get the value <i>undefined</i>.  You can check for this in the
+function by testing if <i>typeof</i> the parameter is "undefined".
+There can be a good reason for doing this:  It makes it possible to have
+optional parameters.  For example, consider</np>
+
+<pre>function multiple( str, count ) {
+     if ( typeof count === "undefined" ) {
+         count = 2;
+     }
+     let copies = "";
+     for (let i = 0; i &lt; count; i++) {
+         copies += str;
+     }
+     return copies;
+}</pre>
+
+<np>If no value is provided for <i>count</i>, as in the function call <i>multiple</i>("boo"),
+then <i>count</i> will be set to&nbsp;2.  Note by the way that declaring a variable in a function
+using <b>let</b> or <b>const</b> makes it local to the function, or more generally 
+to the block in which it is declared. (Declaring it using <b>var</b> makes it local to the
+function but not to the block where it is declared.)</np>
+
+<p>It is also possible to provide a default value for a parameter, which will be used
+if the function call does not include a value for that parameter or if the value
+that is provided is <i>undefined</i>.  For example, the
+above function could also be written as</p>
+
+<pre>function multiple( str, count = 2 ) { // default value of count is 2
+     let copies = "";
+     for (let i = 0; i &lt; count; i++) {
+         copies += str;
+     }
+     return copies;
+}</pre>
+
+<p>You can also provide extra values in a function call, using something called
+a "rest parameter":  The last parameter in the parameter list can be preceded by
+three dots, as in "function&nbsp;f(x,&nbsp;y,&nbsp;...z)".  Any extra parameters
+are gathered into an array, which becomes the value of the rest parameter inside
+the function.  For example, this makes it possible to write a
+<i>sum</i> function that takes any number of input values:</p>
+
+<pre>function sum(...rest) {
+    let total = 0;
+    for (let i = 0; i &lt; rest.length; i++) {
+         total += rest[i];
+    }
+    return total;
+}</pre>
+
+<np>With this definition, you can call <i>sum</i>(2,2),
+<i>sum</i>(1,2,3,4,5), and even <i>sum</i>().  The value of the
+last function call is zero.</np>
+
+<p>(An older technique for dealing with a variable number of parameters is to use
+the special variable <i>arguments</i>.  In a function definition, <i>arguments</i>
+is an array-like object that contains the values of all of the parameters
+that were passed to the function.)</p>
+
+<p>It is possible to define a function inside another function.  The nested
+function is then local to the function in which it is nested, and can only
+be used inside that function.  This lets you define a "helper function" inside the
+function that uses it, instead of adding the helper function to the global
+namespace.</p>
+
+<break/>
+
+<p>Functions in JavaScript are "first class objects."  This means that functions
+are treated as regular data values, and you can do the sort of things with
+them that you do with data:  assign them to variables, store them in arrays,
+pass them as parameters to functions, return them from functions.  In
+fact, it is very common to do all of these things!</p>
+
+<p>When you define a function using a definition like the ones in the
+examples shown above, it's almost the same as assigning a function to
+a variable.  For example, given the above definition of the function <i>sum</i>,
+you can assign <i>sum</i> to a variable or pass it as a parameter, and you
+would be assigning or passing the function.  And if the value of a variable
+is a function, you can use the variable just as you would use the function
+name, to call the function.  That is, if you do</p>
+
+<pre>let f = sum;</pre>
+
+<np>then you can call <i>f</i>(1,2,3), and it will be the  same
+as calling <i>sum</i>(1,2,3).  (One difference between defining a function
+and assigning a variable is that a function defined by a function definition
+can be used anywhere in the program, even before the function definition.
+Before it starts executing the program,
+the computer reads the entire program to find all the <i>function</i> definitions that
+it contains.  Assignment statements, on the other hand, are executed when the
+computer gets to them while executing the program.)</np>
+
+<p>JavaScript even has something like "function literals."  That is, there is a way of
+writing a function data value just at the point where you need it, without
+giving it a name or defining it with a standard function definition.  Such
+functions are called "anonymous functions." There are two syntaxes for anonymous functions.
+The older syntax looks like a function definition without a name. Here, for example,
+an anonymous function is created and passed as the first parameter to a
+function named <i>setTimeout</i>:</p>
+
+<pre>setTimeout( function () {
+    alert("Time's Up!");
+}, 5000 );</pre>
+
+<np>To do the same thing without anonymous functions would require defining a standard
+named function that is only going to be used once:</np>
+
+<pre>function alertFunc() {
+    alert("Time's Up!");
+}
+
+setTimeout( alertFunc, 5000 );</pre>
+
+<p>The second syntax for anonymous functions, new in ES6, is the "arrow function,"
+which takes the form <bnf>&lt;parameter list&gt; => &lt;definition&gt;</bnf>.
+For example,</p>
+
+<pre>() => { alert("Times Up!"); }</pre>
+
+<np>or</np>
+
+<pre>(x,y) => { return x+y; }</pre>
+
+<np>If there is exactly one parameter, the parentheses in the parameter list can
+be omitted.  If there is only one statement, the braces around the definition can
+be omitted.  And if the single statement is a <i>return</i> statement, then
+the word "return" can also be omitted.  Thus, we have arrow functions such as
+"x&nbsp;=>&nbsp;x*x".  An arrow function, like any function, can be assigned to a variable, 
+passed as a parameter, or even returned as the return value of
+a function.  For example,</np>
+
+<pre>setTimeout( () => alert("Times up!"), 5000);</pre>
+
+<p>In C, functions can be assigned to variables and passed as parameters to functions.
+However, there are no anonymous functions in&nbsp;C.  
+Something similar to arrow functions has been 
+added to Java in the form of "lambda expressions."</p>
+
+</subsection>
+
+
+
+
+<subsection title="Arrays and Objects" id="proglang.3.2">
+
+<p>An array in JavaScript is an object, which includes several methods for working
+with the array.  The elements in an array
+can be of any type; in fact, different elements in the same array can have different
+types. An array value can be created as a list of values enclosed between square brackets, [&nbsp;and&nbsp;].  For example:</p>
+
+<pre>let A = [ 1, 2, 3, 4, 5 ];
+let B = [ "foo", "bar" ];
+let C = [];</pre>
+
+<np>The last line in this example creates an empty array, which initially
+has length zero.  An array can also be created using a <word>constructor</word> that specifies
+the initial size of the array:</np>
+
+<pre>let D = new Array(100);  // space for 100 elements</pre>
+
+<np>Initially, the elements of <i>D</i> all have the value <i>undefined</i>.</np>
+
+<p>The length of an array is not fixed.  (This makes JavaScript arrays more similar to Java
+<classname>ArrayLists</classname> than they are to Java or C arrays.)  
+If <i>A</i> is an array, its current length is <i>A.length</i>.
+The <i>push</i> method can be used to add a new element to the end of an
+array, increasing its length by one: <i>A.push</i>(6).  The <i>pop</i> method removes
+and returns the last item: <i>A.pop</i>().  In fact, it is legal to assign
+a value to an array element that does not yet exist:</p>
+
+<pre>let E = [ 1, 2, 3 ];  // E has length 3
+E[100] = 17;  // E now has length 101.</pre>
+
+<np>In this example, when a value is assigned to <i>E</i>[100], the length of the
+array is increased to make it large enough to hold the new element.</np>
+
+<p>Modern JavaScript has an alternative version of the <i>for</i> loop that is particularly
+useful with arrays.  It takes the form
+<i>for&nbsp;(let&nbsp;v&nbsp;of&nbsp;A)&nbsp;&dots;</i>, where <i>A</i> is an
+array and <i>v</i> is the loop control variable.  In the body of the loop,
+the loop control variable takes on the value of each element of <i>A</i> in turn.
+Thus, to add up all the values in an array of numbers, you could say:</p>
+
+<pre>let total = 0;
+for (let num of A) {
+    total = total + num; // num is one of the items in the array A.
+}</pre>
+
+
+<p>Because of their flexibility, standard JavaScript arrays are not very efficient for
+working with arrays of numbers.  Modern web browsers define <word term="typed array">typed arrays</word>
+for numerical applications.  For example, an array of type <i>Int32Array</i>
+can only hold values that are 32-bit integers. Typed arrays are used extensively in
+<word>WebGL</word>; they are covered in this book when they are needed.</p>
+
+<break/>
+
+<p>JavaScript has objects and classes, although its classes are not exactly
+equivalent to those in Java or C++.  For one thing, it is possible to 
+have objects without classes.  An object is essentially just a collection of
+key/value pairs, where a key is a name, like an instance variable or method
+name in Java, which has an associated value.  The term "instance variable" 
+is not usually used in JavaScript; the preferred term is "property."</p>
+
+<p>The value of a property of an object can be an
+ordinary data value or a function (which is just another type of data
+value in JavaScript).  It is possible to create an object as a list of
+key/value pairs, enclosed by {&nbsp;and&nbsp;}.  For example,</p>
+
+<pre>let pt = { x: 17, y: 42 };
+
+let ajaxData = {
+    url: "http://some.place.org/ajax.php",
+    data: 42,
+    onSuccess: function () { alert("It worked!"); },
+    onFailure: function (error) { alert("Sorry, it failed: " + error); }
+};</pre>
+
+<np>With these definitions, <i>pt</i> is an object.  It has properties
+<i>pt.x</i>, with value 17, and <i>pt.y</i>, with value 42.  And <i>ajaxData</i>
+is another object with properties including <i>ajaxData.url</i>
+and <i>ajaxData.onSuccess</i>.  The value of <i>ajaxData.onSuccess</i>
+is a function, created here as an anonymous function.  A function that
+is part of an object is often referred to as a "method" of that object,
+so <i>ajaxData</i> contains two methods, <i>onSuccess</i> and <i>onFailure</i>.
+</np>
+
+<p>Objects are open in the sense that you can add
+a new property to an existing object at any time just by assigning
+a value.  For example, given the object <i>pt</i> defined above, you can
+say</p>
+
+<pre>pt.z = 84;</pre>
+
+<np>This adds <i>z</i> as a new property of the object, with initial value 84.</np>
+
+<p>Objects can also be created using <word term="constructor">constructors</word>.
+A constructor is a function that is called using the <i>new</i> operator to create an object.
+For example, </p>
+
+<pre>let now = new Date();</pre>
+
+<np>This calls the constructor <i>Date</i>(), which is a standard part
+of JavaScript.  <classname>Date</classname> is a class, and "new&nbsp;Date()"
+creates an object of type <classname>Date</classname>.
+When called with no parameters, <i>new&nbsp;Date</i>() constructs
+an object that represents the current date and time.</np>
+
+<p>New classes can be created using the <b>class</b> keyword.  A class definition
+contains a list of function definitions, which are declared <b>without</b> the
+"function" keyword.  A class definition should include a special function named 
+"constructor" that serves as the constructor for the class.  This constructor
+function is actually called when the <i>new</i> operator is used with the
+name of the class.  In the function
+definition, properties of the object are referred to using the special variable <i>this</i>,
+and properties are added to the object by assigning values to them in
+the constructor.</p>
+
+<pre>class Point2D {
+    constructor(x = 0,y = 0) {
+           // Construct an object of type Point2D with properties x and y.
+           // (The parameters x and y to the constructor have default value 0.)
+        if (typeof x !== "number" || typeof y !== "number")
+            throw new TypeError("The coordinates of a point must be numbers.");
+        this.x = x;
+        this.y = y;
+    }
+    move(dx,dy) {
+           // Defines a move() method as a property of any Point2D object.
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+    }
+}</pre>
+
+<np>With this definition, it is possible to create objects of type <classname>Point2D</classname>.
+Any such object will have properties named <i>x</i> and <i>y</i>, and a method named <i>move</i>().
+For example:
+</np>
+
+<pre>let p = new Point2D();  // p.x and p.y are 0.
+let q = new Point2D(17,42);  // q.x is 17, q.y is 42.
+q.move(10,20);  // q.x is now 27, and q.y is now 62.
+q.z = 1;  // We can still add new properties to q.</pre>
+
+<p>A new class can extend an existing class, and then becomes a "subclass" of that
+class.  However, this option is not covered here, except for the following simple example:
+</p>
+
+<pre>class Point3D extends Point2D {
+    constructor(x = 0, y = 0, z = 0) {
+        if (typeof z !== "number")
+            throw new TypeError("The coordinates of a point must be numbers.");
+        super(x,y);  // Call the Point2D constructor; creates this.x and this.y.
+        this.z = z;  // Add the property z to the object.
+    }
+    move(dx,dy,dz) { // Override the definition of the move() method
+        super.move(dx,dy);  // Call move() from the superclass.
+        if (typeof dz !== "undefined") {
+            // Allows move() to still be called with just two parameters.
+            this.z = this.z + dz;
+        }
+    }
+}</pre>
+
+<np>For a more extensive example of classes and subclasses, see <sourceref href="canvas2d/HierarchicalModel2D.html"/>.</np>
+
+<break/>
+
+<p>The <b>class</b> keyword was new in ES6, but JavaScript already had classes.
+However, in earlier versions of JavaScript, a class was simply defined
+by a constructor function, and a constructor function could be any
+function called with the "new" operator.  Since this kind of class is
+still used, it is worthwhile to look at how it works.</p>
+ 
+<p>A constructor function is written like an ordinary function; by convention, the name of
+a constructor function begins with an upper case letter. A constructor function defines
+a class whose name is the name of the function.  For example, let's see how to use a constructor
+function instead of the <b>class</b> keyword to define the class <classname>Point2D</classname>:</p>
+
+<pre>function Point2D(x,y) {
+    if ( typeof x === "number") {
+        this.x = x;
+    }
+    else {
+        this.x = 0;
+    }
+    if ( typeof y === "number" ) {
+        this.y = y;
+    }
+    else {
+        this.y = 0;
+    }
+    this.move = function(dx,dy) {
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+    }
+}</pre>
+
+<np>When called with the <i>new</i> operator, as in
+"new&nbsp;Point2D(17,42)", this function creates
+an object that has properties <i>x</i>, <i>y</i>, and <i>move</i>.
+These properties are created by assigning values to <i>this.x</i>,
+<i>this.y</i>, and <i>this.move</i> in the constructor function.
+The object that is created is essentially the same as an object
+created using the <classname>Point2D</classname> class 
+defined above.  (One note:  the <i>move</i> method could <b>not</b> be
+defined here using an arrow function, since the special variable "this" is
+not appropriately defined in the body of an arrow function.)
+</np>
+
+<p>The definition of the <i>move</i> method in this example is not done
+in the best way possible.  The problem is that every object of type
+<classname>Point2D</classname> gets its own copy of <i>move</i>.
+That is, the code that defines <i>move</i> is duplicated for each
+object that is created.  The solution is to use something called the
+"prototype" of the function <i>Point2D</i>.</p>
+
+<p>This might take us farther into the details of JavaScript than we really need to go,
+but here is how it works:
+Every object has a prototype, which is another object.  Properties of the 
+prototype are considered to be properties of the object, unless the object
+is given its own property of the same name.  When several objects have the same prototype,
+those objects share the properties of the prototype.  Now, when an object is
+created by a constructor function, the prototype of the constructor becomes
+the prototype of the new object that it creates.  This means that properties
+that are added to the prototype of a constructor function are shared by
+all the objects that are created by that function.  Thus, instead
+of assigning a value to <i>this.move</i> in the constructor function, we
+can do the following outside the definition of function <i>Point2D</i>:</p>
+
+<pre>Point2D.prototype.move = function(dx,dy) {
+    this.x = this.x + dx;
+    this.y = this.y + dy;
+}</pre>
+    
+<np>The properties of the prototype are shared by all objects
+of type <classname>Point2D</classname>.  In this case, there
+is a single copy of <i>move</i> in the prototype, which is used by all such objects.
+The result is then a <classname>Point2D</classname> class that is essentially
+the same as the class defined using the <b>class</b> keyword.
+</np>
+
+</subsection>
+
+<subsection title="JavaScript on Web Pages" id="proglang.3.3">
+
+<p>There are three ways to include JavaScript code on web pages (that is, in HTML files).
+First, you can include it inside &lt;script&gt; elements, which have the form</p>
+
+<pre>&lt;script&gt;
+    
+    // ... JavaScript code goes here ...
+    
+&lt;/script&gt;</pre>
+
+<np>You will sometimes see a <i>type</i> attribute in the first line, as in</np>
+
+<pre>&lt;script type="text/javascript"&gt;</pre>
+
+<np>The attribute specifies the programming language used for the script.  However,
+the value "text/javascript" is the default and the <i>type</i> attribute is not
+required for JavaScript scripts.  (You might also see a &lt;script&gt; with
+<i>type=&leftquote;module"</i>, indicating a modular JavaScript program.
+Modules are used in the <word>three.js</word> library, but are not mentioned
+elsewhere in this textbook.  Modules were a new feature in ES6.  They make it possible
+to break up a large program into components and control the sharing of variables
+between components.  Modules are not used in the programs for this textbook,
+but they are used in the <word>three.js</word> 3D graphics library.
+They are covered briefly in the chapter on three.js.)</np>
+
+<p>The second way to use JavaScript code is to put it in a separate file, usually with a
+name ending with ".js", and import that
+file into the web page.  A JavaScript file can be imported using a variation of the
+&lt;script&gt; tag that has the form</p>
+
+<pre>&lt;script src="filename.js"&gt;&lt;/script&gt;</pre>
+
+<np>where "filename.js" should be replaced by the URL, relative or
+absolute, of the JavaScript file.  The closing tag, &lt;/script&gt;, is
+required here to mark the end of the script, even though it is <b>not</b> permitted
+to have any code inside the script element.  (If you do, it will be ignored.)
+Importing JavaScript code from a file in this way has the same effect as typing the
+code from the file directly into the web page.</np>
+
+<p>Script elements of either type are often included in the &lt;head&gt; section of
+an HTML file, but they actually occur at any point in the file.  You can use any number
+of script elements on the same page.  A script can include statements such as function
+calls and assignment statements, as well as variable and function declarations.</p>
+
+<p>The third way to use JavaScript on a web page is in event
+handlers that can occur inside HTML elements.  For example, consider</p>
+
+<pre>&lt;h1 onclick="doClick()"&gt;My Web Page&lt;/h1&gt;</pre>
+
+<np>Here, the <i>onclick</i> attribute defines an event handler that will
+be executed when the user clicks on the text of the &lt;h1&gt; element.  The value
+of an event handler attribute such as <i>onclick</i> can be any JavaScript code.
+It can include multiple statements, separated by semicolons, and can even extend over several lines.
+Here, the code is "doClick()", so that clicking the &lt;h1&gt; element
+will cause the JavaScript function <i>doClick</i>() to be called.  I should note
+that this is an old-fashioned way to attach an event handler to an element,
+and it should not be considered best style.  There are alternatives
+that I will mention later.  Nevertheless, I sometimes do things the old-fashioned way.</np>
+
+<p>It is important to understand that all the JavaScript code in &lt;script&gt; elements,
+including code in imported files, is read and executed as the page is being loaded.  Usually,
+most of the code in such scripts consists of variable initializations and the definitions
+of functions that are meant to be called after the page has loaded, in response to events.
+Furthermore, all the scripts on a page are part of the same program.  For example, you
+can define a variable or function in one script, even in an imported file, and then use
+it in another script.</p>
+
+<break/>
+    
+<p>JavaScript for web pages has several standard functions that allow you to
+interact with the user using dialog boxes.  The simplest of these is
+<i>alert</i>(<i>message</i>), which will display <i>message</i> to the user
+in a popup dialog box, with an "OK" button that the user can click to dismiss the
+message.</p>
+
+<p>The function <i>prompt</i>(<i>question</i>) will display <i>question</i> in a dialog
+box, along with an input field where the user can enter a response.  The <i>prompt</i>
+function returns the user's response as its return value.   This type of dialog
+box comes with an "OK" button and with a "Cancel" button.  If the user hits
+"Cancel", the return value from <i>prompt</i> is <i>null</i>.  If the user hits
+"OK", the return value is the content of the input field (which might be the empty
+string).</p>
+
+<p>The function <i>confirm</i>(<i>question</i>) displays <i>question</i> in a dialog
+box along with "OK" and "Cancel" buttons.  The return value is <i>true</i> or
+<i>false</i>, depending on whether the user hits "OK" or "Cancel".</p>
+
+<p>Here, for example, is a simple guessing game that uses these functions for
+user interaction:</p>
+
+<pre>alert("I will pick a number between 1 and 100.\n"
+         + "Try to guess it!");
+         
+do {
+
+    let number = Math.floor( 1 + 100*Math.random() );
+    let guesses = 1;
+    let guess = Number( prompt("What's your guess?") );
+    while (guess !== number ) {
+        if ( isNaN(guess) || guess &lt; 1 || guess &gt; 100 ) { 
+            guess = Number( prompt("Please enter an integer\n" +
+                              "in the range 1 to 100") );
+        }
+        else if (guess &lt; number) {
+            guess = Number( prompt("Too low.  Try again!") );
+            guesses++;
+        }
+        else {
+            guess = Number( prompt("Too high.  Try again!") );
+            guesses++;
+        }
+    }
+    alert("You got it in " + guesses + " guesses.");
+    
+} while ( confirm("Play again?") );</pre>
+
+<np>(This program uses <i>Number</i>() to convert the user's
+response to a number.  If the response cannot be
+parsed as a number, then the value will be the not-a-number value <i>NaN</i>.
+The function <i>isNaN</i>(<i>guess</i>) is used to check whether the value
+of <i>guess</i> is this special not-a-number value.  It's not possible to do
+that by saying "if&nbsp;(guess&nbsp;===&nbsp;NaN)" since the
+expression NaN&nbsp;===&nbsp;NaN evaluates to <i>false</i>!
+The same, by the way, is true of the not-a-number value in Java.)</np>
+
+<break/>
+    
+<p>You can try out JavaScript code in the JavaScript consoles that
+are available in many web browsers.  In the Chrome browser, for example, you can access a console
+in the menu under "More&nbsp;Tools" / "Developer Tools", then click the "Console" tab in the developer
+tools.  This will show the
+web console at the bottom of the Chrome window, with a JavaScript input prompt.
+The console can also be detached into a separate window.
+When you type a line of JavaScript and press return, it is executed, and its
+value is output in the console.  The code is evaluated in the context of the current web
+page, so you can even enter commands that affect that page.  The Web console also shows
+JavaScript errors that occur when code on the current web page is executed, and JavaScript
+code can write a message to the console by calling <i>console.log</i>(<i>message</i>).
+All this makes the console very useful for debugging.  (Browser tools also include a
+sophisticated JavaScript program debugger.)</p>
+
+<p>Other browsers have similar developer tools.  For the JavaScript console in Firefox,
+look for "Web Developer Tools" under "Web Developer" in the menu.
+In the Safari browser, use "Show&nbsp;JavaScript&nbsp;Console" in the "Develop" menu (but note that the
+Develop menu has to be enabled in the Safari Preferences, under the "Advanced" tab).
+In the Edge browser, access "Developer Tools" by hitting the F12 key.</p>
+
+<p>When an error occurs on a web page, you don't get any notification, except for some
+output in the console.  So, if your script doesn't seem to be working, the first thing you
+should do is open the console and look for an error message.  When you are doing JavaScript
+development, you might want to keep the console always open.</p>
+
+
+</subsection>
+
+
+
+<subsection title="Interacting with the Page" id="proglang.3.4">
+
+<p>JavaScript code on a web page can manipulate the content and the style of
+that page.  It can do this because of the <word>DOM</word>
+(Document Object Model).  When a web page is loaded,
+everything on the page is encoded into a data structure, defined by the DOM,
+which can be accessed from JavaScript as a collection of objects.  There are
+several ways to get references to these objects, but I will discuss only one:
+<i>document.getElementById</i>.  Any element on a web page can have an <i>id</i>
+attribute.  For example:</p>
+
+<pre>&lt;img src="somepicture.jpg" id="pic"&gt;</pre>
+
+<np>or</np>
+
+<pre>&lt;h1 id="mainhead"&gt;My Page&lt;/h1&gt;</pre>
+
+<np>An id should be unique on the page, so that an element is uniquely
+identified by its id.  Any element is represented by a DOM object.  If an element
+has an id, you can obtain a reference to the corresponding DOM object by passing
+the id to the function <i>document.getElementById</i>.  For example:</np>
+
+<pre>let image = document.getElementById("pic");
+let heading = document.getElementById("mainhead");</pre>
+
+<p>Once you have a DOM object, you can use it to manipulate the element that it
+represents.  For example, the content of the element is given by the
+<i>innerHTML</i> property of the object.  The value is a string containing
+text or HTML code.  In our example, the value of
+<i>heading.innerHTML</i> is the string "My&nbsp;Page".  Furthermore, you
+can assign a value to this property, and doing so will change the content
+of the element. For example:</p>
+
+<pre>heading.innerHTML = "Best Page Ever!";</pre>
+
+<np>This does not just change the value of the property in the object;
+it actually changes the text that is displayed on the web page!  This will seem odd (and maybe even a little creepy)
+to programmers who are new to JavaScript: It's an assignment statement that has a side effect.  But that's
+the way the DOM works.  A change to the DOM data structure that represents a web
+page will actually modify the page and change its display in the web browser.</np>
+
+<p>Some attributes of elements become properties of the objects that represent them.
+This is true for the <i>src</i> attribute of an image element, so that in our
+example, we could say</p>
+
+<pre>image.src = "anotherpicture.jpg";</pre>
+
+<np>This will change the source of the image element.  Again, this is a "live"
+assignment: When the assignment statement is executed, the image on the web page
+changes.</np>
+
+<p>For readers who know <word>CSS</word>, note that
+the DOM object for an element has a property named <i>style</i> that is itself
+an object, representing the CSS style of the object.   The <i>style</i> object
+has properties such as <i>color</i>, <i>backgroundColor</i>, and <i>fontSize</i>
+representing CSS properties.  By assigning values to these properties, you can
+change the appearance of the element on the page.  For example,</p>
+
+<pre>heading.style.color = "red";
+heading.style.fontSize = "150%";</pre>
+
+<np>These commands will make the text in the &lt;h1&gt; element red and 50% larger than usual.
+The value of a style property must be a string that would be a legal value for the corresponding
+CSS style.</np>
+
+<p>Most interesting along these lines, perhaps, are properties of input elements, since
+they make it possible to program interaction with the user.  Suppose that in the HTML
+source of a web page, we have</p>
+
+<pre>&lt;input type="text" id="textin"&gt;
+
+&lt;select id="sel"&gt;
+   &lt;option value="1"&gt;Option 1&lt;/option&gt;
+   &lt;option value="2"&gt;Option 2&lt;/option&gt;
+   &lt;option value="3"&gt;Option 3&lt;/option&gt;
+&lt;/select&gt;
+
+&lt;input type="checkbox" id="cbox"&gt;</pre>
+
+<np>and in JavaScript, we have</np>
+
+<pre>let textin = document.getElementById("textin");
+let sel = document.getElementById("sel");
+let checkbox = document.getElementById("cbox");</pre>
+
+
+<np>Then the value of the property <i>checkbox.checked</i> is a boolean that
+can be tested to determine whether the checkbox is checked or not, and the value
+<i>true</i> or <i>false</i> can be assigned to <i>checkbox.checked</i>
+to check or uncheck the box programmatically.  The value of
+<i>checkbox.disabled</i> is a boolean that tells whether the checkbox is disabled.
+(The user can't change the value of a disabled checkbox.)  Again, you can both test
+and set this value.  The properties <i>sel.disabled</i> and <i>textin.disabled</i> do
+the same thing for the &lt;select&gt; menu and the text input box.
+The properties <i>textin.value</i> and <i>sel.value</i> represent the current values of
+those elements.  The value of a text input is the text that is currently in the box.
+The value of a &lt;select&gt; element is the value of the currently selected
+option.  As an example, here is complete source code for a 
+<tex>web page</tex><web><a href="guessing-game.html">web&nbsp;page</a></web> that implements a
+guessing game using a text input box and buttons:</np>
+
+<pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Guessing Game&lt;/title&gt;
+&lt;script&gt;
+    "use strict";
+    let number = Math.floor( 1 + 100*Math.random() );
+    let guessCount = 0;
+    let guessMessage = "Your guesses so far: ";
+    function guess() {
+        let userNumber = Number( document.getElementById("guess").value );
+        document.getElementById("guess").value = "";
+        if ( isNaN(userNumber) || userNumber &lt; 1 || userNumber &gt; 100 ) {
+            document.getElementById("question").innerHTML =
+               "Bad input!&lt;br&gt;Try again with an integer in the range 1 to 100.";
+        }
+        else if (userNumber === number) {
+            guessCount++;
+            document.getElementById("question").innerHTML =
+                "You got it in " + guessCount + " guesses. " +
+                userNumber + " is correct.&lt;br&gt;" + 
+                "I have picked another number.  Make a guess!";
+            number = Math.floor( 1 + 100*Math.random() );
+            guessCount = 0;
+            guessMessage = "Your guesses so far: ";
+            document.getElementById("message").innerHTML = "";
+        }
+        else if (userNumber &lt; number) {
+            guessCount++;
+            document.getElementById("question").innerHTML =
+                userNumber + " is too low.&lt;br&gt;Try again.";
+            guessMessage += " " + userNumber;
+            document.getElementById("message").innerHTML = guessMessage;
+        }
+        else {
+            guessCount++;
+            document.getElementById("question").innerHTML =
+                userNumber + " is too high.&lt;br&gt;Try again.";
+            guessMessage += " " + userNumber;
+            document.getElementById("message").innerHTML = guessMessage;
+        }
+    }
+&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;p id="question"&gt;I will pick a number between 1 and 100.&lt;br&gt;
+     Try to guess it.  What is your first guess?&lt;/p&gt;
+    &lt;p&gt;&lt;input type="text" id="guess"&gt;
+       &lt;button onclick="guess()"&gt;Make Guess&lt;/button&gt;&lt;/p&gt;
+    &lt;p id="message"&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+
+<break/>
+    
+<p>Here's one problem with some of my discussion.  Suppose that a script uses the function
+<i>document.getElementById</i> to get the DOM object for some HTML element. If that
+script is executed before the page has finished loading, the element that it is
+trying to access might not yet
+exist.  And remember that scripts are executed as the page is loading.  Of course,
+one solution is to call <i>document.getElementById</i> only in functions that
+are executed in response to events that can only occur after the page has loaded; 
+that's what I did in the previous example.
+But sometimes, you want to assign a DOM object to a global variable.  Where should
+you do that?  One possibility is to put the script at the end of the page.  That
+will probably work.  Another, more common technique is to put the assignment into
+a function and arrange for that function to run after the page has finished loading. When the browser
+has finished loading the page and building its DOM representation, it fires a
+<i>load</i> event.  You can arrange for some JavaScript code to be called in
+response to that event.  A common way of doing this is to add an <i>onload</i>
+event-handler to the &lt;body&gt; tag:
+</p>
+
+<pre>&lt;body onload="init()"&gt;</pre>
+
+<np>This will call a function named <i>init</i>() when the page has loaded.
+That function should include any initialization code that your program needs.</np>
+
+<p>You can define similar event-handlers in other elements.
+For example, for &lt;input&gt; and &lt;select&gt; elements,
+you can supply an <i>onchange</i> event-handler that will be executed when
+the user changes the value associated with the element. This
+allows you to respond when the user checks or unchecks a checkbox or selects
+a new option from a select menu.</p> 
+
+<p>It's possible to include an event handler for an element in the HTML tag that
+creates the element, as I did with the <i>body onload</i> event. But that's not the preferred way to set up event handling.
+For one thing, the mixing of JavaScript code and HTML code is often considered to be
+bad style.  Alternatively, there are two other ways to install event handlers using the DOM.  Suppose that
+<i>checkbox</i> is a DOM object representing a check box element, probably obtained
+by calling <i>document.getElementById</i>.  That object has a property named
+<i>onchange</i> that represents an event-handler for the checkbox's onchange event.
+You can set up event handling by assigning a function to that property.
+If <i>checkBoxChanged</i> is the function that you want to call when the user
+checks or unchecks the box, you can use the JavaScript command:</p>
+
+<pre>checkbox.onchange = checkBoxChanged;</pre>
+
+<np>You could also use an anonymous function:</np>
+
+<pre>checkbox.onchange = function() { alert("Checkbox changed"); };</pre>
+
+<np>Note that the value of <i>checkbox.onchange</i> is a function, not a string
+of JavaScript code.</np>
+
+
+<p>The other way to set up event handling in JavaScript is 
+with the <i>addEventListener</i> function.
+This technique is more flexible because it allows you to set up more than one event handler for
+the same event.
+This function is a method in any DOM element object.  Using it, our checkbox
+example becomes</p>
+
+<pre>checkbox.addEventListener( "change", checkBoxChanged, false );</pre>
+
+<np>The first parameter to <i>addEventListener</i>
+is a string that gives the name of the event. The name is
+the same as the name of the event attribute in HTML, with "on" stripped off the front:
+<i>onchange</i> becomes "change".  The second parameter is the function that will be called
+when the event occurs.  It can be given as the name of a function or as an
+anonymous function. The third parameter is harder to explain and will, for 
+our purposes, always be false. You can remove an event listener from an element
+by calling <i>element.removeEventListener</i> with the same parameters that were
+used in the call to <i>element.addEventListener</i>.  The <i>load</i> event
+is associated with a predefined object named <i>window</i>, so instead of attaching
+an event-handler for that event in the &lt;body&gt; tag, you could say
+ </np>
+ 
+ <pre>window.onload = init;</pre>
+ 
+ <np>or</np>
+ 
+ <pre>window.addEventListener("load", init, false);</pre>
+
+<p>Similarly, there is an <i>onmousedown</i> event that is defined for any element.
+A handler for this event can be attached to a DOM element, <i>elem</i>, either
+by assigning a function to <i>elem.onmousedown</i> or by calling
+<i>elem.addEventListener</i>("mousedown",handler,false).  Other common events include
+<i>onmouseup</i>, <i>onmousemove</i>, <i>onclick</i>, and <i>onkeydown</i>.  An
+<i>onkeydown</i> event handler responds when the user presses a key on the keyboard.  The
+handler is often attached to the document object:</p>
+
+<pre>document.onkeydown = doKeyPressed;</pre>
+
+<p>An event-handler function can take a parameter that contains information about the event.
+For example, in an event-handler for mouse events, using <i>evt</i> as the name of the parameter,
+<i>evt.clientX</i> and <i>evt.clientY</i> give the location of the mouse
+in the browser window.  In a handler for the <i>onkeydown</i> event, <i>evt.keyCode</i> is
+a numeric code for the key that was pressed.</p>
+
+<p>Event handling is a complicated subject, and I have given only a short introduction here.
+As a first step in learning more about events in JavaScript, you might look at the HTML source
+code for the sample web page <sourceref href="canvas2d/EventsStarter.html"/>.</p>
+
+
+
+</subsection>
+
+
+
+</section>

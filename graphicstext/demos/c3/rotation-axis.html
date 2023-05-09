@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rotation Axes</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    button {
+		margin: 2px;
+    }
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script>
+
+var cylinder, cone;
+var bigCylinder, bigCone;
+
+var angle = 0;
+var axisX = 0, axisY = 1, axisZ = 0;
+
+var animating = false;
+
+var camera;
+
+function square(size, r, g, b) {
+    size = size/2;
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [r, g, b, 0.8]);
+    glTranslatef(0,0,size);    // Move square size units forward.
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex2f(-size,-size);    // Draw the square (before the
+    glVertex2f(size,-size);     //   the translation is applied)
+    glVertex2f(size,size);      //   on the xy-plane, with its center
+    glVertex2f(-size,size);     //   at (0,0,0).
+    glEnd();
+}
+
+function cube(size) {
+    glPushMatrix();
+    square(size,1,0,0);        // front face is red
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(180,0,1,0); // rotate square to back face
+    square(size,0,1,1);        // back face is cyan
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(-90,0,1,0); // rotate square to left face
+    square(size,1,0,1);        // left face is magenat
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(90,0,1,0); // rotate square to right face
+    square(size,0,0.7,0);       // right face is green
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(-90,1,0,0); // rotate square to top face
+    square(size,0,0,1);        // top face is blue
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(90,1,0,0); // rotate square to bottom face
+    square(size,1,1,0);        // bottom face is yellow
+    glPopMatrix();
+}
+
+function draw() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 40);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, [0.4,0.4,0.4,1]);
+    
+    camera.apply();
+        
+    glPushMatrix();
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [1,0,0,1]);
+    glTranslated(0,0,5);
+    glsimDrawModel(cylinder);
+    glTranslated(0,0,6);
+    glsimDrawModel(cone);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [0,.8,0,1]);
+    glRotated(90,0,1,0);
+    glTranslated(0,0,5);
+    glsimDrawModel(cylinder);
+    glTranslated(0,0,6);
+    glsimDrawModel(cone);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [.5,.5,1,1]);
+    glRotated(-90,1,0,0);
+    glTranslated(0,0,5);
+    glsimDrawModel(cylinder);
+    glTranslated(0,0,6);
+    glsimDrawModel(cone);
+    glPopMatrix();
+    
+    glPushMatrix();
+    if (axisX != 0 || axisY != 0) {
+		var a = -axisY;
+		var b = axisX;
+		var len = Math.sqrt(axisX*axisX + axisY*axisY + axisZ*axisZ);
+		var cos = axisZ/len;
+		var theta = Math.acos(cos);
+		theta = theta / Math.PI * 180;
+        glRotatef(theta, a, b, 0);
+    }
+    else if ( (axisZ < 0)) {
+		glRotatef(180,0,1,0);
+    }
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [1,1,1,1]);
+    glTranslated(0,0,-2);
+    glsimDrawModel(bigCylinder);
+    glTranslated(0,0,13);
+    glsimDrawModel(bigCone);
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(angle, axisX, axisY, axisZ);
+    cube(7);
+    glPopMatrix();
+    
+}
+
+function frame() {
+    if (animating) {
+		angle += 1;
+		if (angle > 360) {
+			angle = angle-360;
+		}
+		draw();
+		requestAnimationFrame(frame);
+	}
+}
+
+function forceAnimation() {
+    if (!animating) {
+		document.getElementById("animate").checked = true;
+		doAnimationCheckbox();
+	}
+}
+
+function doAnimationCheckbox() {
+    var run = document.getElementById("animate").checked
+	if (run != animating) {
+		animating = run;
+		frame();
+	}
+}
+
+function error(message) {
+    var el = document.getElementById("headline");
+    if (message) {
+		el.style.color = "red";
+		el.innerHTML = message;
+    }
+    else {
+		el.style.color = "black";
+		el.innerHTML = "3D Rotation Demo";
+    }
+}
+
+function setAxis(x,y,z) {
+    error(null);
+    axisX = x;
+    axisY = y;
+    axisZ = z;
+    document.getElementById("x").value = "" + axisX;
+    document.getElementById("y").value = "" + axisY;
+    document.getElementById("z").value = "" + axisZ;
+    angle = 0;
+	forceAnimation();
+}
+
+function reset() {
+    error(null);
+    axisX = 0;
+    axisY = 1;
+    axisZ = 0;
+    document.getElementById("x").value = "0";
+    document.getElementById("y").value = "1";
+    document.getElementById("z").value = "0";
+    angle = 0;
+    camera.lookAt( 15,12,30, 0,0,0, 0,1,0 );
+	forceAnimation();
+}
+
+function setFromInputs() {
+    var a = Number(document.getElementById("x").value);
+    var b = Number(document.getElementById("y").value);
+    var c = Number(document.getElementById("z").value);
+    if (isNaN(a)) {
+		error("The x-value is not a legal number!");
+		return;
+    }
+    if (isNaN(b)) {
+		error("The y-value is not a legal number!");
+		return;
+    }
+    if (isNaN(c)) {
+		error("The z-value is not a legal number!");
+		return;
+    }
+    if (a*a+b*b+c*c < 0.0000001) {
+		error("Axis vector is too close to zero!");
+		return;
+    }
+    axisX = a;
+    axisY = b;
+    axisZ = c;
+    angle = 0;
+    document.getElementById("x").value = "" + axisX;
+    document.getElementById("y").value = "" + axisY;
+    document.getElementById("z").value = "" + axisZ;
+	forceAnimation();
+}
+
+function initGL() {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [1,1,1,1]);    
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    gluPerspective( 50, 1, 10, 50); // fovy, aspect, near, far
+    glMatrixMode(GL_MODELVIEW);
+    glClearColor(0,0,0,1);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 1);
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+		return;
+    }
+    initGL();
+    document.getElementById("animate").checked = false;
+	document.getElementById("animate").onchange = doAnimationCheckbox;
+    document.getElementById("x").value = "0";
+    document.getElementById("y").value = "1";
+    document.getElementById("z").value = "0";
+    cylinder = uvCylinder(0.3,10);
+    cone = uvCone(0.5,3);
+    bigCylinder = uvCylinder(0.5,24);
+    bigCone = uvCone(0.8,3.2);
+    camera = new Camera();
+    camera.lookAt( 15,12,30, 0,0,0, 0,1,0 );
+    camera.setScale(14);
+    camera.installTrackball(function() {
+		if (!animating) {
+			draw();			
+		}
+	});
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">3D Rotation Demo</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+</div>
+
+<div id="tools">
+<h3>Rotation Axis:</h3>
+<p>x = <input id="x" type="text" size="6"></p>
+<p>y = <input id="y" type="text" size="6"></p>
+<p>z = <input id="z" type="text" size="6"></p>
+<p><button onclick="setFromInputs()">Set</button>
+<button onclick="reset()">Reset</button><br>
+<button onclick="setAxis(1,0,0)">+X</button>
+<button onclick="setAxis(0,1,0)">+Y</button>
+<button onclick="setAxis(0,0,1)">+Z</button><br>
+<button onclick="setAxis(-1,0,0)">-X</button>
+<button onclick="setAxis(0,-1,0)">-Y</button>
+<button onclick="setAxis(0,0,-1)">-Z</button>
+</p>
+<p style="margin-bottom: 0"><label><input type="checkbox" id="animate"> <b>Animate</b></label></p>
+
+</div>
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>In this demo, a translucent cube rotates about an axis.
+The axis of rotation is shown as a long white arrow.  The arrow passes
+through the point (0,0,0) and points in the direction
+of the point (x,y,z), where the values of x, y, and z
+come from the input boxes at the right. (The rotation animation
+is turned off initially.  It can be turned on and off using the checkbox,
+and it comes on automatically whenever the axis is changed.)</p>
+<p>A set of coordinate axes is also shown.  The positive x-axis
+is a green arrow, the positive y-axis is blue, and the
+positive z-axis is red.  One of the coordinate axes might
+be hidden by the axis of rotation.  (Initially, the y-axis
+is hidden.)</p>
+<p>You can drag your mouse to rotate the whole assembly, to
+get a better view.  Try rotating the view so that the axis
+of rotation is pointing straight towards you, and notice that
+the direction of rotation is counterclockwise from that
+point of view.  You should observe that the direction of rotation always
+follows the "right-hand rule": If you point your right thumb
+along the rotation axis, then the fingers
+of your right hand will curl in the direction of rotation.
+The right-hand rule applies because the coordinate system for
+the demo is a right-handed coordinate system.</p>
+<p>The "Set" button takes values from the input boxes and
+uses them to set the point (x,y,z) that determines the axis
+of rotation.  For example, try choosing (x,y,z) to make the cube rotate
+around one of its major diagonals.</p>
+<p>The "Reset" button restores the demo to its
+initial state (but with the animation turned on).</p>
+<p>The "+X" button sets the axis of rotation to point in the
+direction of the positive x-axis; it sets (x,y,z) = (1,0,0).
+The "-X" button makes the axis point in the direction of the
+negative x-axis, with (x,y,z) = (-1,0,0).  The "+Y", "-Y",
+"+Z", and "-Z" buttons so that same things for the y- and
+z-axes.  The coordinate axes are the most common choices
+for the rotation axis.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

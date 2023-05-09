@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/three.min.js"></script>
+<script src="../script/threejs/OrbitControls.js"></script>
+<script>
+
+var canvas, scene, renderer, camera;
+
+var objects = [];   // The available objects, to be created in createWorld()
+var currentObject;  // The currently displayed object, one of the objects in the array.
+var material;       // The material, which is used on all the objects
+var textureURL = [  // URLs of the available textures.
+       "textures/brick001.jpg",
+       "textures/Earth-1024x512.jpg",
+       "textures/NightEarth-512x256.jpg",
+       "textures/marble.jpg",
+       "textures/metal003.gif",
+       "textures/mandelbrot.jpeg",
+   ];
+var currentTexture;  // The currently used texture.
+var textureOffsetS;  // Horizontal texture offset, for the texture animation.
+var textureOffsetT;  // Vertical texture offset, for the texture animation.
+
+
+function render() {  
+    renderer.render(scene,camera);
+}
+
+function createWorld() {
+    scene = new THREE.Scene();
+    renderer.setClearColor("white");
+    
+    camera = new THREE.PerspectiveCamera(45, canvas.width/canvas.height, 0.1, 100);
+    camera.position.set(0,0,30);
+    var light = new THREE.DirectionalLight();
+    light.position.set(0,0,1);
+    camera.add(light); // light will move with camera
+    scene.add(camera);
+   
+    material = new THREE.MeshPhongMaterial( {
+        color: "white",
+        specular: 0x080808,
+        side: THREE.DoubleSide  // so it will  work with open tube and plane
+    } );
+
+    /* Create an array of objects.  Only one of these objects is shown at a time.
+     * They all use the same material.*/
+    
+    objects.push( new THREE.Mesh( new THREE.BoxGeometry(12,12,12), material ) );
+    objects.push( new THREE.Mesh( new THREE.SphereGeometry(8,48,24), material ) );
+    objects.push( new THREE.Mesh( new THREE.CylinderGeometry(6,6,13,32,1), material ) );
+    objects.push( new THREE.Mesh( new THREE.CylinderGeometry(0,7,15,32,1), material ) );
+    objects.push( new THREE.Mesh( new THREE.TorusGeometry(6,4,16,64), material ) );
+    objects.push( new THREE.Mesh( new THREE.IcosahedronGeometry(9), material ) );
+    objects.push( new THREE.Mesh( new THREE.CylinderGeometry(6,6,13,32,1,true), material ) );
+    objects.push( new THREE.Mesh( new THREE.PlaneGeometry(20,15), material ) ) ;
+   
+    // The last object is a "pill", a hierarchical object made from a tube and two hemispheres.
+    var hemisphereGeom = new THREE.SphereGeometry( 5, 32, 16, 0, 2*Math.PI, 0, Math.PI/2 );
+    var tubeGeom = new THREE.CylinderGeometry( 5, 5, 8, 32, 5, true );
+    var top = new THREE.Mesh( hemisphereGeom, material );
+    var bottom = new THREE.Mesh( hemisphereGeom, material );
+    var pill = new THREE.Mesh( tubeGeom, material );
+    top.position.y = 4;  // move to top of cylinder
+    bottom.rotation.x = Math.PI; // rotate so it's facing down
+    bottom.position.y = -4; // move to bottom of cylinder
+    pill.add(top);
+    pill.add(bottom);
+    objects.push(pill);
+
+    currentObject = objects[4];
+    scene.add(currentObject);
+}
+
+
+/**
+ *  When an animation is in progress, this function is called just before rendering each
+ *  frame of the animation.  In this case, small amounts are added to the horizontal and
+ *  veritcal textrue obbsets.
+ */
+function updateForFrame() { 
+    textureOffsetS -= 0.0023;
+    textureOffsetT -= 0.00137;
+    currentTexture.offset.set(textureOffsetS,textureOffsetT);
+    currentTexture.needsUpdate;  // Essential to tell three.js that texture properties have changed!!
+}
+
+
+/**
+ *  Add one of the available textures to the array.  It's assumed that the textures are
+ *  in fact available in a texture folder in the same folder as this file.
+ */
+function installTexture(textureNum) {
+   var callback = function() {
+         // to be called after the texture is loaded, to show the new texture
+       material.needsUpdate = true;
+       try {
+           render();
+       }
+	   catch (e) {
+            document.getElementById("headline").innerHTML =
+			   "Can't access texture.  Note that some browsers<br>can't use a texture from a local disk.";
+	   }
+   };
+   var error = function() { // Function to be called if there is an error loading texture
+         document.getElementById("headline").innerHTML =
+         "<b>Error!  Failed to load texture!</b>";
+      };
+   
+   let loader = new THREE.TextureLoader();
+   texture = loader.load(textureURL[textureNum], callback, undefined, error);
+   
+   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;  // Important to set repeat mode!!
+   material.map = texture; // Applies this texture to the material and hence to the object.
+   material.needsUpdate = true;  // Essential to tell three.js that material properties have changed!!
+   textureOffsetS = 0;  // we start the texture with no texture offset
+   textureOffsetT = 0;
+   currentTexture = texture;
+   if (!animating) {
+          // Note that when the object first renders with this texture, the texture
+          // image might not have been loaded yet; if not, the object will be black.
+       render();
+   }
+}
+
+
+/**
+ *  An event listener for the onchange event on the select element that
+ *  controls what texture is currently selected.
+ */
+function doTextureSelect() {
+    var texNum = Number(document.getElementById("texture").value);
+    installTexture(texNum); 
+}
+
+
+/**
+ *  An event listener for the onchange event on the select element that
+ *  controls which object is currently selected for viewing.
+ */
+function doObjectSelect() {
+    var objNum = Number(document.getElementById("object").value);
+    scene.remove(currentObject);
+    scene.add(objects[objNum]);
+    currentObject = objects[objNum];
+    material.flatShading = objNum == 5;  // icosahedron needs flat shading
+ //   material.needsUpdate = true; // I'm not sure why this is required??
+    controls.reset();
+    if (! animating) {
+        render();
+    }
+}
+
+
+//--------------------------- animation support -----------------------------------
+
+var clock;  // Keeps track of elapsed time of animation.
+
+var animating = false;
+
+function doFrame() {  
+    if (animating) {
+        clock.frameNumber++;
+        updateForFrame();
+        render();
+        requestAnimationFrame(doFrame); 
+    }
+}
+
+function startAnimation() {
+    if (!animating) {
+       if (!clock) {
+          clock = new THREE.Clock(false);
+          clock.frameNumber = 0;
+          clock.getFrameNumber = function() { return this.frameNumber }
+       }
+       clock.start();
+       animating = true;
+       requestAnimationFrame(doFrame);
+    }
+}
+
+function pauseAnimation() {
+    if (animating) {
+        clock.stop();
+        animating = false;
+    }
+}
+
+function doAnimationCheckbox() { 
+    if ( document.getElementById("animate").checked )
+        startAnimation();
+    else
+        pauseAnimation();
+}
+
+
+function init() {
+    try {
+        canvas = document.getElementById("maincanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true
+        });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    document.getElementById("texture").value = "0";
+    document.getElementById("object").value = "4";
+    document.getElementById("animate").checked = false;
+    document.getElementById("texture").addEventListener("change",doTextureSelect,false);
+    document.getElementById("object").addEventListener("change",doObjectSelect,false);
+    document.getElementById("animate").addEventListener("change",doAnimationCheckbox,false);
+    createWorld();
+    controls = new THREE.OrbitControls(camera,canvas);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.addEventListener("change", render);
+    installTexture(0);
+    render();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Three.js Textures</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools">
+<p><b>Select Texture:</b><br> 
+    <select id="texture" style="margin-left: 25px">
+    <option value="0">Brick</option>
+    <option value="1">Earth</option>
+    <option value="2">Night Earth</option>
+    <option value="3">Marble</option>
+    <option value="4">Metal</option>
+    <option value="5">Mandelbrot</option>
+    </select>
+</p>
+<p style="margin-top:25px"><b>Select Object:</b><br>
+    <select id="object" style="margin-left: 25px">
+    <option value="0">Cube</option>
+    <option value="1">Sphere</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Torus</option>
+    <option value="5">Icosaahedron</option>
+    <option value="6">Open Tube</option>
+    <option value="7">Plane</option>
+    <option value="8">Pill</option>
+    </select>
+</p>
+<p style="margin-top:25px"><label><input type="checkbox" id="animate">Animate Texture</label></p>
+<p style="margin-top:25px"><b>Use mouse<br>to rotate.</b></p>
+</div>
+
+</div>
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>The demo can render a variety of standard <i>three.js</i> objects with a
+selection of different image textures.  When animation is turned on, the
+texture offset is animated, which has the effect of making the texture
+move across the surface.</p>
+<p>The "pill" object in the demo is a compound object, composed of
+an open cylinder and two hemispheres.  The hemispheres are added
+as children of the cylinder.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

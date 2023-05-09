@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Modeling vs. Viewing 3D</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    canvas {
+        background-color: white;
+    }
+    #sliders {
+        background: none;
+    }
+    table p {
+        margin: 0 0 3px 0;
+    }
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script src="../script/glsim.js"></script>
+<script>
+
+var canvas;    // Main canvas, shows image.
+var mtCanvas;  // Shows transform as modeling transform
+var vtCanvas;  // Shows transform as viewing transform
+
+var sliders;
+
+function square(r, g, b) {
+    glColor3f(r,g,b);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-0.5, -0.5, 0.5);
+    glVertex3f(0.5, -0.5, 0.5);
+    glVertex3f(0.5, 0.5, 0.5);
+    glVertex3f(-0.5, 0.5, 0.5);
+    glEnd();
+}
+
+function cube(size, x, y, z) {  // draws a cube with side length = size, center at (x,y,z)
+
+    glPushMatrix();
+    glTranslatef(x,y,z);  // move to desired point
+    glScalef(size,size,size); // scale unit cube to desired size
+    
+    square(1, 0, 0); // red front face
+    
+    glPushMatrix();
+    glRotatef(90, 0, 1, 0);
+    square(0, 1, 0); // green right face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(-90, 1, 0, 0);
+    square(0, 0, 1); // blue top face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(180, 0, 1, 0);
+    square(0, 1, 1); // cyan back face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(-90, 0, 1, 0);
+    square(1, 0, 1); // magenta left face
+    glPopMatrix();
+    
+    glPushMatrix();
+    glRotatef(90, 1, 0, 0);
+    square(1, 1, 0); // yellow bottom face
+    glPopMatrix();
+    
+    glPopMatrix(); // Restore matrix to its state before cube() was called.
+
+}
+
+function drawScene() {
+    cube(2.5,-3,-3,-12);
+    cube(2.5,-3,3,-12);
+    cube(2.5,3,-3,-12);
+    cube(2.5,3,3,-12);
+    cube(2.5,-3,-3,-8);
+    cube(2.5,-3,3,-8);
+    cube(2.5,3,-3,-8);
+    cube(2.5,3,3,-8);
+}
+
+function drawScene2() {
+    cube(2,-4,-4,-12);
+    cube(2,-4,4,-12);
+    cube(2,4,-4,-12);
+    cube(2,4,4,-12);
+    cube(2,-4,-4,-8);
+    cube(2,-4,4,-8);
+    cube(2,4,-4,-8);
+    cube(2,4,4,-8);
+}
+
+function drawViewBox() {
+    glColor3f(0,0,0);
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(-4,-4,-5);
+    glVertex3f(4,-4,-5);
+    glVertex3f(4,4,-5);
+    glVertex3f(-4,4,-5);
+    glEnd();
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(-9.6,-9.6,-12);
+    glVertex3f(-9.6,9.6,-12);
+    glVertex3f(9.6,9.6,-12);
+    glVertex3f(9.6,-9.6,-12);
+    glEnd();
+    glBegin(GL_LINES);
+    glVertex3f(4,4,-5);
+    glVertex3f(9.6,9.6,-12);
+    glVertex3f(-4,-4,-5);
+    glVertex3f(-9.6,-9.6,-12);
+    glVertex3f(-4,4,-5);
+    glVertex3f(-9.6,9.6,-12);
+    glVertex3f(4,-4,-5);
+    glVertex3f(9.6,-9.6,-12);
+    glEnd();
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    glDepthMask(false);
+    glColor4f(0,0,0,0.5);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-4,-4,-5);
+    glVertex3f(4,-4,-5);
+    glVertex3f(4,4,-5);
+    glVertex3f(-4,4,-5);
+    glEnd();
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-9.6,-9.6,-12);
+    glVertex3f(-9.6,9.6,-12);
+    glVertex3f(9.6,9.6,-12);
+    glVertex3f(9.6,-9.6,-12);
+    glEnd();
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-4,4,-5);
+    glVertex3f(4,4,-5);
+    glVertex3f(9.6,9.6,-12);
+    glVertex3f(-9.6,9.6,-12);
+    glEnd();
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-4,-4,-5);
+    glVertex3f(-9.6,-9.6,-12);
+    glVertex3f(9.6,-9.6,-12);
+    glVertex3f(4,-4,-5);
+    glEnd();
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(4,4,-5);
+    glVertex3f(4,-4,-5);
+    glVertex3f(9.6,-9.6,-12);
+    glVertex3f(9.6,9.6,-12);
+    glEnd();
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(-4,-4,-5);
+    glVertex3f(-4,4,-5);
+    glVertex3f(-9.6,9.6,-12);
+    glVertex3f(-9.6,-9.6,-12);
+    glEnd();
+    glDisable(GL_BLEND);
+    glDepthMask(true);
+}
+
+function drawAll() {
+    drawMain();
+    drawModeling();
+    drawViewing();
+}
+
+function drawMain() {
+    var dz = sliders.value(0);
+    var zAngle = sliders.value(1);
+    var yAngle = sliders.value(2);
+    var xAngle = sliders.value(3);
+    glsimUse(canvas);
+    glClearColor(1,1,1,1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+    glTranslatef(0,0,dz);
+    glRotatef(zAngle,0,0,1);
+    glRotatef(yAngle,0,1,0);
+    glRotatef(xAngle,1,0,0);
+    drawScene();
+}
+
+function drawModeling() {
+    var dz = sliders.value(0);
+    var zAngle = sliders.value(1);
+    var yAngle = sliders.value(2);
+    var xAngle = sliders.value(3);
+    glsimUse(mtCanvas);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glPushMatrix();
+    glTranslatef(0,0,dz);
+    glRotatef(zAngle,0,0,1);
+    glRotatef(yAngle,0,1,0);
+    glRotatef(xAngle,1,0,0);
+    drawScene();
+    glPopMatrix();
+    drawViewBox();
+}
+
+function drawViewing() {
+    var dz = sliders.value(0);
+    var zAngle = sliders.value(1);
+    var yAngle = sliders.value(2);
+    var xAngle = sliders.value(3);
+    glsimUse(vtCanvas);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    drawScene();
+    glPushMatrix();
+    glRotatef(-xAngle,1,0,0);
+    glRotatef(-yAngle,0,1,0);
+    glRotatef(-zAngle,0,0,1);
+    glTranslatef(0,0,-dz);
+    drawViewBox();
+    glPopMatrix();
+}
+
+function reset() {
+    sliders.setValue(0,0);
+    sliders.setValue(1,0);
+    sliders.setValue(2,0);
+    sliders.setValue(3,1);
+    drawAll();
+}
+
+function initGL() {
+    glsimUse(canvas);
+    glClearColor(1,1,1,1);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    glFrustum(-4,4,-4,4,5,12);
+    glMatrixMode(GL_MODELVIEW);
+    glsimUse(mtCanvas);
+    glClearColor(1,1,1,1);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    gluPerspective(50,1,2,50);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(13,20,6,0,0,-12,0,1,0);
+    glsimUse(vtCanvas);
+    glClearColor(1,1,1,1);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    gluPerspective(50,1,2,50);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(13,20,6,0,0,-12,0,1,0);
+}
+
+function init() {
+    canvas = document.getElementById("maincanvas");
+    mtCanvas = document.getElementById("mtcanvas");
+    vtCanvas = document.getElementById("ctcanvas");
+    try {
+        initGL();
+    }
+    catch (e) {
+        document.getElementById("headline").innerHTML =
+                      "ERROR: Can't initialize OpenGL; WebGL not supported?";
+        return;
+    }
+    sliders = new SliderCanvas(document.getElementById("sliders"));
+    sliders.addSlider({label:"z-trans", min:-5, max:5, step:0.01, value:0, decimals:2});
+    sliders.addSlider({label:"z-rotate", min: -180, max:180, step:1, value:0});
+    sliders.addSlider({label:"y-rotate", min: -30, max:30, step:1, value:0});
+    sliders.addSlider({label:"x-rotate", min: -30, max:30, step:1, value:0});
+    sliders.draw();
+    drawAll();
+    sliders.onChange = drawAll;
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Modeling Transform vs. Viewing Transform in 3D</h3>
+
+<table border=0 cellpadding=5>
+<tr valign=top>
+  <td><canvas id="maincanvas" width="300" height="300"></canvas></td>
+  <td align=center><p><b>Transforms:</b></p>
+             <canvas id="sliders" width="300" height="200"></canvas><br>
+             <button onclick="reset()">Reset</button></td>
+</tr>
+<tr valign=top>
+  <td align=center><p><b>As Modeling Transform:</b></p><canvas id="mtcanvas" width="300" height="300"></canvas></td>
+  <td align=center><p><b>As Viewing Transform:</b></p><canvas id="ctcanvas" width="300" height="300"></canvas></td>
+</table>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>The point of this demo is to help you to understand the equivalence
+between modeling transformations and viewing transformations in 3D.  Modeling
+transforms apply to objects; they scale, rotate, and translate objects.    A viewing
+transform can scale, rotate and translate the viewer.  (This demo,
+however, only does translation and rotation, not scaling.)</p>
+<p>In OpenGL, if we keep the same projection, so that the size and shape
+of the view volume remains unchanged, then we can think of the viewing
+transform as moving the view volume around in 3D space.  As the viewer moves,
+the region in space enclosed by the view volume will change.</p>
+<p>The image in the top left section of the demo shows a view of a 3D
+scene consisting of eight cubes.  The projection is a perspective projection,
+with the viewer fairly close to the cubes. The
+sliders to the right allow you to control the modelview transformation that
+is used to create image.  But are they applied to the <b>objects</b>
+as modeling transforms, or are they applied to the <b>viewer</b>?</p>
+<p>The two lower pictures will help you understand that the question can't
+really be answered, because of the equivalence between the two types of
+transformation.  They give a bird's eye view of the scene, from a different
+perspective.  The view volume for the upper left image is shown as a translucent
+gray box in the lower images.  Remember that the view volume encloses the
+region in 3D space that is rendered in the upper image.  Note that in the
+initial configuration, sections of the four back cubes lie outside the
+view volume and so are not visible in the image.</p>
+<p>Suppose that you apply transforms by dragging the sliders. In the image
+on the lower left, the view volume remains fixed, while the objects move around.
+This is visualizing the transforms as a modeling transformation.
+At the same time, in the image in the lower
+right, the objects remain fixed, while the viewport moves around. This
+is visualizing the same transforms as a viewing transformation.</p>
+<p>You should notice that in both pictures, the contents of the view volume
+are exactly the same, and they agree with what is rendered in the image.</p>
+<p>Spend some time playing with the sliders!  Try dragging the z-translation
+slider back and forth, and notice how different parts of the cubes are cut
+off as they move into and out of the view volume.  Notice how the effect
+of a transform on the objects is the opposite of its effect on the view
+volume.  It will be easiest to see what is going on if you work with
+one slider at a time.  Use the "Reset" button to reset all the sliders
+to their initial values.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

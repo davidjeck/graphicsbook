@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" 
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" 
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="300px" height="180px" 
+     viewBox="-1.5 -1.5 5 3">
+
+<defs>
+
+   <rect id="rotatingsquare" x="-0.2" y="-0.2" width="0.4" height="0.4"
+              stroke="red" stroke-width="0.01" fill="red" fill-opacity="0.6"
+              transform="rotate(30)">
+       <animateTransform attributeName="transform"
+             type="rotate" from="0" to="360" dur="3s" 
+             repeatCount="indefinite"/>   
+   </rect>
+
+   <g id="segment">
+       <polyline points="0,0 1,0 0.5,0.866" fill="none" stroke="blue" 
+          stroke-width="0.03" stroke-linecap="round" stroke-linejoin="round"/>
+       <use xlink:href="#rotatingsquare" transform="translate(1,0)"/>
+   </g>
+
+</defs>
+
+<rect x="-1.5" y="-1.5" width="3" height="3" 
+          fill="white" stroke="black" stroke-width="0.02"/> <!-- fill background -->
+          
+<use xlink:href="#segment" transform="translate(2,0)"/>
+
+<g>
+   <animateTransform attributeName="transform" attributeType="XML"
+              type="rotate" from="360" to="0" dur="13s" 
+              fill="remove" repeatCount="indefinite"/>   
+   <use xlink:href="#segment"/>
+   <use xlink:href="#segment" transform="rotate(60)"/>
+   <use xlink:href="#segment" transform="rotate(120)"/>
+   <use xlink:href="#segment" transform="rotate(180)"/>
+   <use xlink:href="#segment" transform="rotate(240)"/>
+   <use xlink:href="#segment" transform="rotate(300)"/>
+</g>
+
+</svg>
+

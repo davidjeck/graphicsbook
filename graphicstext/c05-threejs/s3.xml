@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Other Features" id="threejs.3">
+
+<p1>We will finish this chapter with a look at a few additional features
+of <i>three.js</i>.  In the process, you will learn about some new aspects
+of 3D graphics.</p1>
+
+
+<subsection title="Instanced Meshes" id="threejs.3.1">
+
+<p>The class <classname>THREE.InstancedMesh</classname> makes it possible to 
+quickly render several objects, possibly a large number of objects, that
+use the same geometry but differ in the transformations that
+are applied to them and, possibly, in their material color.  Each copy of the
+object is called an "instance," and the process of creating all of the
+copies is called <word>instanced drawing</word> or instancing. 
+In WebGL&nbsp;2.0 (and in WebGL&nbsp;1.0 with an extension), it is possible to draw all of the
+instances with a single function call, making it very efficient.</p>
+
+<p><classname>InstancedMesh</classname> is fairly easy to use.  Along with
+the geometry and material for the mesh, the constructor specifies
+the maximum number of instances that it can support:
+</p>
+
+<p>instances = new THREE.InstancedMesh(geometry, material, count)</p>
+
+<np>To set the transformation for instance number <i>i</i>,
+you can call</np>
+
+<pre>instances.setMatrixAt( i, matrix );</pre>
+
+<np>where <i>matrix</i> is an object of type <classname>THREE.Matrix4</classname>
+representing the modeling transformation.  Similarly, you can set the
+color for instance number <i>i</i> with</np>
+
+<pre>instances.setColorAt( i, color );</pre>
+
+<np>where <i>color</i> is of type <classname>THREE.Color</classname>.
+Instance colors are optional.  If provided, they replace the color
+property of <i>material</i>.</np>
+
+<p>The <classname>Matrix4</classname> class includes methods that make
+it easy to create a transformation matrix. The constructor</p>
+
+<pre>matrix = new THREE.Matrix4();</pre>
+
+<np>creates an
+identity matrix, which can then be modified.  For example,
+the method <i>matrix.makeTranslation</i>(<i>dx,dy,dz</i>) replaces the
+current matrix with the transformation matrix for a translation by
+the vector (<i>dx,dy,dz</i>).  There are functions for making scaling
+and rotation matrices.  To make more complex transformations, there
+is a function for multiplying matrices.</np>
+
+<p>The sample program <sourceref href="threejs/instanced-mesh.html"/>
+uses a single <classname>InstancedMesh</classname> to make 1331 spheres, arranged
+in an 11-by-11-by-11 cube.  To move the spheres into position, different
+translations are applied to each instance.  An instance color is also
+set for each instance.</p>
+
+<img src="instanced-mesh.png" width="237" height="234" tex="instanced-mesh.eps" texscale="0.6"/>
+
+
+</subsection>
+
+
+<subsection title="User Input" id="threejs.3.2">
+
+<p>Most real programs require some kind of user interaction.  For a web application,
+of course, the program can get user input using HTML widgets such as buttons and text input boxes.
+But direct mouse interaction with a 3D world is more natural in many programs.</p>
+
+<p>The most basic example is using the mouse to rotate the scene.  In <i>three.js</i>,
+rotation can be implemented using the class <classname>THREE.TrackballControls</classname> or the
+class <classname>THREE.OrbitControls</classname>. Note that both classes support touchscreen
+as well as mouse interaction.  The main difference between the classes
+is that with <i>OrbitControls</i>,
+the rotation is constrained so that the positive <i>y</i>-axis is always the up direction
+in the view.  <i>TrackballControls</i>, on the other hand, allows completely free
+rotation.  Another difference is that <i>TrackballControls</i> is meant to be used
+only with a scene that is continuously animated.  <i>OrbitControls</i> is used for rotation in
+most of my sample programs and demos.  <i>TrackballControls</i> is used only in
+<sourceref href="threejs/full-window.html"/> and <sourceref href="threejs/curves-and-surfaces.html"/>.</p>
+
+
+<p>The two control classes are not part of the main <i>three.js</i> JavaScript file.
+To use one of them, you need the JavaScript file <sourceref href="threejs/OrbitControls.js">OrbitControls.js</sourceref>
+or <sourceref href="threejs/TrackballControls.js">TrackballControls.js</sourceref>, which can be
+found in the folder <i>examples/js/controls</i> in the <i>three.js</i> download.</p>
+
+<p>The two classes are used in a similar way.  I will discuss <classname>OrbitControls</classname> first.
+In my examples, I create a camera and move it away from the origin. I usually add a light object
+to the camera object, so that the light will move along with the camera, providing some
+illumination to anything that is visible to the camera.  The <classname>OrbitControls</classname>
+object is used to rotate the camera around the scene.  The constructor for the
+control object has two parameters, the camera and the canvas on which the scene is rendered.
+Here is typical setup:</p>
+
+<pre>camera = new THREE.PerspectiveCamera(45, canvas.width/canvas.height, 0.1, 100);
+camera.position.set(0,15,35);
+camera.lookAt( new THREE.Vector3(0,0,0) ); // camera looks toward origin
+
+let light = new THREE.PointLight(0xffffff, 0.6);
+camera.add(light);  // viewpoint light moves with camera
+scene.add(camera);
+
+controls = new THREE.OrbitControls( camera, canvas );</pre>
+
+<np>The constructor installs listeners on the <i>canvas</i> so that the controls can respond
+to mouse events.  If an animation is running, the only other thing that you need to
+do is call</np>
+
+<pre>controls.update();</pre>
+
+<np>before rendering the scene. The
+user will be able to rotate the scene by dragging on it with the left mouse button.
+The controls will also do "panning" (dragging the scene in the plane of the screen)
+with the right mouse button and "zooming" (moving the camera forward and backward) with the middle mouse button
+or scroll wheel.   To disable zooming and panning, you can set</np>
+
+<pre>controls.enablePan = false;
+controls.enableZoom = false;</pre>
+
+<np>And you can return the original view of the scene by calling
+<i>controls.reset</i>().</np>
+
+<p>If your program is not running a continuous animation,
+you need a way to re-render the scene in response to user actions.
+When the user drags the mouse, the <i>controls</i> object
+generates a "change" event.  You can add a listener for that
+event, to respond to the event by redrawing the scene.  To
+do that, just call</p>
+
+<pre>controls.addEventListener( "change", callback );</pre>
+
+<np>Where <i>callback</i>() is the function that should be called
+when the event occurs.  If you have a function <i>render</i>() that
+renders your scene, you can simply pass <i>render</i> as the
+value of <i>callback</i>.</np>
+
+<p>Unfortunately, a <classname>TrackballControls</classname> object
+does not emit "change" events, and there does not seem to be any way to
+use it without having an animation running.  With an animation,
+<i>TrackballControls</i> are used in the same way as <i>OrbitControls</i>,
+except that the properties for panning and zooming 
+are <i>controls.noPan</i> and <i>controls.noZoom</i>; they 
+should be set to <i>true</i> to disable panning and zooming.
+One nice feature of <classname>TrackballControls</classname>
+is that they implement inertia: When the user releases the mouse
+after dragging, the motion of the scene will slow to a stop instead
+of stopping abruptly.</p>
+
+<break/>
+
+<p>A much more interesting form of mouse interaction is to let the user select objects
+in the scene by clicking on them.  The problem is to determine which object the
+user is clicking.  The general procedure is something like this:  Follow a ray from
+the camera through the point on the screen where the user clicked and find the first
+object in the scene that is intersected by that ray.  That's the object that is visible
+at the point where the user clicked.  Unfortunately, the procedure involves a lot
+of calculations.  Fortunately, <i>three.js</i> has a class that can do the work for
+you:  <classname>THREE.Raycaster</classname>.</p>
+
+<p>A <classname>Raycaster</classname> can be used to find intersections of a ray with
+objects in a scene.  (A ray is just half of a line, stretching from some given starting
+point in a given direction towards infinity.)  You can make one raycaster object to use
+throughout your program:</p>
+
+<pre>raycaster = new THREE.Raycaster();</pre>
+
+<np>To tell it which ray to use, you can call</np>
+
+<pre>raycaster.set( startingPoint, direction );</pre>
+
+<np>where both of the parameters are of type <classname>THREE.Vector3</classname>.
+Their values are in terms of <word>world coordinates</word>, the same coordinate
+system that you use for the scene as a whole.  The <i>direction</i> must
+be a <word>normalized vector</word>, with length equal to one.
+For example, suppose that you want to fire a laser gun&dots;.  The 
+<i>startingPoint</i> is the location of the gun, and the <i>direction</i>
+is the direction that the gun is pointing.  Configure the raycaster 
+with those parameters, and you can use it to find out what object is struck
+by the laser beam.</np>
+
+<p>Alternatively, and more conveniently
+for processing user input, you can express the ray in terms of the camera and
+a point on the screen:</p>
+
+<pre>raycaster.setFromCamera( screenCoords, camera );</pre>
+
+<np>The <i>screenCoords</i> are given as a <classname>THREE.Vector2</classname> expressed
+in <word>clip coordinates</word>.  This means the horizontal coordinate ranges from
+&minus;1 on the left edge of the viewport to 1 on the right, and the vertical coordinate ranges from
+&minus;1 at the bottom to 1 on the top.  (Clip coordinates are called "normalized device
+coordinates" in <i>three.js</i>.)  So, we need to convert from pixel coordinates on a
+canvas to clip coordinates.  Here's one way to do it, given a mouse event, <i>evt</i>:</np>
+
+<pre>let r = canvas.getBoundingClientRect();
+let x = evt.clientX - r.left; // convert mouse location to canvas pixel coords
+let y = evt.clientY - r.top;
+
+let a = 2*x/canvas.width - 1; // convert canvas pixel coords to clip coords
+let b = 1 - 2*y/canvas.height;
+
+raycaster.setFromCamera( new THREE.Vector2(a,b), camera );</pre>
+
+<p>Once you have told the raycaster which ray to use, it is ready to find
+intersections of that ray with objects in the scene.  This can be
+done with the function</p>
+
+<pre>raycaster.intersectObjects( objectArray, recursive );</pre>
+
+<np>The first parameter is an array of <classname>Object3D</classname>.
+The raycaster will search for intersections of its current ray with objects in the array.
+If the second parameter is <i>true</i>, it will also search descendants of those
+objects in the <word>scene graph</word>; if it is <i>false</i> or is omitted, then only the
+objects in the array will be searched.  For example, to search for intersections
+with all objects in the scene, use</np>
+
+<pre>raycaster.intersectObjects( scene.children, true );</pre>
+
+<p>The return value from <i>intersectObjects</i> is an array of JavaScript objects.
+Each item in the array represents an intersection of the ray with an <classname>Object3D</classname>.
+The function finds all such intersections, not just the first.  If no intersection is
+found, the array is empty.  The array is sorted by increasing distance from the starting 
+point of the ray.  If you just want the first intersection, use the first element of the array.</p>
+
+<p>Each element in the array is an object whose properties contain information about the
+intersection.  Suppose that <i>item</i> is one of the array elements.  Then the most useful
+properties are:  <i>item.object</i>, which is the <classname>Object3D</classname> that 
+was intersected by the ray; and <i>item.point</i>, which  is the point of intersection, 
+given as a <classname>Vector3</classname> in world coordinates.  That information is
+enough to implement some interesting user interaction.</p>
+
+<demo src="c5/raycaster-input.html" width="620" height="430"><p><tex>The demo
+<demoref href="c5/raycaster-input.html"/></tex><web>The following demo</web>
+uses some basic mouse interaction to let the user edit a scene.  The scene shows
+a number of tapered yellow cylinders standing on a green base.  The user can
+drag the cylinders, add and delete cylinders, and rotate the scene.  A set of 
+radio buttons lets the user select which action should be performed by the mouse.<tex>
+Here's a screenshot from the program:</tex></p></demo>
+
+<texdiv><img tex="raycaster-demo.eps" texscale="0.5"/></texdiv>
+
+<p>Let's look at how the actions are implemented.   The only objects are the base and the
+cylinders.  In the program, the base is referred to as <i>ground</i>, and all the objects
+are children of an <classname>Object3D</classname> named <i>world</i>.  (I use the <i>world</i>
+object to make it easy to rotate the set of all visible objects without moving the camera or lights.)
+For all drag, add, and delete actions, I look for intersections of these objects with
+a ray that extends from the camera through the mouse position:</p>
+
+<pre>raycaster.setFromCamera( new THREE.Vector2(a,b), camera );
+let intersects = raycaster.intersectObjects( world.children );</pre>
+
+<np>If <i>intersects.length</i> is zero, there are no intersections, and there is nothing
+to do.  Otherwise, I look at <i>intersects</i>[0], which represents an intersection with
+the object that is visible at the mouse position.  So, <i>intersects</i>[0]<i>.object</i>
+is the object that the user clicked, and <i>intersects</i>[0]<i>.point</i> is the
+point of intersection.</np>
+
+<p>The Delete action is the simplest to implement:  When the user clicks a cylinder, the cylinder should be 
+removed from the scene.  If the first intersection is with the <i>ground</i>, then 
+nothing is deleted.  Otherwise, the clicked object was a cylinder and should be deleted:</p>
+
+<pre>if ( intersects[0].object != ground ) {
+    world.remove( intersects[0].object );
+    render();
+}</pre>
+
+<p>For an Add action, we should add a cylinder only if the user clicked the ground. In that case,
+the point of intersection tells where the cylinder should be added.  An interesting issue
+here is that we get the point of intersection in world coordinates, but in order to
+add the cylinder as a child of <i>world</i>, I need to know the point of intersection
+in the local coordinate system for <i>world</i>.  The two coordinate systems will be different
+if the world has been rotated.  Fortunately, every <classname>Object3D</classname>
+has a method <i>worldToLocal</i>(<i>v</i>) that can be used to transform a <classname>Vector3</classname>,
+<i>v</i>, from world coordinates to local coordinates for that object.  This method does not
+return a value; it modifies the coordinates of the vector&nbsp;<i>v</i>.  (There is also a
+<i>localToWorld</i> method.)  So, the Add action can be implemented like this:</p>
+
+<pre>item = intersects[0];
+if (item.object == ground) {
+    let locationX = item.point.x;  // world coords of intersection point
+    let locationZ = item.point.z;
+    let coords = new THREE.Vector3(locationX, 0, locationZ); // y is always 0
+    world.worldToLocal(coords); // transform to local coords
+    addCylinder(coords.x, coords.z); // adds a cylinder at corrected location
+    render();
+}</pre>
+
+<p>For a Drag action, we can determine which cylinder was clicked using the same test as for delete.
+However, the problem of moving the cylinder as the user drags the mouse raises a new issue:
+how do we know where to put the cylinder when the mouse moves?  We somehow have to transform a new mouse
+position into a new position for the cylinder.   For that, we can use the raycaster
+again.  My first thought was to create a ray from the camera through the new mouse position, use that ray
+to find its intersection with the ground, and then to move the cylinder to that 
+point of intersection.  Unfortunately, this puts the <b>base</b> of the cylinder at the
+mouse position, and it made the cylinder jump to the wrong position as soon as I started moving
+the mouse.  I realized that I didn't want to track the intersection with the ground; I needed to
+track the intersection with a plane that lies at the same height as the original point of intersection.
+To implement this, I add an invisible plane at that height just during dragging,
+and I use intersections with that plane instead of intersections with the ground.
+(You can have invisible objects in <i>three.js</i>&mdash;just set the <i>visible</i> 
+property of the material to <i>false</i>.)</p>
+
+
+</subsection>
+
+
+
+<subsection title="Shadows" id="threejs.3.3">
+
+<p>One thing that has been missing in our 3D images is shadows.  Even if you didn't
+notice the lack consciously, it made many of the images look wrong.
+Shadows can add a nice touch of realism to a scene, but OpenGL, including WebGL, 
+cannot generate shadows automatically.  There are ways to compute shadows that 
+can be implemented in OpenGL, but they are tricky to use and they are not completely
+realistic physically.  One method, which is called <newword>shadow mapping</newword>,
+is implemented in <i>three.js</i>.  Shadow mapping in <i>three.js</i> is certainly not trivial to use,
+but it is easier than trying to do the same thing from scratch.</p>
+
+<demo src="c5/shadows.html" width="560" height="520"><p><web>Here is
+a demo that</web><tex>The online demo <demoref href="c5/shadows.html"/></tex>
+shows a <i>three.js</i> scene that uses shadow mapping.  The lights that
+cast the shadows can be animated, so you can watch the shadows change
+as the lights move.<tex>  Here is an image from the demo:</tex></p></demo>
+
+<texdiv><img tex="threejs-shadows.eps" texscale="0.6"/></texdiv>
+
+<p>The basic idea of shadow mapping is fairly straightforward: To tell what parts
+of a scene are in shadow, you have to look at the scene from the point of view of
+the light source.  Things that are visible from the point of view of the light
+are illuminated by that light.  Things that are not visible from the light are
+in shadow.  (This is ignoring the possibility of transparency and indirect, reflected
+light, which cannot be handled by shadow mapping.)  To implement this idea, place a camera at the light source and take a picture.
+In fact, you don't need the picture itself.  What you need is the <word>depth buffer</word>.  After the
+picture has been rendered, the value stored in the depth buffer for a given pixel
+contains, essentially, the distance from the light to the object that is visible from the
+the light at that point.  That object is illuminated by the light. If an object
+is at greater depth than the value stored in the depth buffer, then that object is
+in shadow.  The depth buffer is the shadow map.  Now, go back to the point of view of the camera,
+and consider a point on some object as it is rendered from the camera's point of view.  Is that
+point in shadow or not?  You just have to transform that point from the camera's viewing coordinates
+to the light's viewing
+coordinates and check the depth of the transformed point.  If that depth is greater than
+the corresponding value in the shadow map, then the point is in shadow.  Note that if there
+are several lights, each light casts its own shadows, and you need a shadow map for each light.</p>
+
+<p>It is computationally expensive to compute shadow maps and to apply them, and
+shadows are disabled by default in <i>three.js</i>.  To get shadows, you need to do
+several things.  You need to enable shadow computations in the WebGL renderer by
+saying</p>
+
+<pre>renderer.shadowMap.enabled = true;</pre>
+
+<np>Only <classname>DirectionalLights</classname> and
+<classname>SpotLights</classname> can cast shadows.  To get
+shadows from a light, even after enabling shadows in the renderer, you have to set
+the light's <i>castShadow</i> property to <i>true</i>:</np>
+
+<pre>light.castShadow = true;  // This light will cast shadows.</pre>
+
+<np>Furthermore, shadows have to be enabled for each object that
+will cast or receive shadows.  "Receiving" a shadow means that shadows will
+be visible on that object.  Casting and receiving are enabled separately for
+an object.</np>
+
+<pre>object.castShadow = true;     // This object will cast shadows.
+object.receiveShadow = true;  // Shadows will show up on this object.</pre>
+
+<p>Even this might not make any shadows show up, and if they do they might
+look pretty bad.  The problem is that you usually have to configure the
+cameras that are used to make the shadow maps.</p>
+
+<p>Each <classname>DirectionalLight</classname> or
+<classname>SpotLight</classname> has its own
+shadow camera, which is used to create the shadow
+map from the point of view of that light.  (A <classname>DirectionalLight</classname>
+has a property named <i>shadow</i> of type <classname>THREE.DirectionalLightShadow</classname>,
+which in turn has a property named <i>camera</i> of type <classname>THREE.OrthographicCamera</classname>
+that holds the shadow camera.  So, the shadow camera for a directional light <i>dl</i> is
+<i>dl.shadow.camera</i>.)   The shadow camera for a directional
+light uses an <word>orthographic projection</word>.  An orthographic projection is 
+configured by view volume limits
+<i>xmin</i>, <i>xmax</i>, <i>ymin</i>, <i>ymax</i>, <i>near</i>, and
+<i>far</i> (see <localref href="gl1geom.3.3"/>).   
+For a directional light, <i>dl</i>, these limits correspond to
+the properties <i>dl.shadow.camera.left</i>, <i>dl.shadow.camera.right</i>, <i>dl.shadow.camera.bottom</i>,
+<i>dl.shadow.camera.top</i>, <i>dl.shadow.camera.near</i>,  and <i>dl.shadow.camera.far</i>.
+These values are in view coordinates for the shadow camera; that is, they are relative to <i>dl.position</i>.  
+It is important to make sure that
+all the objects in your scene, or at least those that cast shadows, are within the view volume of
+the shadow camera.  Furthermore,
+you don't want the limits to be too big: If the scene occupies only a small part
+of the camera's view volume, then only a small part of the shadow map contains
+useful information&mdash;and then since there is so little information about shadows, your
+shadows won't be very accurate.  The default values assume a very large scene.
+For a relatively small scene, you might set:</p>
+
+<pre>dl.shadow.camera.left = -20;
+dl.shadow.camera.right = 20;
+dl.shadow.camera.bottom = -20;
+dl.shadow.camera.top = 20;
+dl.shadow.camera.near = 1;
+dl.shadow.camera.far = 30;</pre>
+
+<p>The shadow camera for a spotlight is of type <classname>THREE.PerspectiveCamera</classname> 
+and uses a <word>perspective projection</word>.  (The use of
+a camera with a limited view is why you can have shadows from spotlights but not from
+point lights.)  For a spotlight <i>sl</i>, the shadow camera is configured by the
+properties <i>sl.shadow.camera.near</i>, <i>sl.shadow.camera.far</i>,
+and  <i>sl.shadow.camera.fov</i> (where "fov" is the vertical
+field of view angle, given in degrees rather than radians).  The default value
+for <i>fov</i> is probably OK, except that if you change the spotlight's cutoff angle,
+you will want to change the <i>fov</i> to match.  But you should be sure to set appropriate values
+for <i>near</i> and <i>far</i>, to include all of your scene and as little extra as is practical.
+Again, <i>near</i> and <i>far</i> are distances from <i>sl.position</i>.</p>
+
+<p>To get more accurate shadows, you might want to increase
+the size of the shadow map.  The shadow map is a kind of texture image which by default is 512 by 512
+pixels.  You can increase the accuracy of the shadows by using a larger shadow map.
+To do that for a light, <i>light</i>, set the values of the properties
+<i>light.shadow.mapSize.width</i> and <i>light.shadow.mapSize.height</i>.  For example,</p>
+
+<pre>light.shadow.mapSize.width = 1024;
+light.shadow.mapSize.height = 1024;</pre>
+
+<np>I'm not sure whether power-of-two values are absolutely required here, but
+they are commonly used for textures.</np>
+
+</subsection>
+
+
+
+<subsection title="Cubemap Textures and Skyboxes" id="threejs.3.4">
+
+<p>We have created and viewed simple scenes, shown on a solid-colored background.
+It would be nice to put our scenes in an "environment" such as the interior of a building,
+a nature scene, or a public square.  It's not practical to build representations of
+such complex environments out of geometric primitives, but we can get a reasonably
+good effect using textures.  The technique that is used in <i>three.js</i> is called a
+<newword>skybox</newword>.  A skybox is a large cube &mdash; effectively, infinitely large &mdash;
+where a different texture is applied to each face of the cube.  The textures are images
+of some environment.  For a viewer inside the cube, the six texture images on the cube fit together to provide
+a complete view of the environment in every direction.  The six texture images
+together make up what is called a <newword>cubemap texture</newword>.
+The images must match up along the edges of the cube to form a seamless view of
+the environment.</p>
+
+<p>A cube map of an actual physical environment can be made by taking six pictures
+of the environment in six directions: left, right, up, down, forward, and back.  (More realistically,
+it is made by taking enough photographs to cover all directions, with overlaps, and then using software to "stitch"
+the images together into a complete cube map.)  The six
+directions are referred to by their relation to the coordinate axes as:
+positive&nbsp;x, negative&nbsp;x, positive&nbsp;y, negative&nbsp;y, positive&nbsp;z, and negative&nbsp;z,
+and the images must be listed in that order when you specify the cube map.
+Here is an example.  The first picture shows the six images of a cube map laid
+out next to each other.  The positive y image is at the top, the negative y image is at the
+bottom.  In between are the negative x, positive z, positive x, and negative z images
+laid out in a row.  The second picture shows the images used to texture a cube, viewed here from 
+the outside.  You
+can see how the images match up along the edges of the cube:</p>
+
+<img src="cubemap.png" width="650" height="283" tex="cubemap.eps" texscale="0.6"/>
+
+<np>(This cube map, and others used in this section, are by Emil Persson, who has made a 
+large number of cube maps available for download
+at <a href="http://www.humus.name/index.php?page=Textures">http://www.humus.name/index.php?page=Textures</a>
+under a creative commons license.)</np>
+
+<p>For a skybox, conceptually, a very large cube would be used.  
+The camera, lights, and any objects that are to be part
+of the scene would be inside the cube. 
+It is possible to construct a skybox by hand in just this way.</p>
+
+<p>However, <i>Three.js</i> makes it very easy to use a skybox as the background for a scene.
+It has the class <classname>THREE.CubeTexture</classname> to represent 
+cube maps, and you can enclose your scene in a skybox simply by assigning
+a <classname>CubeTexture</classname> as the value of the property
+<i>scene.background</i>.  (The value of that property could also be a normal
+<classname>Texture</classname> or a <classname>Color</classname>.)</p>
+
+<p>A <classname>CubeTexture</classname> can be created by a <classname>CubeTextureLoader</classname>,
+which can load the six images that make up the cube map.  The loader has
+a method named <i>load</i>() that works in the same way as the <i>load</i>()
+method of a <classname>TextureLoader</classname> (<localref href="threejs.2.3"/>), 
+except that the first parameter
+to the method is an array of six strings giving the URLs of the six images
+for the cube map.  For example:</p>
+
+<pre>let textureURLs = [  // URLs of the six faces of the cube map 
+        "cubemap-textures/park/posx.jpg",   // Note:  The order in which
+        "cubemap-textures/park/negx.jpg",   //   the images are listed is
+        "cubemap-textures/park/posy.jpg",   //   important!
+        "cubemap-textures/park/negy.jpg",  
+        "cubemap-textures/park/posz.jpg",   
+        "cubemap-textures/park/negz.jpg"
+   ];
+loader = new THREE.CubeTextureLoader();
+cubeTexture = loader.load( textureURLs, onLoad, undefined, onError );</pre>
+
+<np>Here, <i>onLoad</i> is a function that will be called after the
+texture has finished loading. The function could, for example,
+set <i>scene.background</i> equal to <i>cubeTexture</i> and re-render
+the scene with the new background.  The last parameter <i>onError</i>
+is a function that will be called if the texture cannot be loaded.
+Only the first parameter is required.</np>
+
+
+<p>The sample program <sourceref href="threejs/skybox.html"/>
+shows two WebGL scenes.  The first scene shows a cube with the six
+images from a cube map applied as normal textures to the six faces of
+a cube.  The second scene uses the same cube map as a skybox.  If you rotate
+the view of the second scene, you can look at all parts of the skybox and
+see how it forms a seamless environment that completely encloses the scene.
+</p>
+
+
+</subsection>
+
+
+
+<subsection title="Reflection and Refraction" id="threejs.3.5">
+
+<p>A reflective surface shouldn't just reflect light&mdash;it should reflect its
+environment.  <i>Three.js</i> can use <newword>environment mapping</newword>
+to simulate reflection.  (Environment mapping is also called "reflection mapping.")
+Environment mapping uses a cube map texture.  Given a
+point on a surface, a ray is cast from the camera position to that point,
+and then the ray is reflected off the surface.  The point where the reflected
+ray hits the cube determines which point from the texture should be mapped to the point on the
+surface.  For a simulation of perfect, mirror-like reflection, the surface
+point is simply painted with the color from the texture.
+Note that the surface does not literally reflect other objects in the scene.
+It reflects the contents of the cube map texture.  However,
+if the same cube map texture is used on a skybox, and if the skybox is
+the only other object in the scene,  then it will look like
+the surface is a mirror that perfectly reflects its environment.</p>
+
+<p>This type of reflection is very easy to do in <i>three.js</i>.  You only need to
+make a mesh material and set its
+<i>envMap</i> property equal to the cubemap texture object.  For example,
+if <i>cubeTexture</i> is the texture object obtained using
+a <classname>THREE.CubeTextureLoader</classname>, as in the skybox example above, we can make a sphere that
+perfectly reflects the texture by saying:</p>
+
+<pre>let geometry = new THREE.SphereGeometry(1,32,16);
+let material = new THREE.MeshBasicMaterial( { 
+        color: "white",  // Color will be multiplied by the environment map. 
+        envMap: cubeTexture  // CubeTexture to be used as an environment map.
+    } );
+let mirrorSphere = new THREE.Mesh( geometry, material );</pre>
+
+<np>For the effect to look good, you would want to use the
+same texture as the <i>scene</i> background.  Note that no lighting would be 
+necessary in the scene, since
+the sphere uses a <classname>MeshBasicMaterial</classname>.
+The colors seen on the sphere come entirely from the environment map and
+the basic color of the sphere material.  The environment map color is multiplied
+by the basic color.  In this example, the basic <i>color</i> of the
+material is white, and the sphere color is exactly equal to the color
+from the texture.  With a different base color, the environment map texture would be "tinted"
+with that color.  You could even apply a regular texture map to the sphere, to be used in place of
+the color, so that the reflection of the skybox would be combined with the texture.</np>
+
+<p>The sample program <sourceref href="threejs/reflection.html"/> demonstrates
+environment mapping.  It can show a variety of environment-mapped objects, with
+a variety of skybox textures, and it has several options for the base color of the
+object.  Here are two images from that program.  The one on the left shows a reflective
+arrowhead shape with a white base color.  On the right, the object is a model
+of a horse (taken from the <i>three.js</i> download) whose base color is pink:</p>
+
+<img src="threejs-reflection.png" width="650" height="328" tex="threejs-reflection.eps" texscale="0.6"/>
+
+<demo src="c5/reflection-demo.html" width="600" height="525"><np><tex>A very similar program is available as a demo
+in the on-line version of this section.</tex>
+<web>Here is a demo that is very similar to the sample program.  In the demo, you can choose
+to view just the skybox or just the reflective object, and you can see that the object only
+seems to be reflecting its actual environment.  Use your mouse to rotate the scene to see
+how the reflection changes as the orientation of the object changes.</web></np></demo>
+
+<p><i>Three.js</i> can also do <newword>refraction</newword>.  Refraction
+occurs when light passes through a transparent or translucent object.  A ray of light will be
+bent as it passes between the inside of the object and the outside.  The amount
+of bending depends on the so-called "indices of refraction" of the material outside
+and the material inside the object.  More exactly, it depends on the ratio between
+the two indices.  Even a perfectly transparent object will be visible because of
+the distortion induced by this bending (unless the ratio is 1, meaning that there
+is no bending of light at all).</p>
+
+<p>In <i>three.js</i>, refraction is implemented using environment maps.  As with reflection,
+a refracting object does not show its actual environment; it refracts the cubemap texture
+that is used as the environment map.  For refraction, a special
+"mapping" must be used for the environment map texture.  The <i>mapping</i> property 
+of a texture tells how that texture will be mapped to a surface.  For a cubemap
+texture being used for refraction, it should be set to <i>THREE.CubeRefractionMapping</i>.  
+(The default value of this property in a cubemap texture is 
+appropriate for reflection rather than refraction.)  Here is an example of
+loading a cubemap texture and setting its mapping property for use with refraction:</p>
+
+<pre>cubeTexture = new THREE.CubeTextureLoader().load( textureURLs );
+cubeTexture.mapping = THREE.CubeRefractionMapping;</pre>
+
+<np>In addition to this, the <i>refractionRatio</i> property of the material
+that is applied to the refracting object should be set.  The value is a number
+between 0 and&nbsp;1; the closer to 1, the less bending of light.  The default value
+is so close to 1 that the object will be almost invisible. This example uses
+a value of 0.6:</np>
+
+<pre>let material = new THREE.MeshBasicMaterial( { 
+        color: "white",
+        envMap: cubeTexture,
+        refractionRatio: 0.6
+    } );</pre>
+
+<np>This gives a strong refractive effect.  If you set the material color to
+something other than white, you will get something that looks like tinted glass.
+Another property that you might set is the <i>reflectivity</i>.  For a refractive
+object, this value tells how much light is transmitted through the object rather than reflected
+from its surface.
+The default value, 1, gives 100% transmission of light; smaller values make objects
+look like they are made out of "cloudy" glass that blocks some of the light.</np>
+
+<p>The sample program <sourceref href="threejs/refraction.html"/>
+is a copy of <i>reflection.html</i> that has been modified to
+do refraction instead of reflection.  The objects look like they are made of glass instead
+of mirrors.  The program has a checkbox that makes the glass look cloudy and one
+that increases the <i>refractionRatio</i> from 0.6 to&nbsp;0.9.
+The following images are
+from that program.  A perfectly transmissive arrowhead is shown in the first image, and a cloudy
+sphere in the second.  Notice how the sphere shows an inverted image of the objects
+behind it:</p>
+
+<img src="threejs-refraction.png" width="650" height="324" tex="threejs-refraction.eps" texscale="0.6"/>
+
+<p>In my reflection and refraction examples, the environment is a skybox, and there is a single
+object that reflects or refracts that environment.  But what if a scene includes more than one
+object?  The objects won't be in the cubemap texture.  If you use the cubemap texture on
+the objects, they won't reflect or refract <b>each other</b>.  There is no complete solution
+to this problem in WebGL.  However, you can make an object reflect or refract other objects
+by making an environment map that includes those objects.  If the objects are moving, this means
+that you have to make a new environment map for every frame.  Recall that an environment map
+can be made by taking six pictures of the environment from different directions.  <i>Three.js</i> has a kind of camera that
+can do just that, <classname>THREE.CubeCamera</classname>.  I won't go into the
+full details, but a CubeCamera can take a
+six-fold picture of a scene from a given point of view and make a cubemap texture from
+those images.  To use the camera, you have to place it at the location of an object&mdash;and make the
+object invisible so it doesn't show up in the pictures.  Snap the picture, and apply it
+as an environment map on the object.  For animated scenes, you have to do this in every frame,
+and you need to do it for every reflective/refractive object in the scene.  Obviously, this
+can get very computationally expensive!  And the result still isn't perfect.  For one thing,
+you won't see multiple reflections, where objects reflect back and forth on each other several
+times. For that, you need a different kind of rendering from the one used by OpenGL.
+We will return to the topic of dynamic cubemaps in <localref href="webgl3d.4.4"/> and
+to alternative rendering techniques in <localref href="advanced"/>.</p>
+
+
+</subsection>
+
+
+
+
+
+</section>

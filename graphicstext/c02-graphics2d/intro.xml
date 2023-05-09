@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>With this chapter, we begin our study of computer graphics by looking at the two-dimensional case.
+Things are simpler, and a lot easier to visualize, in 2D than in 3D, but most of
+the ideas that are covered in this chapter will also be very relevant to 3D.</p1>
+
+<p>The chapter begins with four sections that examine 2D graphics in a general way,
+without tying it to a particular programming language or graphics API.  The coding
+examples in these sections are written in pseudocode that should make sense to
+anyone with enough programming background to be reading this book.
+In the next three sections, we will take quick looks at 2D graphics in three
+particular languages: Java with <classname>Graphics2D</classname>,
+JavaScript with HTML <tag>canvas</tag> graphics, and SVG.  We will see how these
+languages use many of the general ideas from earlier in the chapter.</p>
+
+</intro>

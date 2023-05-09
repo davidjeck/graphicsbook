@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Cubic Bezier Curve Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script>
+
+var canvas;
+var graphics;
+var points;
+var hideSelect;
+var lockSelect;
+var dragPointIndex;
+
+function Point2D(x,y) {
+    this.x = x;
+    this.y = y;
+}
+
+function draw() {
+    var i;
+    graphics.fillStyle = "white";
+    graphics.fillRect(0,0,canvas.width,canvas.height);
+    if ( ! hideSelect.checked ) {
+        graphics.lineWidth = 1;
+        if (lockSelect.checked) {
+            graphics.strokeStyle = "#888888";   
+        }
+        else {
+            graphics.strokeStyle = "red";
+        }
+        for (i = 0; i < 9; i++) {
+            if (i % 3 != 1) {
+                graphics.beginPath();
+                graphics.moveTo( points[i].x + .5, points[i].y + .5 );
+                graphics.lineTo( points[i+1].x + .5, points[i+1].y + .5 );
+                graphics.stroke();
+            }
+        }
+        for (i = 0; i < 10; i++) {
+            if ( i % 3 == 0 ) {
+                graphics.fillStyle="black";
+                disk(points[i].x, points[i].y, 5);
+            }
+            else {
+                graphics.fillStyle= "blue";
+                graphics.fillRect(points[i].x - 5, points[i].y - 5, 10, 10);
+                
+            }
+        }
+    }
+    graphics.beginPath();
+    graphics.moveTo(points[0].x,points[0].y);
+    for (i = 1; i < 10; i += 3) {
+        graphics.bezierCurveTo(points[i].x,points[i].y,
+                              points[i+1].x,points[i+1].y,
+                              points[i+2].x,points[i+2].y);
+    }
+    graphics.lineWidth = 2;
+    graphics.strokeStyle = "black";
+    graphics.stroke();
+}
+
+function disk( x, y, radius ) {
+    graphics.beginPath();
+    graphics.arc(x,y,radius,0,Math.PI*2);
+    graphics.fill();
+}
+
+function doLock() {
+    if ( lockSelect.checked ) {
+        points[4].x = 2*points[3].x - points[2].x;
+        points[4].y = 2*points[3].y - points[2].y;
+        points[7].x = 2*points[6].x - points[5].x;
+        points[7].y = 2*points[6].y - points[5].y;
+    }
+    draw();
+}
+
+
+
+function doMouseDown(x,y) {
+    if (hideSelect.checked) {
+        return false;
+    }
+    for (var i = 9; i >= 0; i--) {
+        var p = points[i];
+        if (Math.abs(p.x - x) <= 5 && Math.abs(p.y - y) <= 5) {
+            dragPointIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+function doTouchStart(x,y) {  // same as do mouse down, with a bigger hit area
+    if (hideSelect.checked) {
+        return false;
+    }
+    var closestPt = null;
+    var closestDist;
+    for (var i = 9; i >= 0; i--) {
+        var p = points[i];
+        if (Math.abs(p.x - x) <= 18 && Math.abs(p.y - y) <= 18) {
+            var dist = (p.x - x)*(p.x - x) + (p.y - y)*(p.y - y);
+            if (closestPt == null || dist < closestDist) {
+                closestPt = i;
+                closestDist = dist;
+            }
+        }
+    }
+    if (closestPt != null) {
+        dragPointIndex = closestPt;
+        return true;
+    }
+    return false;
+}
+
+function doMouseMove(x,y) {
+    x = Math.max(0, Math.min(canvas.width,x));
+    y = Math.max(0, Math.min(canvas.height,y));
+    var offsetX = x - points[dragPointIndex].x;
+    var offsetY = y - points[dragPointIndex].y;
+    points[dragPointIndex].x = x;
+    points[dragPointIndex].y = y;
+    if ( dragPointIndex % 3 == 0) {
+        if (dragPointIndex > 0) {
+            points[dragPointIndex - 1].x += offsetX;
+            points[dragPointIndex - 1].y += offsetY;
+        }
+        if (dragPointIndex < 9) {
+            points[dragPointIndex + 1].x += offsetX;
+            points[dragPointIndex + 1].y += offsetY;
+        }
+    }
+    else if (lockSelect.checked) {
+        if (dragPointIndex == 2) {
+            points[4].x = 2*points[3].x - points[2].x;
+            points[4].y = 2*points[3].y - points[2].y;
+        }
+        else if (dragPointIndex == 4) {
+           points[2].x = 2*points[3].x - points[4].x;
+           points[2].y = 2*points[3].y - points[4].y;
+        }
+        else if (dragPointIndex == 5) {
+            points[7].x = 2*points[6].x - points[5].x;
+            points[7].y = 2*points[6].y - points[5].y;
+        }
+        else if (dragPointIndex == 7) {
+            points[5].x = 2*points[6].x - points[7].x;
+            points[5].y = 2*points[6].y - points[7].y;
+        }
+    }
+    draw();
+}
+
+function init() {
+    canvas = document.getElementById("maincanvas");
+    if (!maincanvas.getContext) {
+        document.getElementById("headline").innerHTML = "ERROR: Canvas not supported";
+        return;
+    }
+    graphics = canvas.getContext('2d');
+    lockSelect = document.getElementById("lock");
+    lockSelect.checked = false;
+    lockSelect.onclick = doLock;
+    hideSelect = document.getElementById("hide");
+    hideSelect.checked = false;
+    hideSelect.onclick = function() { draw(); };
+    points = [
+        new Point2D(50,300),  new Point2D(150,350),
+        new Point2D(130,85), new Point2D(180,85), new Point2D(230,85),
+        new Point2D(250,330), new Point2D(300,360), new Point2D(400,340),
+        new Point2D(375,75), new Point2D(450,150)
+    ];
+    draw();
+    setUpMouseHander(canvas,doMouseDown,doMouseMove);
+    setUpTouchHander(canvas,doTouchStart,doMouseMove);
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3>Cubic Bezier Curves Demo</h3>
+
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="500" height="400"></canvas>
+</div>
+
+
+<p style="font-weight: bold; font-size:90%; text-indent:0; clear: both">
+   <input type="checkbox" id="lock"><label for="lock" style="margin-right:1cm">Lock Control Point Pairs</label>
+   <input type="checkbox" id="hide"><label for="hide">Hide Controls</label></p>
+
+
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo shows a path made up of three cubic Bezier curve
+segments.  Each segment is defined by its two endpoints and two control points.
+The endpoints are black disks.  The control points are blue squares.
+A control point determines the tangent at the corresponding endpoint.</p>
+<p><b>You can drag the endpoints and the control points!</b></p>
+<p>If "Lock Control Point Pairs" is checked,
+then the two control points associated with the endpoint where two
+segments join are constrained to move together.  This makes the curve smooth
+at that point.  When the control points are not locked, you can get a corner
+at an endpoint.</p>
+<p>The "Hide Controls" checkbox will hide the control points and endpoints
+so that you can see curve better.  You can't edit the curve while
+Hide Controls is checked.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<!--
+   This page lets the user place shapes on the canvas
+   by clicking the canvas, as a demo of WebGL graphics.
+   (The application is actually more suited to the 2D canvas
+   graphics API.)
+   
+   Pop-up menus allow the user to control the shape, the color
+   of the shape, and the degree of opaqueness.
+   
+   Note that in this program, the WebGL context option preserveDrawingBuffer
+   is set to true, which means that the image in the buffer will be retained
+   after the image is copied to the web page.  This is essential in this
+   program because the response to a click is simply to draw one shape -- the
+   previous image still has to be there!
+-->
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Shape Stamper in WebGL</title>
+<style>
+    body {
+        background-color: #DDDDDD;
+    }
+    canvas {
+        display: block;  /* stops the browser from adding some space below the canvas for text descenders */
+    }
+    #canvas-holder {
+        border: thin solid black;
+        float: left;  /* so border is the width of the canvas, not the width of the page */
+    }
+    label {
+        margin-left: 20px;
+    }
+</style>
+
+<script>
+
+"use strict";
+
+const  vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "uniform float u_width;\n" +
+       "uniform float u_height;\n" +
+       "void main() {\n" +
+       "   float x = -1.0 + 2.0*(a_coords.x / u_width);\n" +
+       "   float y = 1.0 - 2.0*(a_coords.y / u_height);\n" +
+       "   gl_Position = vec4(x, y, 0.0, 1.0);\n" +
+       "}\n";
+
+const  fragmentShaderSource =
+       "precision mediump float;\n" +
+       "uniform vec3 u_color;\n" +
+       "uniform float u_alpha;\n" +
+       "void main() {\n" +
+       "   gl_FragColor = vec4(u_color, u_alpha);\n" +
+       "}\n";
+
+let  canvas;  // The canvas where WebGL draws.
+
+let  gl;  // The WebGL graphics context.
+
+let  uniformWidth;   // Location of uniform named "u_width"
+let  uniformHeight;  // Location of uniform named "u_height"
+let  uniformColor;   // Location of uniform named "u_color" (for RGB components)
+let  uniformAlpha;   // Location of uniform named "u_alpha" (for alpha components)
+
+let  attributeCoords;  // Location of the attribute named "a_coords".
+let  bufferCoords;     // A vertex buffer object to hold the values for coords.
+
+const  colorList = [ // available colors for shapes
+        [ 1, 0, 0 ],
+        [ 0, 0.8, 0 ],
+        [ 0, 0, 1 ],
+        [ 0, 1, 1 ],
+        [ 1, 0, 1 ],
+        [ 1, 1, 0 ],
+        [ 0, 0, 0 ],
+        [ 0.5, 0.5, 0.5 ]
+    ];
+
+/**
+ *  The init() function installs this function as a handler for mousedown events
+ *  on the canvas.  It's purpose is to draw one shape at the current mouse position,
+ *  with the properties specified by the popup menu.  However, if the user is holding
+ *  the shift key down, then the canvas is cleared.
+ */
+function doMouseDown(event) {
+    if (event.shiftKey) {
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        return;
+    }
+    
+    /* Get mouse position (x,y) in pixel coords on the canvas. */
+    
+    let  r = canvas.getBoundingClientRect();
+    let  x = event.clientX - r.left;
+    let  y =event.clientY - r.top;
+    
+    /* Get the settings from the pop-up menu, and use them to set the color and alpha uniforms. */
+    
+    let  shape = document.getElementById("shapeChoice").value;
+    let  colorNumber = Number(document.getElementById("colorChoice").value);
+    let  alpha = Number(document.getElementById("opacityChoice").value);
+    
+    gl.uniform3fv( uniformColor, colorList[colorNumber] );
+    gl.uniform1f( uniformAlpha, alpha );
+    
+    /* Create the values for the a_coords attribute, depending on the shape.  The shape
+       will be drawn as a primitive of type gl.TRIANGLE_FAN. */
+       
+    let  coords;  // a Float32Array to hold the coordinates.
+    let  k;  // index into the coords array, starting at index 0.
+    
+    switch (shape) {
+    case "Circle":  // Approximated as a regular polygon with 32 sides
+        coords = new Float32Array(64);
+        k = 0;
+        for (let  i = 0; i < 32; i++) {
+            let  angle = i/32 * 2*Math.PI;
+            coords[k++] = x + 50*Math.cos(angle);  // x-coord of vertex
+            coords[k++] = y + 50*Math.sin(angle);  // y-coord of vertex
+        }
+        break;
+    case "Square":
+        coords = new Float32Array(8);
+        coords[0] = x-40;
+        coords[1] = y-40;
+        coords[2] = x-40;
+        coords[3] = y+40;
+        coords[4] = x+40;
+        coords[5] = y+40;
+        coords[6] = x+40;
+        coords[7] = y-40;
+        break;
+    case "Triangle":
+        coords = new Float32Array(6);
+        coords[0] = x-50;
+        coords[1] = y+40;
+        coords[2] = x+50;
+        coords[3] = y+40;
+        coords[4] = x;
+        coords[5] = y-60;
+        break;
+    default: // "Star"
+        coords = new Float32Array(24);
+        k = 0;
+        coords[k++] = x;
+        coords[k++] = y;
+        for (let  i = 0; i <= 10; i++) {
+            let  angle = -Math.PI/2 + i/10 * 2*Math.PI;
+            let  radius = (i % 2 === 0)? 50 : 21;
+            coords[k++] = x + radius*Math.cos(angle);  // x-coord of vertex
+            coords[k++] = y + radius*Math.sin(angle);  // y-coord of vertex
+        }
+        break;
+    }
+    
+    /* Transfer the attribute values to the VBO, and draw the shape */
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, coords.length/2);
+   
+}
+
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   let  vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+   }
+   let  fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+   }
+   let  prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+   }
+   return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context, and fill the canvas with white.
+ */
+function initGL() {
+    let  prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    attributeCoords = gl.getAttribLocation(prog, "a_coords");
+    bufferCoords = gl.createBuffer();
+    gl.enableVertexAttribArray(attributeCoords); 
+    uniformWidth = gl.getUniformLocation(prog, "u_width");
+    uniformHeight = gl.getUniformLocation(prog, "u_height");
+    uniformColor = gl.getUniformLocation(prog, "u_color");
+    uniformAlpha = gl.getUniformLocation(prog, "u_alpha");
+    gl.uniform1f(uniformHeight, canvas.height);
+    gl.uniform1f(uniformWidth, canvas.width);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clearColor(1,1,1,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+} 
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        let  options = {  // no need for alpha channel or depth buffer in this program,
+                         // but we need to preserve the image in the drawingBuffer
+            alpha: false,
+            depth: false,
+            preserveDrawingBuffer: true
+        };
+        gl = canvas.getContext("webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
+        return;
+    }
+    document.getElementById("shapeChoice").value = "Star";
+    document.getElementById("colorChoice").value = "0";
+    document.getElementById("opacityChoice").value = "0.5";
+    canvas.addEventListener("mousedown", doMouseDown, false);
+}
+
+
+window.onload = init;  // Arrange for init() to be called after page has loaded.
+
+
+</script>
+</head>
+<body>
+
+<h2>WebGL Shape-Stamper</h2>
+
+<noscript><p><b>Sorry, but this page requires JavaScript.</b></p></noscript>
+
+<p><b>Click the canvas to add a shape! Shift-click to clear.</b></p>
+
+<p>
+    <label><b>Shape:</b>&nbsp;<select id="shapeChoice">
+        <option>Circle</option>
+        <option>Square</option>
+        <option>Triangle</option>
+        <option>Star</option>
+    </select></label>
+    <label><b>Color:</b>&nbsp;<select id="colorChoice">
+        <option value="0">Red</option>
+        <option value="1">Green</option>
+        <option value="2">Blue</option>
+        <option value="3">Cyan</option>
+        <option value="4">Magenta</option>
+        <option value="5">Yellow</option>
+        <option value="6">Black</option>
+        <option value="7">Gray</option>
+    </select></label>
+    <label><b>Opacity:</b>&nbsp;<select id="opacityChoice">
+        <option value="1.0">100%</option>
+        <option value="0.75">75%</option>
+        <option value="0.5">50%</option>
+        <option value="0.25">25%</option>
+        <option value="0.1">10%</option>
+    </select></label>
+</p>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="640" height="480"></canvas>
+</div>
+
+</body>
+</html>

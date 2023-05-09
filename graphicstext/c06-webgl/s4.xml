@@ -1,0 +1,981 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Image Textures" id="webgl.4">
+
+<p1><word term="texture">Textures</word> play an essential role in 3D graphics,
+and support for <word term="image texture">image textures</word> is built into
+modern <word term="GPU">GPUs</word> on the hardware level.  In this section,
+we look at the WebGL API for image textures. Image textures
+in OpenGL&nbsp;1.1 were covered in <localref href="gl1light.3"/>.  Much of
+that section is still relevant in modern OpenGL, including WebGL.  So,
+as we cover image textures in WebGL, much of the material will not be
+new to you.  However, there is one feature that is new since OpenGL&nbsp;1.1:
+<newword term="texture unit">texture units</newword>.</p1>
+
+<p>One of the significant differences between WebGL 1.0 and WebGL 2.0 is 
+an increase in support for different types of textures and for
+different ways of using textures.  Access to most of the new features
+requires using <word>GLSL</word>&nbsp;ES&nbsp;3.00 for the <word term="shader">shader</word> programs.
+We will stick to WebGL&nbsp;1.0 for most of this section, but will discuss some
+of the new WebGL&nbsp;2.0 features in the final subsection.
+</p>
+
+<subsection title="Texture Units and Texture Objects" id="webgl.4.1">
+
+<p>A texture unit, also called a texture mapping unit (<newword>TMU</newword>) or
+a texture processing unit (TPU),
+is a hardware component in a GPU  that does sampling.  <newword term="sampling">Sampling</newword>
+is the process of computing a color from an image texture and <word>texture coordinates</word>.
+Mapping a texture image to a surface is a fairly complex operation, since it requires more
+than just returning the color of the <word>texel</word> that contains some given texture
+coordinates.  It also requires applying the appropriate <word term="minification filter">minification</word>
+or <word>magnification filter</word>, possibly using <word term="mipmap">mipmaps</word> if available.
+Fast texture sampling is one of the key requirements for good GPU performance.</p>
+
+<p>Texture units are not to be confused with <word term="texture object">texture objects</word>.
+We encountered texture objects in <localref href="gl1light.3.7"/>.  A texture object
+is a data structure that contains the color data for an image texture, and possibly for
+a set of mipmaps for the texture, as well as the values of texture properties such
+as the minification and magnification filters and the <word>texture repeat mode</word>.
+A texture unit must access a texture object to do its work.  The texture unit is the
+processor; the texture object holds the data that is processed.</p>
+
+<p>(By the way, I should really be more careful about throwing around the terms "GPU" and
+"hardware."  Although a texture unit probably does use an actual hardware component in the
+GPU, it could also be emulated, more slowly, in software.  And even if there is
+hardware involved, having eight texture units does not necessarily mean that there are
+eight hardware components; the texture units might share time on a smaller number of
+hardware components.  Similarly, I said previously that texture objects are stored
+in memory in the GPU, which might or might not be literally true in a given case.
+Nevertheless, you will probably find it conceptually easier to think of a texture unit 
+as a piece of hardware and a texture object as a data structure in the GPU.)</p>
+
+<break/>
+
+<p>In <word>GLSL</word>, texture lookup is done using <newword term="sampler variable">sampler variables</newword>.
+A sampler variable is a variable in a shader program.  In GLSL&nbsp;ES&nbsp;1.00, the only sampler types are 
+<i>sampler2D</i> and <i>samplerCube</i>.
+A <i>sampler2D</i> is used to do lookup in a standard texture image; a <i>samplerCube</i> is used
+to do lookup in a <word>cubemap texture</word> (<localref href="threejs.3.4"/>).
+The value of a sampler variable is a reference to a texture unit.  The value tells which texture
+unit is invoked when the sampler variable is used to do texture lookup.
+Sampler variables must be declared as global uniform variables.  
+It is not legal for a shader program to assign a value to a sampler variable.  The
+value must come from the JavaScript side.</p>
+
+<p>On the JavaScript side, the available texture units are numbered 0, 1, 2,&nbsp;&dots;, where
+the maximum value is implementation dependent.  The number of units can be determined as the value of
+the expression</p>
+
+<pre>gl.getParameter( gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS )</pre>
+
+<np>(Please remember, again, that <i>gl</i> here is the name of a JavaScript variable that refers to the
+WebGL context, and that the name is up to the programmer.)</np>
+
+<p>As far as JavaScript is concerned, the value of a sampler variable is an integer.  If you
+want a sampler variable to use texture unit number 2, then you set the value of the
+sampler variable to&nbsp;2.  This can be done using the function <i>gl.uniform1i</i>
+(<localref href="webgl.1.4"/>).  For example, suppose a shader program declares a sampler
+variable
+</p>
+
+<pre>uniform sampler2D u_texture;</pre>
+
+<np>To set its value from JavaScript, you need the location of the variable in the
+shader program.  If <i>prog</i> is the shader program, the location is obtained by
+calling</np>
+
+<pre>u_texture_location = gl.getUniformLocation( prog, "u_texture" );</pre>
+
+<np>Then, you can tell the sampler variable to use texture unit number 2 by calling</np>
+
+<pre>gl.uniform1i( u_texture_location, 2 );</pre>
+
+<np>Note that the integer value is not accessible in GLSL.  The integer tells the
+sampler which texture unit to use, but there is no way for the shader program to
+find out the number of the unit that is being used.</np>
+
+<break/>
+
+<p>To use an image texture, you also need to create a texture object, and you need to load
+an image into the texture object.  You might want to set some properties of the texture
+object, and you might want to create a set of mipmaps for the texture.  And
+you will have to associate the texture object with a texture unit.  All this is
+done on the JavaScript side.</p>
+
+<p>The command for creating a texture object is <i>gl.createTexture</i>().  The command
+in OpenGL&nbsp;1.1 was <i>glGenTextures</i>.  The WebGL command is easier to use.
+It creates a single texture object and returns a reference to it.  For example,</p>
+
+<pre>textureObj = gl.createTexture();</pre>
+
+<np>This just allocates some memory for the object.  In order to use it, you must
+first "bind" the texture object by calling <i>gl.bindTexture</i>.  For example,</np>
+
+<pre>gl.bindTexture( gl.TEXTURE_2D, textureObj );</pre>
+
+<np>The first parameter, <i>gl.TEXTURE_2D</i>, is the texture target.  This target is
+used for working with an ordinary texture image.  There is a different target for
+cubemap textures.</np>
+
+<p>The function <i>gl.texImage2D</i> is used to load an image into the currently bound
+texture object.  We will come back to that in the next subsection.  But remember that
+this command and other commands always apply to the currently bound texture object.
+The texture object is not mentioned in the command; instead, the texture object must be bound
+before the command is called.</p>
+
+<p>You also need to tell a texture unit to use the texture object.  Before you can
+do that, you need to make the texture unit "active," which is done by calling the function
+<i>gl.activeTexture</i>.  The parameter is one of the constants
+<i>gl.TEXTURE0</i>, <i>gl.TEXTURE1</i>, <i>gl.TEXTURE2</i>,&nbsp;&dots;, which represent
+the available texture units.  (The values of these constants are <b>not</b> 0, 1, 2,&nbsp;&dots;.)
+Initially, texture unit number 0 is active.  To make texture unit number 2 active, for example, use</p>
+
+<pre>gl.activeTexture( gl.TEXTURE2 );</pre>
+
+<np>(This function should really have been called <i>activeTexture<b>Unit</b></i>, or maybe
+<i>bindTextureUnit</i>, since it works similarly to the various WebGL "bind" functions.) 
+If you then call</np>
+
+
+<pre>gl.bindTexture( gl.TEXTURE_2D, textureObj );</pre>
+
+<np>to bind a texture object, while texture unit 2 is active, then
+the the texture object <i>textureObj</i> is bound to texture unit number&nbsp;2 for
+<i>gl.TEXTURE_2D</i> operations.  The binding
+just tells the texture unit which texture object to use.  That is, when texture unit&nbsp;2 does
+<i>TEXTURE_2D</i> lookups, it will do so using the image and the settings that are stored in <i>textureObj</i>.
+A texture object can be bound to several texture units at the same time.  However, a given
+texture unit can have only one bound <i>TEXTURE_2D</i> at a time.</np>
+
+<p>So, working with texture images in WebGL involves working with texture objects, texture
+units, and sampler variables.  The relationship among the three is illustrated in this
+picture:</p>
+
+<img src="texture-units-and-objects.png" width="566" height="357" tex="texture-units-and-objects.eps" texscale="0.75"/>
+
+<np>A sampler variable uses a texture unit, which uses a texture object, which holds a texture image.
+The JavaScript commands for setting up this chain are shown in the illustration.  To apply a texture
+image to a primitive, you have to set up the entire chain. Of course, you also have to
+provide texture coordinates for the primitive, and 
+you need to use the sampler variable in the shader program to access the texture.</np>
+
+<p>Suppose that you have several images that you would like to use on several different
+primitives.  Between drawing primitives, you need to change the texture image that will be
+used.  There are at least three different ways to manage the images in WebGL:</p>
+
+<ol>
+<li>You could use a single texture object and a single texture unit.  The bound texture object,
+the active texture unit, and the value of the sampler variable can be set once and never changed.  
+To change to a new image, you would use <i>gl.texImage2D</i> to load the image into the texture
+object.  This is essentially how things were done in OpenGL&nbsp;1.0.  It's very inefficient,
+except when you are going to use each image just once.  That's why texture objects were
+introduced.</li>
+<li>You could use a different texture object for each image, but use just a single texture unit.
+The active texture and the value of the sampler variable will never have to be changed.
+You would switch to a new texture image using <i>gl.bindTexture</i> to bind the texture
+object that contains the desired image.</li>
+<li>You could use a different texture unit for each image.  You would load each
+image into its own texture object and bind that object to one of the texture units.
+You would switch to a new texture image by changing the value of the sampler variable.</li>
+</ol>
+
+<np>I don't know how options 2 and 3 compare in terms of efficiency.  Note that you
+are only <b>forced</b> to use more than one texture unit if you want to apply more
+than one texture image to the same primitive.  To do that, you will need several
+sampler variables in the shader program.  They will have different values so that
+they refer to different texture units, and the color of a pixel will somehow depend
+on samples from both images.  This picture shows two textures being combined
+in simple ways to compute the colors of pixels in a textured square:</np>
+
+<img src="multi-texture.png" width="560" height="279" tex="multi-texture.eps" texscale="0.6"/>
+
+
+<demo src="c6/multi-texture.html" width="625" height="475">
+<np>In the image on the left, a <word>grayscale</word> "brick" image is multiplied by an "Earth" image;
+that is, the red component of a pixel is computed by multiplying the red component from
+the brick texture by the red component from the Earth texture, and same for green and blue.
+On the right, the same Earth texture is subtracted from a "cloth" texture.  Furthermore,
+the pattern is distorted because the texture coordinates were  modified before being
+used to sample the textures, using the formula <i>texCoords.y</i> <code>+=</code> 
+0.25<code>*</code><i>sin</i>(6.28*<i>texCoords.x</i>).  That's the kind of thing that
+could only be done with programmable shaders!  The images are taken from
+<web>the following demo</web><tex>the on-line demo <demoref href="c6/multi-texture.html"/></tex>.
+Try it out!</np>
+</demo>
+
+<p>You might want to view the <demoref href="c6/multi-texture.html">source code</demoref>
+to see how the textures are programmed.  Two texture units are used.  The values of two
+uniform sampler variables, <i>u_texture1</i> and <i>u_texture2</i>, are set during
+initialization with the code</p>
+
+<pre>u_texture1_location = gl.getUniformLocation(prog, "u_texture1");
+u_texture2_location = gl.getUniformLocation(prog, "u_texture2");
+gl.uniform1i(u_texture1_location, 0);
+gl.uniform1i(u_texture2_location, 1);</pre>
+
+<np>The values are never changed.  The program uses several texture images.  There is a
+texture object for each image.  On the JavaScript side, the IDs for the texture objects are stored in an array,
+<i>textureObjects</i>.  Two popup menus allow the user to select which texture images
+are applied to the primitive.  This is implemented in the drawing routine by binding
+the two selected texture objects to texture units 0 and&nbsp;1, which are the units used
+by the two sampler variables.  The code for that is:</np>
+
+<pre>let tex1Num = Number(document.getElementById("textureChoice1").value);
+gl.activeTexture( gl.TEXTURE0 );
+gl.bindTexture( gl.TEXTURE_2D, textureObjects[tex1Num] );
+
+let tex2Num = Number(document.getElementById("textureChoice2").value);
+gl.activeTexture( gl.TEXTURE1 );
+gl.bindTexture( gl.TEXTURE_2D, textureObjects[tex2Num] );</pre>
+
+<np>Getting images into the texture objects is another question, which we turn to next.</np>
+
+</subsection>
+
+
+<subsection title="Working with Images" id="webgl.4.2">
+
+<p>An image can be loaded into a texture object using the function <i>gl.texImage2D</i>.
+For use with WebGL, this function usually has the form
+</p>
+
+<pre>gl.texImage2D( target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image );</pre>
+
+<np>The target is <i>gl.TEXTURE_2D</i> for ordinary textures; there are other targets for
+loading cubemap textures.  The second parameter is the mipmap level, which is 0 for the
+main image.  Although it is possible to load individual mipmaps, that is rarely done.
+The next two parameters give the format of the texture inside the texture object and
+in the original image.  In WebGL&nbsp;1.0, the two format parameters should have the same value.
+Since web images are stored in RGBA format, <i>gl.RGBA</i> is probably the most efficient choice, 
+and there is rarely a need to use anything else.
+But you can use <i>gl.RGB</i> if you don't need the alpha component.  And by
+using <i>gl.LUMINANCE</i> or <i>gl.LUMINANCE_ALPHA</i>, you can convert the
+image to grayscale.  (<word term="luminance">Luminance</word> is a weighted average
+of red, green, and blue that approximates the perceived brightness of a color.)
+The fourth parameter is always going to be <i>gl.UNSIGNED_BYTE</i>, indicating that
+the colors in the image are stored using one byte for each color component.  Although
+other values are possible, they don't really make sense for web images.</np>
+
+<p>The last  parameter in the call to <i>gl.texImage2D</i> is the image.  Ordinarily,
+<i>image</i> will be a <word>DOM</word> image element that has been loaded asynchronously
+by JavaScript.   The <i>image</i> can also be a <tag>canvas</tag> element.
+This means that you can draw on a canvas, using the <word>HTML canvas</word> 2D graphics
+API, and then use the canvas as the source for a texture image.  You can even do 
+that with an <word>off-screen canvas</word> that is not visible on the web page.</p>
+
+<p>The image is loaded into the texture object that is currently bound to <i>target</i> in
+the currently active texture unit.  There is no default texture object; that is, if no texture 
+has been bound when <i>gl.texImage2D</i> is called, an error occurs.  The active texture unit
+is the one that has been selected using <i>gl.activeTexture</i>, or is texture unit 0
+if <i>gl.activeTexture</i> has never been called.  A texture object is bound to the active texture unit
+by <i>gl.bindTexture</i>.  This was discussed earlier in this section.</p>
+
+<p>Using images in WebGL is complicated by the fact that images are loaded
+asynchronously.  That is, the command for loading an image just starts the
+process of loading the image.  You can specify a callback function that will
+be executed when the loading completes.  The image won't actually be available
+for use until after the callback function is called.  When loading an
+image to use as a texture, the callback function should load the image into
+a texture object.  Often, it will also call a rendering function to draw
+the scene, with the texture image.</p>
+
+<p>The sample program <sourceref href="webgl/simple-texture.html"/> is an example
+of using a single texture on a triangle.  Here is a function that is
+used to load the texture image in that program.  The texture object is
+created before the function is called.</p>
+
+<pre>/**
+ *  Loads a texture image asynchronously.  The first parameter is the url
+ *  from which the image is to be loaded.  The second parameter is the
+ *  texture object into which the image is to be loaded.  When the image
+ *  has finished loading, the draw() function will be called to draw the
+ *  triangle with the texture.  (Also, if an error occurs during loading,
+ *  an error message is displayed on the page, and draw() is called to
+ *  draw the triangle without the texture.)
+ */
+function loadTexture( url, textureObject ) {
+    const  img = new Image();  //  A DOM image element to represent the image.
+    img.onload = function() { 
+        // This function will be called after the image loads successfully.
+        // We have to bind the texture object to the TEXTURE_2D target before
+        // loading the image into the texture object. 
+        gl.bindTexture(gl.TEXTURE_2D, textureObject);
+        try {
+           gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+           gl.generateMipmap(gl.TEXTURE_2D);  // Create mipmaps; you must either
+                              // do this or change the minification filter.
+        }
+        catch (e) { // Probably a security exception, because this page has been
+                    // loaded through a file:// URL.
+            document.getElementById("headline").innerHTML =
+              "Sorry, couldn't load texture.&lt;br&gt;" +
+              "Some web browsers won't use images from a local disk";
+        }
+        draw();  // Draw the canvas, with or without the texture.  
+    };
+    img.onerror = function() { 
+        // This function will be called if an error occurs while loading.
+        document.getElementById("headline").innerHTML =
+                        "&lt;p&gt;Sorry, texture image could not be loaded.&lt;/p&gt;";
+        draw();  // Draw without the texture; triangle will be black.
+    };
+    img.src = url;  // Start loading of the image.
+                    // This must be done after setting onload and onerror.
+}</pre>
+
+
+<p>Note that image textures for WebGL 1.0 should be power-of-two textures.  That is,
+the width and the height of the image should each be a power of 2, such as
+128, 256, or 512.  You can, in fact, use non-power-of-two textures, but you can't
+use mipmaps with such textures, and the only texture repeat mode that is supported
+by such textures is <i>gl.CLAMP_TO_EDGE</i>.  (WebGL&nbsp;2.0 does not have these
+restrictions.)</p>
+
+<p>(The <code>try..catch</code> statement is used in this function because most
+web browsers will throw a security exception when a page attempts to use an
+image from the local file system as a texture.  This means that if you attempt to run a program
+that uses textures from a downloaded version of this book, the programs that
+use textures might not work.)</p>
+
+<break/>
+
+<p>There are several parameters associated with a texture object, including the
+texture repeat modes and the minification and magnification filters.  They can
+be set using the function <i>gl.texParameteri</i>.   The setting applies to
+the currently bound texture object.  Most of the details are
+the same as in OpenGL 1.1 (<localref href="gl1light.3.3"/>).  For example, the minification
+filter can be set to <i>LINEAR</i> using</p>
+
+<pre>gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);</pre>
+
+<np>Recall that the default minification filter won't work without mipmaps.
+To get a working texture, you have to change the minification filter or install
+a full set of mipmaps.  Fortunately, WebGL has a function that will generate
+the mipmaps for you:</np>
+
+<pre>gl.generateMipmap( gl.TEXTURE_2D );</pre>
+
+<p>The texture repeat modes determine what happens when texture coordinates 
+lie outside the range 0.0 to 1.0.  There is a separate repeat mode for
+each direction in the texture coordinate system.
+In WebGL, the possible values are <i>gl.REPEAT</i>, <i>gl.CLAMP_TO_EDGE</i>,
+and <i>gl.MIRRORED_REPEAT</i>.  The default is <i>gl.REPEAT</i>.  The mode
+<i>CLAMP_TO_EDGE</i> was called <i>CLAMP</i> in OpenGL 1.1, and <i>MIRRORED_REPEAT</i> 
+is new in WebGL.  With <i>MIRRORED_REPEAT</i>, the texture image is repeated to
+cover the entire plane, but every other copy of the image is reflected.  This
+can eliminate visible seams between the copies.  To set a texture
+to use mirrored repeat in both directions, use</p>
+
+<pre>gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);</pre>
+
+<break/>
+
+<p>In WebGL, texture coordinates are usually input to the vertex shader as an attribute
+of type <i>vec2</i>.  They are communicated to the fragment shader in a varying variable.
+Often, the vertex shader will simply copy the value of the attribute into the varying
+variable.  Another possibility is to apply an affine <word>texture transformation</word>
+to the coordinates in the vertex shader before passing them on to the fragment shader.
+In the fragment shader, the texture coordinates are used to sample a
+texture.  The GLSL&nbsp;ES&nbsp;1.00 function for sampling an ordinary texture is</p>
+
+<pre>texture2D( samplerVariable, textureCoordinates );</pre>
+
+<np>where <i>samplerVariable</i> is the uniform variable of type <i>sampler2D</i> that
+represents the texture, and <i>textureCoordinates</i> is a <i>vec2</i> containing
+the texture coordinates. The return value is an RGBA color, represented as a
+value of type <i>vec4</i>.  As a very minimal example, here is a fragment shader that
+simply uses the sampled value from the texture as the color of the pixel.</np>
+
+
+<pre>precision mediump float;
+uniform sampler2D u_texture;
+varying vec2 v_texCoords;
+void main() {
+   vec4 color = texture2D( u_texture, v_texCoords );
+   gl_FragColor = color;
+}</pre>
+
+<np>This shader is from the sample program <sourceref href="webgl/simple-texture.html"/>.</np>
+
+<demo src="c6/textured-points.html" width="600" height="375">
+<p>Textures are sometimes used on primitives of type <i>gl.POINTS</i>.  In that case,
+it's natural to get the texture coordinates for a pixel from the special fragment
+shader variable <i>gl_PointCoord</i>.  A point is rendered as a square, and the
+coordinates in <i>gl_PointCoord</i> range from 0.0 to 1.0 over that square.
+So, using <i>gl_PointCoord</i> means that one copy of the texture will be
+pasted onto the point.  If the <i>POINTS</i> primitive has more than one
+vertex, you will see a copy of the texture at the location of each vertex.
+This is an easy way to put an image, or multiple copies of an image, into a
+scene.  The technique is sometimes referred to as "point sprites."</p>
+<p><web>The following demo draws a single textured primitive of type
+<i>gl.POINTS</i>, so you can see what it looks like.  In the demo, only
+a circular cutout from each square point is drawn.</web><tex>Here is an
+example of a textured primitive of type <i>gl.POINTS</i>.  Only
+a circular cutout from each square point is drawn.  The picture
+is from an on-line demo, <demoref href="c6/textured-points.html"/>.</tex></p></demo>
+
+<texdiv><img tex="textured-points.eps" texscale="0.6"/></texdiv>
+
+<break/>
+
+<p>The pixel data for a texture image in WebGL is stored in memory starting with the
+row of pixels at the bottom of the image and working up from there.  When WebGL creates the
+texture by reading the data from an image, it assumes that the image uses the same format.  However,
+images in a web browser are stored in the opposite order, starting with the pixels
+in the top row of the image and working down.  The result of this mismatch is that
+texture images will appear upside down.  You can account for this by modifying
+your texture coordinates.  However, you can also tell WebGL to invert the
+images for you as it "unpacks" them.  To do that, call</p>
+
+<pre>gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1 );</pre>
+
+<np>Generally, you can do this as part of initialization.  Note however that
+for <i>gl.POINTS</i> primitives, the coordinate system used by <i>gl_PointCoord</i>
+is already upside down, with the <i>y</i>-coordinate increasing from top to bottom.
+So, if you are loading an image for use on a <i>POINTS</i> primitive, you might
+want to set <i>gl.UNPACK_FLIP_Y_WEBGL</i> to its default value,&nbsp;0.</np>
+
+</subsection>
+
+<subsection title="More Ways to Make Textures" id="webgl.4.3">
+
+<p>We have seen how to create a texture from an image or canvas element using <i>gl.texImage2D</i>.
+There are several more ways to make an image texture in WebGL.  First of all, the function
+</p>
+
+<pre>glCopyTexImage2D( target, mipmapLevel, internalFormat,
+                                     x, y, width, height, border );</pre>
+                                     
+<np>which was covered in <localref href="gl1light.3.6"/> also exists in WebGL.
+This function copies data from the color buffer (where WebGL renders its images)
+into the currently bound texture object.  The data is taken from the
+rectangular region in the color buffer with the specified <i>width</i> and
+<i>height</i> and with its lower left corner at (<i>x,y</i>).  The
+<i>internalFormat</i> is usually <i>gl.RGBA</i>.  For WebGL, the <i>border</i>
+must be zero. For example,</np>
+
+<pre>glCopyTexImage2D( gl.TEXTURE_2, 0, gl.RGBA, 0, 0, 256, 256, 0);</pre>
+
+<np>This takes the texture data from a 256-pixel square in the bottom left corner
+of the color buffer.  (In a later chapter, we will see that it is actually possible, and more efficient, for
+WebGL to render an image directly to a texture object, using something called a "framebuffer.")</np>
+
+<p>More interesting, perhaps, is the ability to take the texture data directly from
+an array of numbers.  The numbers will become the color component values for the
+pixels in the texture.  The function that is used for this is an alternative version
+of <i>texImage2D</i>:</p>
+
+<pre>texImage2D( target, mipmapLevel, internalFormat, width, height,
+                                  border, dataFormat, dataType, dataArray )</pre>
+
+<np>and a typical function call would have the form</np>
+
+<pre>gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 
+                                  0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);</pre>
+
+<np>Compared to the original version of <i>texImage2D</i>, there are three extra 
+parameters, <i>width</i>, <i>height</i>, and <i>border</i>. The <i>width</i>
+and <i>height</i> specify the size of the texture image.  For WebGL, the
+<i>border</i> must be zero, and for WebGL&nbsp;1.0, the <i>internalFormat</i> and <i>dataFormat</i>
+must be the same.</np>
+
+<p>The last parameter in this version of <i>texImage2D</i> must be a typed array of 
+type <classname>Uint8Array</classname> or <classname>Uint16Array</classname>, depending 
+on the <i>dataFormat</i> of the texture.  My examples will use <classname>Uint8Array</classname> 
+and texture format <i>gl.RGBA</i> or <i>gl.LUMINANCE</i>.</p>
+
+<p>For an RGBA texture, four color component values are needed for each pixel.  The values
+will be given as unsigned bytes, with values ranging from 0 to 255, in a <i>Uint8Array</i>.
+The length of the array will be 4<code>*</code><i>width</i><code>*</code><i>height</i> (that is,
+four times the number of pixels in the image).  The data for the bottom row of pixels comes
+first in the array, followed by the row on top of that, and so on, with the pixels in 
+a given row running from left to right.
+And within the data for one pixel, the red component comes first, followed by the
+blue, then the green, then the alpha.</p>
+
+<p>As an example of making up texture data from scratch, let's make a 16-by-16 texture image, 
+with the image divided into four 8-by-8 squares that are colored red, white, and blue.  The code uses the fact that
+when a typed array is created, it is initially filled with zeros.  We just have to
+change some of those zeros to 255.</p>
+
+<pre>let pixels = new Uint8Array( 4*16*16 );  // four bytes per pixel
+
+for (let i = 0; i &lt; 16; i++) {
+    for (let j = 0; j &lt; 16; j++) {
+        let offset = 64*i + 4*j ;    // starting index of data for this pixel
+        pixels[offset + 3] = 255;    // alpha value for the pixel
+        if ( i &lt; 8 &amp;&amp; j &lt; 8) { // bottom left quadrant is red
+            pixels[offset] = 255;  // set red component to maximum
+        }
+        else if ( i &gt;= 8 &amp;&amp; j &gt;= 8 ) { // top right quadrant is blue
+            pixels[offset + 2] = 255; // set blue component to maximum
+        }
+        else { // the other two quadrants are white
+            pixels[offset] = 255;     // set all components to maximum
+            pixels[offset + 1] = 255;
+            pixels[offset + 2] = 255;
+        }
+    }
+}
+
+texture = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, texture);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 
+                             0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);</pre>
+
+<p>The last line is there because the default minification filter won't work without
+mipmaps.  The texture uses the default magnification filter, which is also
+<i>gl.LINEAR</i>.  This texture is used on the leftmost square in the image shown below.  The image
+is from the sample program <sourceref href="webgl/texture-from-pixels.html"/>.</p>
+
+<img src="textures-from-pixels.png" width="599" height="119" tex="textures-from-pixels.eps" texscale="0.5"/>
+
+<np>Note the blending along the edges between colors in the leftmost square.  The blending is
+caused by the <i>gl.LINEAR</i> magnification filter.  The second square uses the same
+texture, but with the <i>gl.NEAREST</i> magnification filter, which eliminates the blending.
+The same effect can be seen in the next two squares, which use a black/white
+checkerboard pattern, one with <i>gl.Linear</i> as the magnification filter and
+one using <i>gl.NEAREST</i>.  The texture is repeated ten times horizontally and vertically
+on the square.  In this case, the texture is a tiny 2-by-2 image with two black
+and two white pixels.</np>
+
+<p>As another example, consider the rightmost square in the image.  The gradient 
+effect on that square comes from a texture.  The texture size is 256-by-1 pixels,
+with the color changing from black to white along the length of the texture.  One
+copy of the texture is mapped to the square.  For
+the gradient texture, I used <i>gl.LUMINANCE</i> as the texture format, which means
+that the data consists of one byte per pixel, giving the grayscale value for that
+pixel.  The texture can be created using</p>
+
+<pre>let pixels = new Unit8Array( 256 );  // One byte per pixel
+for ( let i = 0; i &lt; 256; i++ ) {
+    pixels[i] = i;  // Grayscale value for pixel number i is i.
+}
+
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, 256, 1, 
+                             0, gl.LUMINANCE, gl.UNSIGNED_BYTE, pixels);</pre>
+                             
+<np>See the <sourceref href="webgl/texture-from-pixels.html">sample program</sourceref> for more detail.</np>
+
+</subsection>
+
+
+
+<subsection title="Cubemap Textures" id="webgl.4.4">
+
+<p>We encountered cubemap textures in <localref href="threejs.3.4"/>, where saw how they
+are used in <i><word>three.js</word></i> for <word term="skybox">skyboxes</word> 
+and <word>environment mapping</word>.  WebGL has built-in support for cubemap
+textures.  Instead of representing an ordinary image texture, a texture object
+can hold a cubemap texture.  And two texture objects can be bound to the same texture
+unit simultaneously, one holding an ordinary texture and one holding a
+cubemap texture.  The two textures are bound to different targets, <i>gl.TEXTURE_2D</i>
+and <i>gl.TEXTURE_CUBE_MAP</i>.
+A&nbsp;texture object, <i>texObj</i>, is bound to the cubemap target in the currently
+active texture unit by calling</p>
+
+<pre>gl.bindTexture( gl.TEXTURE_CUBE_MAP, texObj );</pre>
+
+<np>A given texture object can be either a regular texture or a cubemap texture, not both.
+Once it has been bound to one texture target, it cannot be rebound to the other target.</np>
+
+<p>A cubemap texture consists of six images, one for each face of the cube.
+A texture object that holds a cubemap texture has six image slots, identified by
+the constants</p>
+
+<pre>gl.TEXTURE_CUBE_MAP_NEGATIVE_X
+gl.TEXTURE_CUBE_MAP_POSITIVE_X
+gl.TEXTURE_CUBE_MAP_NEGATIVE_Y
+gl.TEXTURE_CUBE_MAP_POSITIVE_Y
+gl.TEXTURE_CUBE_MAP_NEGATIVE_Z
+gl.TEXTURE_CUBE_MAP_POSITIVE_Z</pre>
+
+<np>The constants are used as the targets in <i>gl.texImage2D</i> and <i>gl.copyTexImage2D</i>,
+in place of <i>gl.TEXTURE_2D</i>.
+(Note that there are six targets for loading images into a cubemap texture object, but only
+one target, <i>gl.TEXTURE_CUBE_MAP</i>, for binding the texture object to a texture unit.)
+A cubemap texture is often stored as a set of six images, which must be loaded
+separately into a texture object.  Of course, it is also possible for WebGL to create a cubemap by rendering the
+six images.</np>
+
+<p>As usual for images on the web, there is the problem
+of asynchronous image loading to be dealt with.  Here, for example, is a function
+that creates a cubemap texture in my sample program <sourceref href="webgl/cubemap-fisheye.html"/>:</p>
+
+<pre>function loadCubemapTexture() {
+    const  tex = gl.createTexture();
+    let  imageCt = 0; // Number of images that have finished loading.
+
+    load( "cubemap-textures/park/negx.jpg", gl.TEXTURE_CUBE_MAP_NEGATIVE_X );
+    load( "cubemap-textures/park/posx.jpg", gl.TEXTURE_CUBE_MAP_POSITIVE_X );
+    load( "cubemap-textures/park/negy.jpg", gl.TEXTURE_CUBE_MAP_NEGATIVE_Y );
+    load( "cubemap-textures/park/posy.jpg", gl.TEXTURE_CUBE_MAP_POSITIVE_Y );
+    load( "cubemap-textures/park/negz.jpg", gl.TEXTURE_CUBE_MAP_NEGATIVE_Z );
+    load( "cubemap-textures/park/posz.jpg", gl.TEXTURE_CUBE_MAP_POSITIVE_Z );
+
+    function load(url, target) {
+        let  img = new Image();
+        img.onload = function() {
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, tex);
+            try {
+                gl.texImage2D(target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            }
+            catch (e) {
+                document.getElementById("headline").innerHTML =
+                   "Can't access texture.  Note that some browsers" +
+                   " can't use  a texture from a local file.";
+                return;
+            }
+            imageCt++;
+            if (imageCt === 6) {  // all 6 images have been loaded
+                gl.generateMipmap( gl.TEXTURE_CUBE_MAP );
+                document.getElementById("headline").innerHTML = 
+                                      "Funny Cubemap (Fisheye Camera Effect)";
+                textureObject = tex;
+                draw();
+            }
+        };
+        img.onerror = function() {
+            document.getElementById("headline").innerHTML = 
+                                              "SORRY, COULDN'T LOAD TEXTURES";
+        };
+        img.src = url;
+    }
+}</pre>
+
+
+<p>The images for a cubemap must all be the same size.  They must be square.
+The size should, as usual, be a power of two.  For a cubemap texture, texture 
+parameters such as the minification filter are set using the target <i>gl.TEXTURE_CUBE_MAP</i>,
+and they apply to all six faces of the cube.
+For example, </p>
+
+<pre>gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);</pre>
+
+<np>Similarly, <i>gl.generateMipmap</i> will generate mipmaps for all six faces (so
+it should not be called until all six images have been loaded).</np>
+
+<break/>
+
+<p>In a shader program, a cube map texture is represented by a uniform
+variable of type <i>samplerCube</i>.  In GLSL&nbsp;ES&nbsp;1.00, the texture is sampled using
+function <i>textureCube</i>.  For example,</p>
+
+<pre>vec4 color = textureCube( u_texture, vector );</pre>
+
+<np>The first parameter is the <i>samplerCube</i> variable that represents the texture.
+The second parameter is a <i>vec3</i>.  Cube map textures are not sampled using
+regular texture coordinates.  Instead, a 3D <word>vector</word> is used.  The goal is to
+pick out a point in the texture.  The texture lies on the surface of a cube.
+To use a vector to pick out a point in the texture, cast a ray from the center of the cube
+in the direction given by the vector, and check where that ray intersects
+the cube.  That is, if you put the starting point of the vector at the center 
+of the cube, it points to the point on the cube where the texture is to be sampled.</np>
+
+<p>Since we aren't doing 3D graphics in this chapter, we can't use cube maps
+in the ordinary way.  The sample program <sourceref href="webgl/cubemap-fisheye.html"/> uses
+a cube map in an interesting, if not very useful way.  The program uses
+2D texture coordinates.  The fragment shader transforms a pair of 2D texture coordinates
+into a 3D vector that is then used to sample the cubemap texture.  The effect is
+something like a photograph produced by a fisheye camera.  Here's what it looks like.</p>
+
+<img src="cubemap-fisheye.png" width="606" height="306" tex="cubemap-fisheye.eps" texscale="0.5"/>
+
+<np>The picture on the left imitates a fisheye camera with a 170-degree field of view.
+On the right the field of view is 330-degrees, so that pixels near the edge
+of the disk actually show parts of the cube that lie behind the camera.</np>
+
+<p>For each picture, the program draws a square with texture coordinates ranging from 0.0 to 1.0.
+In the texture coordinate system, pixels at a distance greater than 0.5 from the point (0.5,0.5)
+are colored white.  Within the disk of radius 0.5, each circle around the center is mapped
+to a circle on the unit sphere.  That point is then used
+as the direction vector for sampling the cubemap texture.  The point in the texture that appears at the center
+of the disk is the point  where the cube intersects the positive z-axis, that is, 
+the center of the "positive z" image from the cube map.  You don't actually need to understand
+this, but here, for your information, is the fragment shader that does the work:</p>
+
+<pre>#ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+#else
+    precision mediump float;
+#endif
+uniform samplerCube u_texture;  
+uniform float u_angle;  // field of view angle
+varying vec2 v_texCoords;  
+void main() {
+   float dist =  distance( v_texCoords, vec2(0.5) );
+   if (dist > 0.5)
+       gl_FragColor = vec4(1.0);  // white
+   else {
+       float x,y; // coords relative to a center at (0.5,0.5)
+       x = v_texCoords.x - 0.5; 
+       y = v_texCoords.y - 0.5;
+       vec2 circ = normalize(vec2(x,y));  // on the unit circle
+       float phi = radians(u_angle/2.0)*(2.0*dist);  // "latitude"
+       vec3 vector = vec3(sin(phi)*circ.x, sin(phi)*circ.y, cos(phi));
+       gl_FragColor = textureCube( u_texture, vector );  
+    } 
+}</pre>
+
+</subsection>
+
+
+
+
+<subsection title="A Computational Example" id="webgl.4.5">
+
+<p>A GPU can offer an immense amount of processing power.  Although GPUs
+were originally designed to apply that power to rendering images, it was
+quickly realized that the same power could be harnessed to do much more
+general types of programming.  Not every programming task can take
+advantage of the highly parallel architecture of the typical GPU, but
+if a task can be broken down into many subtasks that can be run in
+parallel, then it might be possible to speed up the task significantly
+by adapting it to run on a GPU.  Modern GPUs have become much more
+computationally versatile, but in GPUs that were designed to work
+only with colors, that might mean somehow representing the data
+for a computation as color values.  The trick often involves
+representing the data as colors in a texture, and accessing the
+data using texture lookup functions.</p>
+
+<p>The sample program <sourceref href="webgl/webgl-game-of-life.html"/> 
+is a simple example of this approach.  The program implements
+John Conway's well-known 
+<tex>Game of Life</tex><web><a href="https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life">Game of Life</a></web>
+(which is not really a game).  A Life board consists of a grid of cells that can be either
+alive or dead.  There is a set of rules that takes the current state, or "generation," of
+the board and produces a new generation.  Once some initial state has been assigned to each
+cell, the game can play itself, producing generation after generation, according to the
+rules.  The rules compute the state of a cell in the next generation from the
+states of the cell and its eight neighboring cells in the current generation.  To 
+apply the rules, you have to look at each neighboring cell and count the 
+number of neighbors that are alive.  The same process is applied to every
+cell, so it is a highly parallelizable task that can be easily adapted to run
+on a GPU.</p>
+
+<p>In the sample program, the Life board is a 1024-by-1024 canvas, with each pixel
+representing a cell. Living cells are colored white, and dead cells are black. 
+The program uses WebGL to compute the next generation of the board from the
+current board.  The work is done in a fragment shader.  To trigger the
+computation, a single square is drawn that covers the entire canvas, which
+causes the fragment shader to be called for every pixel in the canvas.
+The fragment shader needs access to the current color of the fragment and
+of its eight neighbors, but it has no way to query those colors directly.
+To give the shader access to that information, the program copies the
+board into a texture object, using the function <i>gl.copyTexImage2D()</i>.
+The fragment shader can then get the information that it needs using
+the GLSL texture lookup function <i>texture2D()</i>.</p>
+
+<p>An interesting point is that the fragment shader needs the texture coordinates
+not just for itself but for its neighbors.  The texture coordinates for the
+fragment itself are passed into the fragment shader as a varying variable, with
+values in the range 0 to 1 for each coordinate.  It can get the texture coordinates for a neighbor
+by adding an offset to its own texture coordinates.  Since the texture is
+1024-by-1024 pixels, the texture coordinates for a neighbor need to be offset
+by 1.0/1024.0.  Here is the complete GLSL&nbsp;ES&nbsp;1.00 fragment shader program:</p>
+
+<pre>#ifdef GL_FRAGMENT_PRECISION_HIGH
+   precision highp float;
+#else
+   precision mediump float;
+#endif
+varying vec2 v_coords;     // texture coordinates for this cell
+const float scale = 1.0/1024.0;  // 1.0 / canvas_size; (offset between 
+                                 //   neighboring cells, in texture coords)
+uniform sampler2D source;  // the texture holding the previous generation
+
+void main() {
+    int alive;  // is this cell alive ?
+    if (texture2D(source,v_coords).r > 0.0)
+       alive = 1;
+    else
+       alive = 0;
+       
+    // Count the living neighbors.  To check for living, just test
+    // the red component of the color, which will be 1.0 for a
+    // living cell and 0.0. for a dead cell.
+       
+    int neighbors = 0; // will be the number of neighbors that are alive
+    
+    if (texture2D(source,v_coords+vec2(scale,scale)).r > 0.0)
+       neighbors += 1;
+    if (texture2D(source,v_coords+vec2(scale,0)).r > 0.0)
+       neighbors += 1;
+    if (texture2D(source,v_coords+vec2(scale,-scale)).r > 0.0)
+       neighbors += 1;
+       
+    if (texture2D(source,v_coords+vec2(0,scale)).r > 0.0)
+       neighbors += 1;
+    if (texture2D(source,v_coords+vec2(0,-scale)).r > 0.0)
+       neighbors += 1;
+       
+    if (texture2D(source,v_coords+vec2(-scale,scale)).r > 0.0)
+       neighbors += 1;
+    if (texture2D(source,v_coords+vec2(-scale,0)).r > 0.0)
+       neighbors += 1;
+    if (texture2D(source,v_coords+vec2(-scale,-scale)).r > 0.0)
+       neighbors += 1;
+    
+    // Output the new color for this cell. using the rules of Life.
+       
+    float color = 0.0; // color for dead cell
+    if (alive == 1) {
+        if (neighbors == 2 || neighbors == 3)
+           color = 1.0; // color for living cell; cell stays alive
+    }
+    else if ( neighbors == 3 )
+        color = 1.0; // color for living cell; cell comes to life
+        
+    gl_FragColor = vec4(color, color, color, 1);
+}
+</pre>
+
+<p>There are some other points of interest in the program.  When the
+WebGL graphics context is created, anti-aliasing is turned off to
+make sure that every pixel is either perfectly black or perfectly
+white. Antialiasing could smear out the colors by averaging the
+colors of nearby pixels.  Similarly, the magnification and minification
+filters for the texture are set to <i>gl.NEAREST</i> to avoid averaging
+of colors.  Also, there is the issue of setting the initial configuration
+onto the board&mdash;that's done by drawing onto the board using
+another shader program with a different fragment shader.</p>
+
+<p>On my computer, the <sourceref href="webgl/webgl-game-of-life.html"/>
+can easily compute 360 generations per second.  I urge you to try it.  It can be fun to watch.</p>
+
+<p>General purpose programming on GPUs has become more and more important.
+Modern GPUs can do computations that have nothing to do with color,
+using various numerical data types.  WebGL&nbsp;2.0, as we'll see, has
+moved a bit in that direction, but accessing the full computational power
+of GPUs from the Web will require a new API.  <newword>WebGPU</newword>,
+currently under development and already available as an experimental
+feature in some web browsers, is an attempt to fulfill that need.
+(However, unlike WebGL, it is not based on OpenGL.)
+</p>
+
+</subsection>
+
+
+
+
+<subsection title="Textures in WebGL 2.0" id="webgl.4.6">
+
+<p>One of the major changes in WebGL 2.0 is greatly increased support
+for textures.  A large number of new texture formats have been added.
+RGBA color components in OpenGL are represented as floating point
+values in the range zero to one, but in practice are often stored as
+one-byte unsigned integers, with values in the range 0 to 255,
+which matches the format that is used for displaying colors on
+most screens.  In fact, you don't really have control over
+how colors are represented internally for use on displays.
+There have been computer displays that used only 16 bits per pixel
+instead of 32, and new HDR (High Dynamic Range) displays can use even more
+bits per pixel.  But when storing data in a texture, it's not really
+necessary to match the color format that is used on a physical display.
+</p>
+
+<p>WebGL 2.0 introduced a large number of so-called "sized" texture formats,
+which give the programmer control over how the data in the texture is represented.
+For example, if the format is <i>gl.RGBA32F</i>, then the texture contains four 32-bit
+floating point numbers for each pixel, one for each of the four RGBA color components.
+The format <i>gl.R32UI</i> indicates one 32-bit unsigned integer per pixel.
+And <i>gl.RG8I</i> means two 8-bit integers per pixel. And <i>gl.RGBA8</i>
+corresponds to the usual format, using one 8-bit unsigned integer for each
+color component. These sized formats are
+used for the internal format of a texture, the <i>internalFormat</i> parameter in a call to a 
+function like <i>gl.texImage2D</i>(), which specifies how the data is actually
+stored in the texture.  You can use textures with sized internal formats as
+image textures for rendering.  But 32 bits for a color component encodes
+far more different colors than could ever be distinguished visually.
+These data formats are particularly useful for computational applications,
+where you really need to control what kind of data you are working with.
+But to effectively compute with data stored in textures, we really need
+to be able to write data to textures, as well as read from textures.
+And for that, we need <word term="framebuffer">framebuffers</word>, which
+won't be covered until <localref href="webgl3d.4"/>.  For now, we will just
+look at a few aspects of the WebGL&nbsp;2.0 API for working with textures.
+</p>
+
+<p>Various versions of the <i>texImage2D</i>() function can be used to initialize
+a texture from an image or from an array of data&mdash;or to zero, when no data source
+is provided.  WebGL&nbsp;2.0 has another, potentially more efficient, function for
+allocating the storage for a texture and initializing it to zero:</p>
+
+<pre>gl.texStorage2D( target, levels, internalFormat, width, height );</pre>
+
+<np>The first parameter is <i>gl.TEXTURE_2D</i> or <i>gl.TEXTURE_CUBE_MAP</i>.
+The second parameter specifies the number of mipmap level that should be generated;
+generally, this will be&nbsp;1.  The <i>width</i> and <i>height</i> give the
+size of the texture, and of course the <i>internalFormat</i> specifies
+the data format for the texture.  The <i>internalFormat</i> must be one
+of the sized internal formats, such as <i>gl.RGBA8</i>.</np>
+
+<p>WebGL 2.0 has support for 3D textures, which hold data for a 3D grid of 
+<word term="texel">texels</word>, with functions <i>gl.texImage3D</i>() and
+<i>gl.texStorage3D()</i>.  It has depth textures, which store depth values 
+like those used in the <word>depth test</word> and are commonly used for
+<word>shadow mapping</word>.  And it can work with compressed textures, which
+can decrease the amount of data that needs to be transferred between the
+CPU and the GPU.  However, I will leave you to explore these capabilities
+on your own if you need them.</p>
+
+<p>Shader programs use <word term="sampler variable">sampler variables</word> to 
+read data from textures.  The shader programming language GLSL&nbsp;ES&nbsp;3.00 
+introduces a number of new sampler types to deal with the new texture
+formats in WebGL&nbsp;2.0.  Where GLSL&nbsp;ES&nbsp;1.00 had only <ptype>sampler2D</ptype>
+and <ptype>samplerCube</ptype>, the newer language adds types such as  <ptype>sampler3D</ptype>
+for 3D textures, <ptype>isampler2D</ptype> for sampling textures whose values are 
+signed integers, and <ptype>sampler2DShadow</ptype> for sampling depth textures.  For
+example, for sampling a texture with a 32-bit integer format, you might
+declare a sampler variable such as
+</p>
+
+<pre>uniform highp isampler2D datatexture;</pre>
+
+<np>The <word>precision qualifier</word>, <i>highp</i>, must be specified because
+<i>isampler2D</i> variables do not have a default precision.  Using high precision
+ensures that you can read 32-bit integers exactly.  (The <i>sampler2D</i> type has
+default precision <i>lowp</i>, which is sufficient when color components
+are really 8-bit integers but which might not be what you want for floating
+point data textures.)</np>
+
+<p>GLSL ES 1.00 uses the function <i>texture2D</i>() to sample a 2D texture
+and <i>textureCube</i>() for sampling a cubemap texture.  Rather than have
+a separate function for each sampler type, GLSL&nbsp;ES&nbsp;3.00 removes
+<i>texture2D</i> and <i>textureCube</i> and replaces them with a single
+overloaded function <i>texture</i>(), which can be used to sample any kind
+of texture.  So, the <i>datatexture</i> defined above might be sampled
+using</p>
+
+<pre>highp ivec4 data = texture( datatexture, coords );</pre>
+
+<np>where <i>coords</i> is a <ptype>vec2</ptype> holding the texture coordinates.
+But in fact, you might want to access texel values more directly.  There is
+a new <i>texelFecth</i>() function that fetches texel values from a texture,
+treating the texture as an array of texels.  Texels are accessed using integer
+coordinates that range from 0 up to the size of the texture.  Applied to
+<i>datatexture</i>, this could look like
+</np>
+
+<pre>highp ivec4 data = texelFetch( datatexture, 0, ivec2(i,j) );</pre>
+
+<np>where <i>i</i> ranges from 0 to the width of the texture minus one, and <i>j</i>
+ranges from 0 to the height minus one.  The second parameter, 0&nbsp;here, specifies
+the mipmap level that is being accessed.  (For integer textures, you are not likely
+to be using mipmaps.)</np>
+
+<p>(The sample program <sourceref href="webgl/texelFetch-MonaLisa-webgl2.html"/>
+is a rather fanciful example of using <i>texelFetch</i>(), though with an ordinary image
+texture rather than a data texture.)</p>
+
+<p>There is a lot more that could be said about WebGL 2.0 textures, but it would
+take us well beyond what I need for this introductory textbook.</p>
+
+</subsection>
+
+</section>
+

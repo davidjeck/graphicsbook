@@ -1,0 +1,590 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE source SYSTEM "../graphicstext.dtd" >
+
+<source>
+
+<webdiv>
+<p>This page contains links to source code for the programs that are used as examples in 
+<a href="../index.html">this&nbsp;book</a>.
+In the web site download of the book, the source code examples can be found in the folder
+named <i>source</i>.  This page also contains a list of links to all of the "live demos" that
+are used in the book; they can be found in the folder named <i>demos</i>.</p>
+</webdiv>
+<texdiv>
+<p>This appendix contains a list of the programs that are used as examples in this book.
+If you have downloaded the web site version of the book, you can find the source code examples in the folder
+named <i>source</i>.  This page also contain a list of the "live demos" that are used in the book.
+In the web site download, they can be found in the folder named <i>demos</i>.
+(The web site download is available on book's web page,
+<a href="http://math.hws.edu/graphicsbook">http://math.hws.edu/graphicsbook</a>.)</p>
+</texdiv>
+
+<p>(Note: Examples and demos for <word>HTML canvas</word> graphics, <word>three.js</word>, and <word>WebGL</word>
+are html files, which can be opened in a web browser.  Many of the html programs use images.
+In certain browsers, the three.js and WebGL programs that use images will not work when the html files
+are loaded from a local hard drive.  That is, they will fail in some web browsers when run
+from the <i>source</i> or <i>demo</i> folder in the web site download of this book.
+The programs should work OK when loaded from a web server.)</p>
+
+<subsection title="Java Graphics2D Examples" id="source.1">
+
+<p>There are a few examples in <localref href="graphics2d.4"/> and 
+<localref href="graphics2d.5"/> that uses the 2D graphics API that is part of Java's Swing GUI toolkit.
+In the web site download, the source code for these examples can be found
+in the folder named <i>java2d</i> inside the <i>source</i> folder.  Each example
+is a single file that can be compiled to produce an application; no
+additional Java files are needed.</p>
+
+<ul>
+<li><sourceref href="java2d/HierarchicalModeling2D.java">HierarchicalModeling2D.java</sourceref> &mdash; 
+shows a simple animated scene, with a moving cart and rotating windmills, that uses <word>hierarchical modeling</word>.
+In this version of the program, the hierarchy is implemented procedurally, using subroutines to
+draw the objects in the scene.</li>
+<li><sourceref href="java2d/SceneGraphAPI2D.java">SceneGraphAPI2D.java</sourceref> &mdash;
+shows the same scene as the previous example, but this time implemented using a scene graph
+data structure.  The scene graph is implemented using static nested classes in the main class.</li>
+<li><sourceref href="java2d/GraphicsStarter.java">GraphicsStarter.java</sourceref> and 
+<sourceref href="java2d/AnimationStarter.java">AnimationStarter.java</sourceref> draw simple
+static and animated scenes, respectively, and are meant to be used as a framework for 
+experimenting with Java graphics.
+<sourceref href="java2d/EventsStarter.java">EventsStarter.java</sourceref> is a similar
+framework for working with mouse and key events in a graphics program.</li>
+<li><sourceref href="java2d/PaintDemo.java">PaintDemo.java</sourceref> draws a polygon that
+can be filled with either a gradient or a texture image, and lets you adjust their
+properties.  This is just a demo of Java paints.  The image files
+<sourceref href="java2d/QueenOfHearts.png">QueenOfHearts.png</sourceref> and
+<sourceref href="java2d/TinySmiley.png">TinySmiley.png</sourceref> are part of this
+program and must be in the same location as the compiled Java class files when the program
+is run.</li>
+<li><sourceref href="java2d/JavaPixelManipulation.java">JavaPixelManipulation.java</sourceref>
+is a demo that manipulates colors of individual pixels in a <classname>BufferedImage</classname>.
+The user can draw a simple picture or load an image from a file.  A "Smudge" tool smears out pixel
+colors, and filters modify the image by performing averaging operations on the pixel colors in
+the image.</li>
+</ul>
+
+</subsection>
+
+<subsection title="HTML Canvas 2D Examples" id="source.2">
+
+<p>The 2D canvas <word>API</word> is discussed in <localref href="graphics2d.6"/>, and several
+examples are mentioned in that section.  Canvas examples are written as web pages, and you can 
+look at the web page in a browser to see what it does.  However, you are also meant to read
+the source code.  And the first four examples are meant to be used as a basis for your own
+experimentation.  (Note that all of the live demos in <localref href="graphics2d"/> use
+the canvas API, but you are not necessarily meant to understand the source code of the
+demos.)  In the web site download of this book, you can find these examples in the <i>canvas2d</i> 
+folder inside the <i>source</i> folder.</p>
+
+<ul>
+<li><sourceref href="canvas2d/GraphicsStarter.html">GraphicsStarter.html</sourceref> is a minimal framework
+for drawing on an <word>HTML canvas</word>.  It includes examples of drawing text and various shapes.</li>
+<li><sourceref href="canvas2d/GraphicsPlusStarter.html">GraphicsPlusStarter.html</sourceref> adds
+a few convenience functions to the previous example, including a function for setting up a
+<word>coordinate system</word> on the canvas and functions to draw shapes such as lines and
+ovals that are not included in the basic API.  It includes examples of using <word term="geometric transform">transforms</word></li>
+<li><sourceref href="canvas2d/AnimationStarter.html">AnimationStarter.html</sourceref> adds animation to the previous
+example and includes a simple example using <word>hierarchical modeling</word>.</li>
+<li><sourceref href="canvas2d/EventsStarter.html">EventsStarter.html</sourceref> is a minimal framework
+for using keyboard and mouse events with a canvas, with some examples of basic event handling.</li>
+<li><sourceref href="canvas2d/SimplePaintProgram.html">SimplePaintProgram.html</sourceref> lets the
+user draw using simple shapes.  There is also a "smudge" tool that lets the user smudge the drawing
+as if it is drawn in wet paint; this is an example of pixel manipulation in the HTML canvas API.
+The program shows how to use an "off-screen canvas."  The demo program <demoref href="c2/SimplePaintDemo.html"/>
+is a version of this program that uses an "overlay canvas" instead of an off-screen canvas.</li>
+</ul>
+
+</subsection>
+
+
+
+<subsection title="Scalable Vector Graphics Examples" id="source.3">
+
+<p><localref href="graphics2d.7"/> discusses <word>SVG</word>, a <word>scene description language</word>
+for 2D <word>vector graphics</word>.  Several examples were discussed in that section.  These
+examples can be opened in a web browser to see the images they produce.  View the source code
+for the web page to see the program that produces the image.  You can also open the files
+in a text editor to read the source.  Some of the examples produce
+animated images.  SVG images should work in almost all modern web browsers.
+These examples can be found in the <i>svg</i> folder inside the <i>source</i> folder.</p>
+
+<ul>
+<li><sourceref href="svg/first-svg-example.svg">first-svg-example.svg</sourceref> is a very
+short first example that just draws a few basic shapes.</li>
+<li><sourceref href="svg/svg-starter.svg">svg-starter.svg</sourceref> shows the basic document
+structure for an SVG image, includes examples of most of the basic shapes, and has a lot of
+comments to explain what is going on.</li>
+<li><sourceref href="svg/svg-face.svg">svg-face.svg</sourceref> is a very simple first example
+of grouping.</li>
+<li><sourceref href="svg/svg-hierarchy.svg">svg-hierarchy.svg</sourceref> is an example of
+<word>hierarchical modeling</word> that makes a model of
+a wheel and a model of a cart that uses two wheels as components.  The image shows a wheel
+and four copies of the cart. The wheel and cart models are also used in the
+cart-and-windmill animation at the end of this list.</li>
+<li><sourceref href="svg/first-svg-animation.svg">first-svg-animation.svg</sourceref> contains
+examples of simple animation, keyframe animation, and transform animation.</li>
+<li><sourceref href="svg/hierarchical-animation.svg">hierarchical-animation.svg</sourceref>
+shows a simple animated hierarchical model.</li>
+<li><sourceref href="svg/cart-and-windmills.svg">cart-and-windmill.svg</sourceref> is a more 
+complex example of hierarchical modeling in SVG. The scene is an animation that shows
+a "cart" moving down a road as windmills turn in the background.  The animation is the same as
+the one implemented in the Java example <sourceref href="java2d/HierarchicalModeling2D.java"/>
+and in the JavaScript demo <demoref href="c2/cart-and-windmills.html"/>.</li>
+</ul>
+
+</subsection>
+
+
+
+<subsection title="OpenGL 1.1 Examples" id="source.4">
+<p><word>OpenGL</word> 1.1 is the topic of <localref href="gl1geom"/> and <localref href="gl1light"/>.
+Examples in those chapters primarily use the C API for OpenGL.  However, the Java API,
+<word term="JOGL">JOGL</word>, is also discussed.  Most program examples are
+available in both the C and the Java APIs.  The JOGL versions can be found in the
+directory named <i>jogl</i> inside the <i>source</i> directory.  The C versions, which
+use the <word>GLUT</word> library to create and manage OpenGL windows, can be 
+found in the directory named <i>glut</i> inside <i>source</i>.  (Many of these
+programs use a "<word>camera</word>" API defined in <sourceref href="jogl/Camera.java"/>
+for Java and in <sourceref href="glut/camera.c"/> and <sourceref href="glut/camera.h"/> 
+for&nbsp;C.)</p>
+<p>The OpenGL demos in the book are written using <i>glsim.js</i>, a <word>JavaScript</word>
+library that implements a small subset of the C API for OpenGL&nbsp;1.1 
+on top of WebGL&nbsp;1.0.  Information about
+glsim can be found in <sourceref href="glsim/glsim-doc.html"/>.  Some of 
+the program examples are available in <word>HTML</word> versions that use the <i>glsim</i>
+library.  They can be found in the <i>glsim</i> directory inside the <i>source</i> directory.</p>
+
+<ul>
+<li><sourceref href="glut/first-triangle.c"/>, <sourceref href="jogl/FirstTriangle.java"/>
+and <sourceref href="glsim/first-triangle.html"/> are C, Java, and JavaScript versions of
+the very first OpenGL example: a triangle whose vertices are assigned the colors red,
+green, and blue.  You can use this example as a starting point for trying out some
+basic 2D drawing commands.  From <localref href="gl1geom.1"/>.</li>
+<li><sourceref href="glut/unlit-cube.c"/>, <sourceref href="jogl/UnlitCube.java"/>,
+and <sourceref href="glsim/unlit-cube.html"/> are C, Java, and JavaScript versions
+of a program that draws a cube using modeling transformations applied to a square.
+There is no lighting in this program, and it uses a basic orthographic projection, so
+the image is not realistic.  From <localref href="gl1geom.2"/>.</li>
+<li><sourceref href="glut/opengl-cart-and-windmill-2d.c"/> (for C),
+<sourceref href="jogl/CartAndWindmillJogl2D.java"/> (for Java), and <sourceref href="glsim/opengl-cart-and-windmill.html"/>
+(for JavaScript) are versions of an example of hierarchical modeling and animation in two dimensions
+with OpenGL 1.1.  It illustrates 2D graphics in OpenGL as well as the use of 
+<i>glPushMatrix</i> and <i>glPopMatrix</i> for hierarchical modeling.  The animation is almost the same as
+the one implemented in the Java Graphics2D example <sourceref href="java2d/HierarchicalModeling2D.java"/>
+and in the HTML canvas graphics demo <demoref href="c2/cart-and-windmills.html"/>.  From
+<localref href="gl1geom.2"/>.</li>
+<li><sourceref href="glut/camera.c"/> and the corresponding header file 
+<sourceref href="glut/camera.h"/> for C, or
+<sourceref href="jogl/Camera.java"/> for JOGL, implement a "<word>camera</word>" API for use with OpenGL 1.1.  This is
+a library for use in other programs, not itself a complete program.  The corresponding API for
+JavaScript is part of my GLSim library, <sourceref href="glsim/glsim.js"/>.  A camera is used in most of 
+the following examples. Discussed in  <localref href="gl1geom.3"/>.</li>
+<li><sourceref href="glut/ifs-polyhedron-viewer.c"/> and <sourceref href="jogl/IFSPolyhedronViewer.java"/>
+are C and Java versions of a program that lets the user view polyhedra that are defined
+as <word term="indexed face set">indexed face sets</word>.  The polyhedra models are defined
+in <sourceref href="jogl/Polyhedron.java"/> for Java and in 
+<sourceref href="glut/polyhedron.c"/> and <sourceref href="glut/polyhedron.h"/> for&nbsp;C.
+This program also requires the camera API discussed in the previous item.  From
+<localref href="gl1geom.4"/>.</li>
+<li><sourceref href="glut/cubes-with-vertex-arrays.c"/>, <sourceref href="jogl/CubesWithVertexArrays.java"/>,
+and the JavaScript version <sourceref href="glsim/cubes-with-vertex-arrays.html"/>
+demonstrate drawing using <i>glDrawArrays</i> and <i>glDrawElements</i>.  From
+<localref href="gl1geom.4"/>.</li>
+<li><sourceref href="glut/color-cube-of-spheres.c"/> and <sourceref href="jogl/ColorCubeOfSpheres.java"/>
+draw a large number of spheres using a variety of rendering methods, and show the time that
+it takes to render the image.  The point is to compare render times for different rendering methods,
+including <word term="display list">display lists</word>, <i>glDrawArrays</i>, and 
+<word term="VBO">vertex buffer objects</word>.  The reader is not
+expected to understand all of the code in this program.  From
+<localref href="gl1geom.4"/>.</li>
+<li><sourceref href="glut/glut-starter.c"/>, <sourceref href="jogl/JoglStarter.java"/>,
+and <sourceref href="glsim/glsim-starter.html"/> are "starter" files for writing OpenGL 1.1
+applications using C, Java, and my JavaScript OpenGL simulator.  These programs don't
+draw anything, but they have function/method stubs for drawing as well as for mouse
+and keyboard interaction and animation.  Discussed in <localref href="gl1geom.6"/></li>
+<li><sourceref href="glut/four-lights.c"/> and <sourceref href="jogl/FourLights.java"/>
+are an example of using light sources and material properties.  The program
+demonstrates multiple, moving light sources and lets the user turn the lights on and
+off to see the effect.  The demo <demoref href="glsim/fout-lights-demo.html"/> is
+a JavaScript version of the same program. From <localref href="gl1light.2"/>.</li>
+<li><sourceref href="glut/texture-demo.c"/> is a C program that shows a variety of
+textures on a variety of objects. It depends on the files <sourceref href="glut/textured-shapes.c"/>
+and <sourceref href="glut/textured-shapes.h"/>, and on the folder <sourceref href="glut/textures"/>
+that contains the texture images used by the program.  The Java version is
+<sourceref href="jogl/TextureDemo.java"/>, and it requires <sourceref href="jogl/TexturedShapes.java"/>,
+as well as the image folder <sourceref href="jogl/textures"/>.
+From <localref href="gl1light.3"/>.</li>
+<li><sourceref href="glut/texture-from-color-buffer.c"/> and <sourceref href="jogl/TextureFromColorBuffer.java"/>
+demonstrate the technique of copying an image from the color buffer using
+the function <i>glCopyTexImage2D</i>().  Draws an animated 2D scene and then uses
+it as a texture on various objects.  Requires the same textured shape libraries mentioned
+in the previous item.  From <localref href="gl1light.3"/>.</li>
+<li><sourceref href="glut/texture-objects.c"/> is a small program to demonstrate the use of texture
+objects to handle multiple textures.  It is available for C only.  From <localref href="gl1light.3"/>.</li>
+</ul>
+
+</subsection>
+
+<subsection title="Three.js Examples" id="source.5">
+
+<p><i><word term="three.js">Three.js</word></i> is a JavaScript library for 3D graphics on Web pages, 
+using <word>WebGL</word> and
+the <word>HTML canvas</word>.  It is discussed in <localref href="threejs"/>.  The examples
+can be found in the folder named <sourceref href="threejs"/>, inside the <i>source</i> folder
+of the web site download.  All of the examples use the JavaScript file
+<sourceref href="threejs/three.min.js"/>, which is a "minified" version of the library, not
+meant for human readers.  A&nbsp;human-readable version, <sourceref href="threejs/three.js"/> is
+also available.  The version is <i>three.js</i> Release 129.  Note that although <i>three.js</i>
+is written using JavaScript modules, the examples in this book only use the non-modular form
+of the library.  <i>Three.js</i> is an open-source project.  It can be downloaded from 
+<a href="http://threejs.org">threejs.org</a>.</p>
+
+<ul>
+<li><sourceref href="threejs/full-window.html"/> &mdash; <i>Three.js</i> is typically used to
+write programs that fill the browser window and continually run an animation.  This example
+shows how to do that, but my other examples do not follow the same pattern.  The animation
+shows colored balls bouncing around inside a translucent box.  The user can rotate the
+scene with the mouse.
+From <localref href="threejs.1"/></li>
+<li><sourceref href="threejs/modeling-starter.html"/> &mdash; A starter program for experimenting
+with building and animating a scene graph model with <i>three.js</i>.  The user can rotate the
+model using the keyboard.  It includes a simple example. From <localref href="threejs.1"/></li>
+<li><sourceref href="threejs/diskworld-1.html"/> &mdash; Shows an animated model of a simple "car" driving around
+the edge of a disk, with "trees" made from a cylinder and a cone.  Based on the previous sample program.
+From <localref href="threejs.1"/></li>
+<li><sourceref href="threejs/vertex-groups.html"/> &mdash; Shows how to use an
+array of materials on a cube and on a pyramid whose geometry is constructed
+by hand.  This uses the "vertex group" feature of <classname>THREE.BufferedGeometry</classname>.
+This is also a version <sourceref href="threejs/vertex-groups-indexed.html"/> that
+represents the pyramid using the <word>indexed face set</word> pattern.
+From <localref href="threejs.2"/></li>
+<li><sourceref href="threejs/textured-pyramid.html"/> &mdash; Shows the same pyramid as the previous
+example, with a texture.  Shows how to define texture coordinates for a <i>three.js</i> geometry.
+From <localref href="threejs.2"/></li>
+<li><sourceref href="threejs/curves-and-surfaces.html"/> &mdash; Creates several surfaces using a parametric
+surface, tube geometry, <word>lathing</word>, and <word>extrusion</word>. From <localref href="threejs.2"/></li>
+<li><sourceref href="threejs/model-viewer.html"/> &mdash; Displays models that are loaded
+from files various formats, using <i>three.js</i> loaders. 
+Models are from the <i>three.js</i> download. (See the demo <demoref href="c5/mesh-animation.html"/>
+to see animated versions of two of the models.) From <localref href="threejs.2"/></li>
+<li><sourceref href="threejs/instanced-mesh.html"/> &mdash; A small example of using a
+<i>THREE.InstancedMesh</i> object, which makes it possible to draw a large numbers of
+instances of the same basic geometry, with different transformations and, optionally, different
+colors for each copy.  From <localref href="threejs.3"/></li>
+<li><sourceref href="threejs/skybox.html"/> &mdash; Demonstrates using a cubemap texture to make
+a <word>skybox</word>. From <localref href="threejs.3"/></li>
+<li><sourceref href="threejs/reflection.html"/> &mdash; A demonstration of using an 
+<word term="environment mapping">environment map</word> to simulate the reflection by 
+an object of its environment.  The environment is a skybox.  From <localref href="threejs.3"/></li>
+<li><sourceref href="threejs/refraction.html"/> &mdash; A demonstration of simulated <word>refraction</word>.  
+This example is almost identical to the previous example, except for using refraction rather
+than reflection. From <localref href="threejs.3"/></li>
+</ul>
+</subsection>
+
+<subsection title="WebGL Examples" id="source.6">
+
+<p><word>WebGL</word> is the version of OpenGL for use on Web pages.  It 
+is discussed in <localref href="webgl"/> and <localref href="webgl3d"/>.  The sample programs
+can be found in a folder named <sourceref href="webgl"/>, inside the <i>source</i> folder
+of the web site download.  The sample programs for WebGL
+are <word>HTML</word> files.  Run the programs by opening them in a Web browser. View the
+source code in a text editor or using a "View Source" command in a web browser.  Part of
+a WebGL program is written in <word>JavaScript</word>.  The other part consists of a
+<word>vertex shader</word> and a <word>fragment shader</word> written in <word>GLSL</word>.
+Many of these examples rely on scripts that are in the same <sourceref href="webgl"/> directory.
+In particular, the 3D examples use the <i><word>glMatrix</word></i> library (<localref href="webgl3d.1.1"/>).
+Most of these programs work with WebGL 1.0, but a few require WebGL 2.0, as noted.</p>
+
+<ul>
+<li><sourceref href="webgl/VAO-test-webgl2.html"/> &mdash; Demonstrates the use of Vertex Array Objects.
+Mentioned in <localref href="webgl.1.7"/>, but it uses many techniques that will be covered later in the
+textbook.  This program requires WebGL&nbsp;2.0.</li>
+<li><sourceref href="webgl/instancing-test-webgl2.html"/> &mdash; Demonstrates the use of instanced
+drawing with <i>gl.drawArraysInstanced</i>().  Mentioned in <localref href="webgl.1.8"/>, but it uses
+techniques that will be covered later in the textbook.  This program requires WebGL&nbsp;2.0</li>
+<li><sourceref href="webgl/webgl-rgb-triangle.html"/> &mdash; The standard OpenGL example rendered using WebGL:
+a triangle whose vertices are red, green, and blue, where the colors of interior pixels are computed
+by interpolating colors from the vertices.  Demonstrates the use of attributes and varying variables.  
+From <localref href="webgl.2"/></li>
+<li><sourceref href="webgl/shape-stamper.html"/> &mdash; The user "stamps" shapes onto the canvas by clicking
+it with the mouse.  Properties of the shape are determined by a set of pop-up menus.  Demonstrates
+the use of uniform variables, the <i>preserveDrawingBuffer</i> option on the WebGL context, and
+a simple coordinate transformation in the vertex shader.  From <localref href="webgl.2"/></li>
+<li><sourceref href="webgl/moving-points.html"/> &mdash; A set of circles moves around in the
+canvas, bouncing off the edges.  Shows how to use the <i>POINTS</i> primitive in WebGL and
+introduces the <i>discard</i> statement in the fragment shader. From <localref href="webgl.2"/></li>
+<li><sourceref href="webgl/simple-texture.html"/> &mdash; A very minimal texture example.  It just
+applies a texture image to a triangle.  From <localref href="webgl.4"/>.</li>
+<li><sourceref href="webgl/texture-from-pixels.html"/> &mdash; Shows how to load a texture from
+an array that contains the pixel color component values for the texture.  (Also demonstrates
+the difference between a <i>gl.LINEAR</i> and a <i>gl.NEAREST</i> magnification filter.)
+From <localref href="webgl.4"/>.</li>
+<li><sourceref href="webgl/cubemap-fisheye.html"/> &mdash; Loads a <word>cubemap texture</word>,
+but uses it in a 2D context to imitate a picture taken with a fisheye lens.  2D&nbsp;texture
+coordinates are first mapped onto a sphere to get the direction vector that is used to
+sample the cubemap. From <localref href="webgl.4"/>.</li>
+<li><sourceref href="webgl/webgl-game-of-life.html"/> &mdash;
+An implementation of John H. Conway's "Game of Live" in WebGL, as a basic example of how GPUs can be used
+to perform computational tasks. From <localref href="webgl.4"/>.</li>
+<li><sourceref href="webgl/texelFetch-MonaLisa-webgl2.html"/> &mdash; 
+A rather silly demo program that uses the GLSL ES 3.00 function <i>texelFetch</i>() to
+get colors from a texture image.  This program requires WebGL&nbsp;2.0.
+From <localref href="webgl.4"/>.</li>
+<li><sourceref href="webgl/simple-hierarchy2D.html"/> &mdash; Demonstrates using 2D modeling transformations 
+in WebGL and GLSL, with some simple animated hierarchical objects.  Transforms are implemented in
+JavaScript as objects of type <classname>AffineTransform2D</classname>, defined in the
+file <sourceref href="webgl/AffineTransform2D.js"/>. From <localref href="webgl.5"/>.</li>
+<li><sourceref href="webgl/glmatrix-cube-unlit.html"/> &mdash; A first example of doing 3D graphics
+directly in WebGL, with no lighting. From <localref href="webgl3d.1"/>.</li>
+<li><sourceref href="webgl/cube-with-simple-rotator.html"/> &mdash; Demonstrates the use
+of a <classname>SimpleRotator</classname> (defined in <sourceref href="webgl/simple-rotator.js"/>)
+to do mouse rotation. From <localref href="webgl3d.1"/>.</li>
+<li><sourceref href="webgl/cube-with-trackball-rotator.html"/> &mdash; Demonstrates the use
+of a <classname>TrackballRotator</classname> (defined in <sourceref href="webgl/trackball-rotator.js"/>)
+to do mouse rotation.  This is almost identical to the previous example.  From <localref href="webgl3d.1"/>.</li>
+<li><sourceref href="webgl/cube-with-basic-lighting.html"/> &mdash; A first example of implementing lighting
+directly in WebGL. Adds lighting to <sourceref href="webgl/glmatrix-cube-unlit.html"/>.  The
+lighting in this case uses only diffuse color and a directional light from the direction of
+the viewer.  From <localref href="webgl3d.2"/>.</li>
+<li><sourceref href="webgl/basic-specular-lighting.html"/> &mdash; A first implementation of specular reflection.
+From <localref href="webgl3d.2"/>.</li>
+<li><sourceref href="webgl/basic-specular-lighting-Phong.html"/> &mdash; A second implementation of specular reflection,
+using <word>Phong shading</word> (with the lighting calculations in the fragment shader).  Aside from moving
+the calculation to the fragment shader, this example is identical to the previous example.
+From <localref href="webgl3d.2"/>.  There is also a version that has been ported to
+WebGL&nbsp;2.0 and GLSL&nbsp;ES&nbsp;3.00:
+<sourceref href="webgl/basic-specular-lighting-Phong-webgl2.html"/>.  The
+required changes are minimal.</li>
+<li><sourceref href="webgl/parametric-function-grapher.html"/> &mdash;  Lets
+the user graph a parametric surface, given by equations x(u,v), y(u,v), and z(u,v) entered by
+the user. A relatively complex program, it illustrates GLSL data structures, two-sided lighting, 
+and polygon offset. From <localref href="webgl3d.2"/>.</li>
+<li><sourceref href="webgl/spotlights.html"/> &mdash; A demo of spotlights, with three colored spotlights.
+The user can change the cutoff angle and spot exponent. From <localref href="webgl3d.2"/></li>
+<li><sourceref href="webgl/diskworld-2.html"/> &mdash; A relatively complex program with hierarchical
+modeling and several kinds of lighting, including moving lights, spotlights, and light attenuation.
+This is the same scene as the <i>three.js</i> example <sourceref href="threejs/diskworld-1.html"/>,
+with added lighting features.  From <localref href="webgl3d.2"/>.</li>
+<li><sourceref href="webgl/texture-transform.html"/> &mdash; Animated texture images, using <i>glMatrix</i> 
+to implement texture transformations.  From <localref href="webgl3d.3"/>.</li>
+<li><sourceref href="webgl/bumpmap.html"/> &mdash; A mostly successful attempt
+to implement <word>bumpmapping</word>. From <localref href="webgl3d.3"/>.</li>
+<li><sourceref href="webgl/skybox-and-env-map.html"/> &mdash; Uses a cubemap texture to make
+a skybox and as an environment map.  From <localref href="webgl3d.3"/>.</li>
+<li><sourceref href="webgl/image-blur.html"/> &mdash; Applies a blur filter to an image.  A very simple
+demo of using blending for something other than transparency.  Also a very simple example of a 
+multi-pass algorithm.  From <localref href="webgl3d.4"/>.</li>
+<li><sourceref href="webgl/render-to-texture.html"/> &mdash; Uses a WebGL <word>framebuffer</word>
+to draw an image directly into a texture. From <localref href="webgl3d.4"/>.
+There is also a port to WebGL&nbsp;2.0, which uses vertex array objects and <i>gl.texStorage2D</i>():
+<sourceref href="webgl/render-to-texture-webgl2.html"/>.</li>
+<li><sourceref href="webgl/cube-camera.html"/> &mdash; Shows a <word>skybox</word> and moving cubes reflected on
+the surface of an object.  Uses a dynamic <word>cubemap texture</word> as an 
+<word term="environment mapping">environment map</word> on the reflective object.  
+The six images for the cubemap texture are redrawn for each frame of an animation. 
+From <localref href="webgl3d.4"/>.</li>
+<li><sourceref href="webgl/anisotropic-filtering.html"/> &mdash;  Demonstrates the use of the WebGL
+<word>anisotropic filtering</word> extension.  Shows a large textured rectangle extending into the distance and
+lets the user turn anisotropic filtering on and off.  From <localref href="webgl3d.5"/>.</li>
+<li><sourceref href="webgl/image-evolver.html"/> &mdash; Demonstrates use of the WEBGL_color_buffer_float
+<word>WebGL extension</word>.  The application is a simple genetic algorithm that tries to approximate a given
+image.  The floating point color buffer is used for two computations: finding the average of the color values in
+an image and computing an image that represents the difference between two images.  From <localref href="webgl3d.5"/>.</li>
+<li><sourceref href="webgl/instancing-test-webgl1.html"/> &mdash; Demonstrates the use of an extension
+to do instanced drawing in WebGL 1.0.  This is a copy of <sourceref href="webgl/instancing-test-webgl2.html"/>,
+modified to work with WebGL 1.0.   From <localref href="webgl3d.5"/>.</li>
+<li><sourceref href="webgl/multiple-draw-buffers-webgl2.html"/> &mdash; Demonstrates drawing to multiple
+textures attached as draw buffers to the same framebuffer.  Requires WebGL&nbsp;2.0 (but something
+similar could be done in WebGL 1.0 with an extension.)
+From <localref href="webgl3d.5"/>.</li>
+</ul>
+</subsection>
+
+
+
+<subsection title="Live Demos" id="source.7">
+
+<p><web>This book</web><tex>The web site version of this book</tex> 
+includes "live" or "interactive" demos that are embedded in the web pages.  The
+demos are small programs written as web pages using JavaScript and either
+<word>HTML canvas</word> graphics or <word>WebGL</word>.  Although they are designed
+to be run as small applications inside other web pages, they can also be run
+as independent web pages.  In the web site download of this book, you can find
+the demos in the folder named <i>demos</i>, organized by chapter number.
+They can be run directly from that folder.  Note that each of the demos requires 
+certain other files that are contained in the <i>demos</i> folder;
+if you copy a demo to a different location, be sure to also copy all the
+files on which it depends.</p>
+
+<p>The demos from <localref href="graphics2d"/> use the 2D canvas graphics API,
+which will work in almost all modern web browsers, 
+Demos from the remaining chapters use WebGL, which will also work with almost all
+modern desktop browsers, and many browsers
+on mobile devices.  (However, WebGL might still have
+problems in some of these browsers on some machines.)  All demo programs that use
+WebGL will work with WebGL&nbsp;1.0.</p>
+
+<p>The demos in <localref href="gl1geom"/> and <localref href="gl1light"/>
+use <sourceref href="glsim/glsim.js">glsim.js</sourceref>, a JavaScript library that I wrote
+to simulate a subset of OpenGL 1.1.  Information about
+glsim can be found in <sourceref href="glsim/glsim-doc.html"/>.</p>
+
+<p>For many of the demos, the reader is not expected to understand the program code for
+the demo at the point where the demo occurs in the book.  Note that the JavaScipt code in the
+demos has <b>not</b> been updated to use the more modern version of JavaSctipt that is covered
+in <localref href="proglang.3"/>.</p>
+
+<ul>
+<li><demoref href="c2/pixel-magnifier.html"/> &mdash; from <localref href="graphics2d.1"/>.
+Magnifies a small square of pixels in an image so that the user can see how text, lines and other
+shapes are made from pixels, including <word>antialiasing</word>.
+</li>
+<li><demoref href="c2/rgb-hsv.html"/> &mdash;  from <localref href="graphics2d.1"/>.
+Lets the user modify a color in the <word term="RGB color">RGB</word> and 
+<word term="HSV color">HSV</word> color spaces by dragging sliders.
+</li>
+<li><demoref href="c2/approximating-ovals.html"/> &mdash;  from <localref href="graphics2d.2"/>.
+Shows how ovals can be approximated by a polygons with different numbers of sides.
+</li>
+<li><demoref href="c2/cubic-bezier.html"/> &mdash;  from <localref href="graphics2d.2"/>.
+Lets the user modify a cubic <word>Bezier curve</word> by dragging endpoints and control points.
+</li>
+<li><demoref href="c2/quadratic-bezier.html"/> &mdash;  from <localref href="graphics2d.2"/>.
+Lets the user modify a quadratic Bezier curve by dragging endpoints and control points.
+</li>
+<li><demoref href="c2/transforms-2d.html"/> &mdash;  from <localref href="graphics2d.3"/>.
+Lets the user apply a sequence of rotation, scaling, and translation transforms to a shape
+and see the results.
+</li>
+<li><demoref href="c2/transform-equivalence-2d.html"/> &mdash;    from <localref href="graphics2d.4"/>.
+attempts to demonstrate the equivalence between the modeling transform and the viewport transform in 2D.
+</li>
+<li><demoref href="c2/cart-and-windmills.html"/> &mdash;  from <localref href="graphics2d.4"/>.
+Shows a simple, animated 2D scene constructed using <word>hierarchical modeling</word>.
+</li>
+<li><demoref href="c2/SimplePaintDemo.html"/> &mdash;  from <localref href="graphics2d.6"/>.
+Lets the user draw on a canvas using some 
+basic shapes.  A "Smudge" tool illustrates pixel manipulation.  This demo is pretty much the
+same as the sample program <sourceref href="canvas2d/SimplePaintProgram.html"/>.
+</li>
+<li><demoref href="c2/image-filters.html"/> &mdash;  from <localref href="graphics2d.6"/>.
+Lets the user apply a variety of "filters" to
+several images.  A filter, as the term is used here, replaces the color of each pixel with a
+weighted average of the colors of that pixel and its eight neighbors.
+</li>
+<li><demoref href="c3/first-triangle-demo.html"/> &mdash;   from <localref href="gl1geom.1"/>.
+Shows the usual first example for
+OpenGL: A triangle with differently colored vertices.  For this demo, you can change the colors
+of the vertices.
+</li>
+<li><demoref href="c3/first-cube.html"/> &mdash;    from <localref href="gl1geom.1"/>.
+Draws a cube with six different colors for the sides
+(with no lighting effects, and with the default orthographic projection).  The user can turn the
+depth test on and off to see the effect.  And the user can use a bigger cube, to see the effects
+of "clipping" when parts of the cube extend outside the visible range of z-values.
+</li>
+<li><demoref href="c3/axes3D.html"/> &mdash;    from <localref href="gl1geom.2"/>.
+Shows a set of coordinate axes in 3D.  The user can drag the mouse to rotate the view.
+</li>
+<li><demoref href="c3/rotation-axis.html"/> &mdash;    from <localref href="gl1geom.2"/>.
+Illustrates rotation about an axis in 3D.  A cube spins about an axis of rotation.
+The user can select the axis.
+</li>
+<li><demoref href="c3/transform-equivalence-3d.html"/> &mdash;    from <localref href="gl1geom.3"/>.
+attempts to demonstrate the
+equivalence between modeling and viewing in 3D.   The user drags sliders to modify a transform,
+and sees that transform applied both to objects as a modeling transform and to the
+view volume as a viewing transform.  The contents of the view volume and the image that
+is produced are the same in either interpretation.
+</li>
+<li><demoref href="c3/ifs-polyhedron-viewer.html"/> &mdash; from <localref href="gl1geom.4"/>.
+Lets the user view a variety of polyhedra that are defined in the program as
+<word term="indexed face set">indexed face sets</word>.  The user can rotate the polyhedron
+and control some rendering options.</li>
+<li><demoref href="c4/materials-demo.html"/> &mdash; from <localref href="gl1light.1"/>.
+Lets the user change the diffuse, specular and shininess properties of an object and
+see the result.</li>
+<li><demoref href="c4/smooth-vs-flat.html"/> &mdash; from <localref href="gl1light.1"/>.
+Lets the user see the difference between using normal vectors to model a smooth surface
+versus modeling a flat-sided polyhedron.</li>
+<li><demoref href="c4/four-lights-demo.html"/> &mdash; from <localref href="gl1light.2"/>.
+Demonstrates the effect of multiple, differently colored, moving lights.</li>
+<li><demoref href="c4/two-sided-demo.html"/> &mdash;  from <localref href="gl1light.2"/>.
+A little demo that illustrates two-sided lighting, with different front and back materials.</li>
+<li><demoref href="c4/texture-transform.html"/> &mdash; from <localref href="gl1light.3"/>.
+Shows textures on various objects, with texture transformations that the user can control
+using sliders.</li>
+<li><demoref href="c4/texture-from-color-buffer.html"/> &mdash; from <localref href="gl1light.3"/>.
+A simple demo of the <i>copyTexImage2D</i>() function; draws an animated 2D scene and uses
+it as a texture on a 3D object.</li>
+<li><demoref href="c4/walkthrough.html"/> &mdash; from <localref href="gl1light.4"/>.
+Lets the user move around in a 3D world by clicking buttons, demonstrating the idea of a
+moving viewer or camera.</li>
+<li><demoref href="c5/point-cloud.html"/> &mdash; from <localref href="threejs.1"/>.
+A first example of using the <i>three.js</i> JavaScript 3D modeling API.  It uses a
+<classname>PointCloud</classname> object to show an animated cloud of points.</li>
+<li><demoref href="c5/mesh-objects.html"/> &mdash; from <localref href="threejs.1"/>.
+Lets the user view many of the basic <i>three.js</i> geometries, with a variety of
+materials.</li>
+<li><demoref href="c5/vertex-and-color-animation.html"/> &mdash; from <localref href="threejs.2"/>.
+Uses per-face and per-vertex coloring to create a multicolored sphere.  Both the colors and
+the position of the vertices can be animated.</li>
+<li><demoref href="c5/textures.html"/> &mdash; from <localref href="threejs.2"/>. Demonstrates
+textures on a variety of <i>three.js</i> objects.</li>
+<li><demoref href="c5/mesh-animation.html"/> &mdash; from <localref href="threejs.2"/>.  Shows
+animated models of a horse and a stork, using models with "morph targets" and the class
+<classname>THREE.MorphAnimation</classname>.  The models are from the <i>three.js</i> download.</li>
+<li><demoref href="c5/raycaster-input.html"/>  &mdash; from <localref href="threejs.3"/>.
+Lets the user edit a scene using the mouse. Uses an object of type <classname>THREE.Raycaster</classname>
+to get mouse input from the user.</li>
+<li><demoref href="c5/shadows.html"/> &mdash; from <localref href="threejs.3"/>.
+Demonstrates support for shadows in <i>three.js</i>.</li>
+<li><demoref href="c5/reflection-demo.html"/> &mdash; from <localref href="threejs.3"/>.
+Demonstrates environment mapping to simulate reflection of an environment.  The environment in this case
+is a skybox.  (The demo is very similar to the sample program <sourceref href="threejs/reflection.html"/>.)</li>
+<li><demoref href="c6/shape-stamper-demo.html"/> &mdash; from <localref href="webgl.2"/>.
+A demo version of the sample WebGL program <sourceref href="webgl/shape-stamper.html"/>.
+The user clicks the canvas to stamp shapes onto the canvas, with properties determined
+by a set of popup menus.  The demo has the same functionality as the sample program, but
+the shapes are drawn using a different technique.</li>
+<li><demoref href="c6/moving-points-demo.html"/> &mdash; from <localref href="webgl.2"/>.
+A demo version of the sample WebGL program <sourceref href="webgl/moving-points.html"/>,
+with identical functionality.  Uses a single <i>gl.POINTS</i> primitive to display
+a set of moving, colored disks.</li>
+<li><demoref href="c6/webgl-limits.html"/> &mdash; from <localref href="webgl.3"/>.
+Displays a list of values for certain resource limits in WebGL, such as the number of
+attributes in a shader program or the size of the viewport.  These values can be
+different on different devices and in different web browsers.</li>
+<li><demoref href="c6/textured-points.html"/> &mdash; from <localref href="webgl.4"/>.
+shows texture images used on a primitive of type <i>gl.POINTS</i>.  It is similar
+to <i>moving-points-demo.html</i>, except that the points are textured instead of colored.</li>
+<li><demoref href="c6/multi-texture.html"/> &mdash; from <localref href="webgl.4"/>.
+Uses two textures on the same object, with two sampler variables in the shader program
+to represent the texture units that are used to apply the textures.</li>
+<li><demoref href="c7/rotators.html"/> &mdash; from <localref href="webgl3d.1"/>.
+Demonstrates the difference between a SimpleRotator (<sourceref href="webgl/simple-rotator.js"/>)
+and a TrackballRotator (<sourceref href="webgl/trackball-rotator.js"/>) by letting the
+user rotate cubes using the two rotators.</li>
+<li><demoref href="c7/per-pixel-vs-per-vertex.html"/> &mdash; from <localref href="webgl3d.2"/>.
+Lets the user compare <word>per-pixel lighting</word> to <word>per-vertex lighting</word>,
+by applying the two techniques to identical objects with identical lighting settings.</li>
+<li><demoref href="c7/spotlight-demo.html"/> &mdash; from <localref href="webgl3d.2"/>.
+Three colored spotlights shine on a square, and the user controls the cutoff angle and
+spot exponent.  A demo version of the sample program <sourceref href="webgl/spotlights.html"/>, with
+some added animation for fun.</li>
+<li><demoref href="c7/generated-texcoords.html"/> &mdash; from <localref href="webgl3d.3"/>.
+Uses texture coordinates generated from object or eye coordinates, instead of providing the
+texture coordinates to the shader program as an attribute.</li>
+<li><demoref href="c7/procedural-textures.html"/> &mdash; from <localref href="webgl3d.3"/>.
+Demonstrates several 2D and 3D procedural textures.</li>
+<li><demoref href="c7/cube-camera-demo.html"/> &mdash; from <localref href="webgl3d.4"/>.
+Essentially a copy of the sample WebGL program <sourceref href="webgl/cube-camera.html"/>.
+Shows a skybox and moving cubes reflected on the surface of a teapot or other object.
+Uses a dynamic cubemap texture that is redrawn for every frame.</li>
+</ul>
+
+
+</subsection>
+
+</source>

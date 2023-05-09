@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGL POINTS Primitive</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    #tools p {
+        margin-top: 30px;
+    }
+    select {
+        margin-left: 15px;
+    }
+</style>
+
+<script src="../script/demo-core.js"></script>
+
+<script>
+
+"use strict";
+
+var vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "attribute vec3 a_color;\n" +
+       "varying vec3 v_color;\n" +
+       "uniform float u_pointsize;\n" +
+       "uniform float u_width;\n" +
+       "uniform float u_height;\n" +
+       "void main() {\n" +
+       "   float x = -1.0 + 2.0*(a_coords.x / u_width);\n" +
+       "   float y = 1.0 - 2.0*(a_coords.y / u_height);\n" +
+       "   gl_Position = vec4(x, y, 0.0, 1.0);\n" +
+       "   v_color = a_color;\n" +
+       "   gl_PointSize = u_pointsize;\n" +
+       "}\n";
+
+var fragmentShaderSource =
+       "precision mediump float;\n" +
+       "varying vec3 v_color;\n" +
+       "void main() {\n" +
+       "   float distanceFromCenter = distance( gl_PointCoord, vec2(0.5,0.5) );\n" +
+       "   if ( distanceFromCenter >= 0.5 ) {\n" +
+       "       discard;  // don't draw this pixel!\n" +
+       "   }\n" +
+       "   gl_FragColor = vec4(v_color, 1.0);\n" +
+       "}\n";
+
+var canvas;  // The canvas where WebGL draws.
+var gl;  // The WebGL graphics context.
+
+var uniformWidth;   // Location of uniform named "u_width"
+var uniformHeight;  // Location of uniform named "u_height"
+var uniformPointsize;   // Location of uniform named "u_pointsize" 
+
+var attributeCoords;  // Location of the attribute named "a_coords".
+var bufferCoords;     // A vertex buffer object to hold the values for coords.
+
+var attributeColor;   // Location of the attribute named "a_color".
+var bufferColor;     // A vertex buffer object to hold the values for color.
+
+var animating = false;  // is the animation running?
+
+/* Data for the points, including their coordinates, velocities and colors.
+   The values for the arrays are created during initialization.  The random
+   colors are used when the user selects colored rather than red points.
+   The positions of the points are updated for each frame of the animation. */
+
+var POINT_COUNT = 40;
+var pointCoords = new Float32Array( 2*POINT_COUNT );
+var pointVelocities = new Float32Array( 2*POINT_COUNT );
+var pointRandomColors = new Float32Array( 3*POINT_COUNT );
+
+function createPointData() { // called during initialization to fill the arrays with data.
+    var i;
+    for (i = 0; i < POINT_COUNT; i++) {
+           // Each point has two coordinates and two velocities.  Velocity number k
+           // tells how fast coordinate number k changes in pixels per frame.
+        pointCoords[2*i] = 12 + (canvas.width-24) * Math.random();  // x-coordinate of point
+        pointCoords[2*i+1] = 12 + (canvas.height-24) * Math.random();  // y-coordinate of point
+        var randomVelocity = 1 + 3*Math.random();
+        var randomAngle = 2*Math.PI * Math.random();
+        pointVelocities[2*i] = randomVelocity * Math.cos(randomAngle);
+        pointVelocities[2*i+1] = randomVelocity * Math.sin(randomAngle);
+    }
+    for (i = 0; i < 3 * POINT_COUNT; i++) {
+           // The array contains color components, with three numbers per vertex.
+           // The color components are just random numbers in the range zero to 1.
+        pointRandomColors[i] = Math.random();
+    }
+}
+
+function updatePointCoordsForFrame() { // Called during an animation, before each frame.
+    var i;
+    var size = Number(document.getElementById("sizeChoice").value) / 2; // radius
+    for (i = 0; i < 2*POINT_COUNT; i += 2) { // x-coords
+        pointCoords[i] += pointVelocities[i];
+        if (pointCoords[i]-size < 0) {
+            pointCoords[i] = size-(pointCoords[i]-size);// move coord back onto canvas
+            pointVelocities[i] = Math.abs(pointVelocities[i]); // and make sure point is moving in positive direction
+        }
+        else if (pointCoords[i]+size > canvas.width) {
+            pointCoords[i] = canvas.width - (pointCoords[i]+size - canvas.width) - size;// move coord back onto canvas
+            pointVelocities[i] = -Math.abs(pointVelocities[i]); // and make sure point is moving in negative direction
+        }
+    }
+    for (i = 1; i < 2*POINT_COUNT; i += 2) { // y-coords
+        pointCoords[i] += pointVelocities[i];
+        if (pointCoords[i]-size < 0) {
+            pointCoords[i] = size-(pointCoords[i]-size);// move coord back onto canvas
+            pointVelocities[i] = Math.abs(pointVelocities[i]); // and make sure point is moving in positive direction
+        }
+        else if (pointCoords[i]+size > canvas.height) {
+            pointCoords[i] = canvas.height - (pointCoords[i]+size - canvas.height) - size;// move coord back onto canvas
+            pointVelocities[i] = -Math.abs(pointVelocities[i]); // and make sure point is moving in negative direction
+        }
+    }
+}
+
+
+/**
+ *  Draws the content of the canvas, in this case, a single primitive of type gl.POINTS
+ */
+function draw() {
+
+    gl.clearColor(0,0,0,1);  // specify the color to be used for clearing
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas (to black)
+    
+    /* Get options from the user interface. */
+
+    var randomColors = document.getElementById("colorCheckbox").checked;
+    var pointsize = Number(document.getElementById("sizeChoice").value);
+    
+    /* Set up values for the "coords" attribute */
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferCoords);
+    gl.bufferData(gl.ARRAY_BUFFER, pointCoords, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(attributeCoords, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(attributeCoords); 
+   
+    /* Set up values for the "color" attribute */
+    
+    if ( randomColors ) { // use the attribute values from the color VBO, filled during initialiation
+        gl.enableVertexAttribArray(attributeColor); 
+    }
+    else { // turn off vertexAttribArray and set a constant attribute color
+        gl.disableVertexAttribArray(attributeColor);
+        gl.vertexAttrib3f(attributeColor, 1, 0, 0);
+    }
+    
+    /* Set the pointsize uniform variable */
+    
+    gl.uniform1f( uniformPointsize, pointsize ); console.log(uniformPointsize + " " + pointsize);
+    
+    /* Draw all the points with one command. */
+   
+    gl.drawArrays(gl.POINTS, 0, POINT_COUNT);
+    
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   var vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw "Error in vertex shader:  " + gl.getShaderInfoLog(vsh);
+   }
+   var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw "Error in fragment shader:  " + gl.getShaderInfoLog(fsh);
+   }
+   var prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+   }
+   return prog;
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    var prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    attributeCoords = gl.getAttribLocation(prog, "a_coords");
+    bufferCoords = gl.createBuffer();
+    attributeColor = gl.getAttribLocation(prog, "a_color");
+    bufferColor = gl.createBuffer();
+    uniformHeight = gl.getUniformLocation(prog, "u_height");
+    uniformWidth = gl.getUniformLocation(prog, "u_width");
+    gl.uniform1f(uniformHeight, canvas.height);
+    gl.uniform1f(uniformWidth, canvas.width);
+    uniformPointsize = gl.getUniformLocation(prog, "u_pointsize");
+    createPointData();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferColor);
+    gl.bufferData(gl.ARRAY_BUFFER, pointRandomColors, gl.STREAM_DRAW);
+    gl.vertexAttribPointer(attributeColor, 3, gl.FLOAT, false, 0, 0);
+}
+
+/*------------ Animation support ------------*/
+
+function doFrame() {
+    if (animating) {
+        updatePointCoordsForFrame();
+        draw();
+        requestAnimationFrame(doFrame)
+    }
+}
+
+function doAnimationCheckbox() {
+    var anim = document.getElementById("animateCheckbox").checked;
+    if (anim != animating) {
+        animating = anim;
+        if (animating) {
+            doFrame();
+        }
+    }
+}
+
+
+/*-------------------------------------------*/
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        var options = {  // no need for alpha channel or depth buffer in this program
+            alpha: false,
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    document.getElementById("animateCheckbox").checked = false;
+    document.getElementById("colorCheckbox").checked = true;
+    document.getElementById("sizeChoice").value = "24";
+    document.getElementById("animateCheckbox").onchange = doAnimationCheckbox;
+    document.getElementById("colorCheckbox").onchange = function() {
+        if (!animating) {
+            draw();
+        }
+    };
+    document.getElementById("sizeChoice").onchange = function() {
+        if (!animating) {
+            draw();
+        }
+    };
+    draw();
+}
+
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Moving Points Demo</h3>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="400" height="300"></canvas>
+</div>
+
+<div id="tools">
+<p>
+    <label><b><input type="checkbox" id="animateCheckbox">Animate</b></label>
+</p>
+<p>
+    <label><b><input type="checkbox" id="colorCheckbox">Random<br><span style="margin-left:30px">Colors</span></b></label>
+</p>
+<p>
+    <label><b>Point Size:</b><br><select id="sizeChoice">
+        <option value="12">Small</option>
+        <option value="24">Medium</option>
+        <option value="48">Large</option>
+    </select></label>
+</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This is a demo version of a sample WebGL program, moving-points.html.
+There is not much to say about its functionality.  The colored disks
+move when the "Animate" box is checked.  If the "Random Color" box
+is unchecked, all the disks are red.  And a popup menu lets you choose
+the size of the disks</p>
+<p>The main point of the demo is that the disks are drawn as a single
+primitive of type <i>gl.POINTS</i>.  A disk appears at each vertex
+of the primitive.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

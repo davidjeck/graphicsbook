@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<!--
+   A demo of lighting and hierarchical modeling using WebGL.  The basic
+   example has been adapted many times, starting from a Java original,
+   and has a few odd features beacause of that (like use  of the
+   currentColor global variable).
+   
+   There is a sun, with a directional light from the direction of the
+   sun that rotates around the diskworld.  It is turned off at "night"
+   when the sun is below the horizon.
+   
+   There is a lamp at the center that comes on at night.  There is
+   a point light at the location of the light that used attenuation.
+   
+   The car has two headlights, with spotlights that come on at light.
+   
+   Emissive color is used to make the lights seem to glow yellow when
+   they are turned on.
+   
+   There is also a very dim viewpoint light, so nothing is ever absolutely
+   dark.
+-->
+<head>
+<title>DiskWorld: WebGL Lighting and Hierarchical Modeling</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+        margin-left: 25px;
+    }
+</style>
+
+
+
+<script src="gl-matrix-min.js"></script>
+<script src="trackball-rotator.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+
+<script>
+
+"use strict";
+
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        v_normal = normalize(a_normal);
+        v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    struct MaterialProperties {
+        vec4 diffuseColor;      // diffuseColor.a is alpha for the fragment
+        vec3 specularColor;
+        vec3 emissiveColor;
+        float specularExponent;
+    };
+    struct LightProperties {
+        bool enabled;
+        vec4 position;
+        vec3 color;
+        float attenuation;   // Linear attenuation factor, >= 0. Only point lights attenuate.
+        vec3 spotDirection;  // Note: only a point light can be a spotlight
+        float spotCosineCutoff; // if <= 0, this is not a spotlight, if >= 1, the light cone shrinks to nothing
+        float spotExponent;
+    };
+    uniform MaterialProperties material; // do two-sided lighting, but assume front and back materials are the same
+    uniform LightProperties lights[4];
+    uniform mat3 normalMatrix;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    vec3 lightingEquation( LightProperties light, MaterialProperties material, 
+                                vec3 eyeCoords, vec3 N, vec3 V ) {
+           // N is normal vector, V is direction to viewer.
+        vec3 L, R; // Light direction and reflected light direction.
+        float spotFactor = 1.0;  // multiplier to account for spotlight
+        float attenuationFactor = 1.0; // multiplier to account for light attenuation with distance
+        if ( light.position.w == 0.0 ) {
+            L = normalize( light.position.xyz );
+        }
+        else {
+            L = normalize( light.position.xyz/light.position.w - v_eyeCoords );
+            if (light.spotCosineCutoff > 0.0) { // the light is a spotlight
+                vec3 D = -normalize(light.spotDirection);
+                float spotCosine = dot(D,L);
+                if (spotCosine >= light.spotCosineCutoff) { 
+                    spotFactor = pow(spotCosine,light.spotExponent);
+                }
+                else { // The point is outside the cone of light from the spotlight.
+                    spotFactor = 0.0; // The light will add no color to the point.
+                }
+            }
+            if (light.attenuation > 0.0) {
+                float dist = distance(eyeCoords,light.position.xyz/light.position.w);
+                attenuationFactor = 1.0 / (1.0 + dist*light.attenuation);
+            }
+        }
+        if (dot(L,N) <= 0.0) {
+            return vec3(0.0);
+        }
+        vec3 reflection = dot(L,N) * light.color * material.diffuseColor.rgb;
+        R = -reflect(L,N);
+        if (dot(R,V) > 0.0) {
+            float factor = pow(dot(R,V),material.specularExponent);
+            reflection += factor * material.specularColor * light.color;
+        }
+        return spotFactor*attenuationFactor*reflection;
+    }
+    void main() {
+        vec3 normal = normalize( normalMatrix*v_normal );
+        vec3 viewDirection = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        vec3 color = material.emissiveColor;
+        for (int i = 0; i < 4; i++) {
+            if (lights[i].enabled) { 
+                if (gl_FrontFacing) {
+                    color += lightingEquation( lights[i], material, v_eyeCoords,
+                                                    normal, viewDirection);
+                }
+                else {
+                    color += lightingEquation( lights[i], material, v_eyeCoords,
+                                                    -normal, viewDirection);
+                }
+            }
+        }
+        gl_FragColor = vec4(color,material.diffuseColor.a);
+    }`;
+
+    
+let gl;   // The webgl context.
+
+let a_coords_loc;         // Location of the a_coords attribute variable in the shader program.
+let a_normal_loc;         // Location of a_normal attribute 
+
+let u_modelview;       // Locations for uniform matrices
+let u_projection;
+let u_normalMatrix;
+
+let u_material;     // An object tolds uniform locations for the material.
+let u_lights;       // An array of objects that holds uniform locations for light properties.
+
+const projection = mat4.create();    // projection matrix
+let modelview;                     // modelview matrix; value comes from rotator
+const normalMatrix = mat3.create();  // matrix, derived from modelview matrix, for transforming normal vectors
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+let frameNumber = 0;  // Originally a frame number, but modified to represent elapsed time in units of 1/60 second.
+
+let torus, sphere, cone, cylinder, disk, ringM, cubeM;  // basic objects, created using function createModel
+
+const matrixStack = [];           // A stack of matrices for implementing hierarchical graphics.
+
+let currentColor = [1,1,1,1];   // The current diffuseColor; render() functions in the basic objects set
+                                // the diffuse color to currentColor when it is called before drawing the object.
+                                // Other color properties, which don't change often are handled elsewhere.
+
+let sunAngle = Math.PI/2; // rotation of the sun about the z-axis.
+let daytime = true;
+
+/**
+ * Draws the image, which consists of either the "world" or a closeup of the "car".
+ */
+function draw() {
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    mat4.perspective(projection, Math.PI/4, 1, 1, 50);
+    gl.uniformMatrix4fv(u_projection, false, projection );
+
+    modelview = rotator.getViewMatrix();
+    
+    lights();
+    
+    world();
+}
+
+/* Set the direction vector of a light, in eye coordinates.
+ * (Note: This function sets the value of the global variable normalMatrix.)
+ * @param modelview the matrix that does object-to-eye coordinate transforms
+ * @param u_direction_loc the uniform variable location for the spotDirection property of the light
+ * @param lightDirection a vector that points in the direction that the spotlight is pointing (a vec3)
+ */
+function setSpotlightDirection( u_direction_loc, modelview, lightDirection ) {
+    mat3.normalFromMat4(normalMatrix,modelview);
+    let transformedDirection = new Float32Array(3);
+    vec3.transformMat3(transformedDirection, lightDirection, normalMatrix);
+    gl.uniform3fv(u_direction_loc, transformedDirection);
+}
+
+/* Set the position of a light, in eye coordinates.
+ * @param u_position_loc the uniform variable location for the position property of the light
+ * @param modelview the matrix that does object-to-eye coordinate transforms
+ * @param lightPosition the location of the light, in object coordinates (a vec4)
+ */
+function setLightPosition( u_position_loc, modelview, lightPosition ) {
+    let transformedPosition = new Float32Array(4);
+    vec4.transformMat4(transformedPosition, lightPosition, modelview);
+    gl.uniform4fv(u_position_loc, transformedPosition);
+}
+
+
+function lights() {
+
+    if (daytime) {  // light 1 is the sun
+        gl.uniform3f( u_lights[1].color, 0.6, 0.6, 0.5 ); // light 1 is the sun during the day
+        gl.uniform1f( u_lights[1].attenuation, 0 );
+    }
+    else {
+        gl.uniform3f( u_lights[1].color, 1, 1, 0.8 ); // light 1 is the lamp at night
+        gl.uniform1f( u_lights[1].attenuation, 2 );
+    }
+    
+    currentColor = [ 0.3, 0.3, 0.3, 1 ];
+    
+    pushMatrix();  // draw the sun, with yellow emissive color during the day, dim white at night; NB: sun won't be illuminated by other lights
+    mat4.rotateZ(modelview,modelview,sunAngle);
+    mat4.translate(modelview,modelview,[6.5,0,0]);
+    mat4.scale(modelview,modelview,[0.4,0.4,0.4]);
+    if (daytime) { 
+        gl.uniform3f( u_material.emissiveColor, 0.7, 0.7, 0 );
+        setLightPosition(u_lights[1].position, modelview, [1,0,0,0]);
+    }
+    else {
+        gl.uniform3f(u_material.emissiveColor, 0.1, 0.1, 0.1 );
+    }
+    sphere.render();
+    gl.uniform3f( u_material.emissiveColor, 0, 0, 0 );
+    popMatrix();
+    
+    pushMatrix();  // draw the lamp, with emissive color at night
+    mat4.translate(modelview,modelview,[0,1.5,0]);
+    mat4.scale(modelview,modelview,[0.15,0.15,0.15]);
+    if (!daytime) { 
+        setLightPosition(u_lights[1].position, modelview, [0,0,0,1]);
+        gl.uniform3f( u_material.emissiveColor, 0.5, 0.5, 0 );
+    }
+    sphere.render();
+    gl.uniform3f( u_material.emissiveColor, 0, 0, 0 );
+    popMatrix();
+    
+    // turn on the headlights at night -- we need all the transforms that are applied to the car
+    if (daytime) {
+        gl.uniform1f( u_lights[2].enabled, 0 );
+        gl.uniform1f( u_lights[3].enabled, 0 );
+    }
+    else {
+        gl.uniform1f( u_lights[2].enabled, 1 );
+        gl.uniform1f( u_lights[3].enabled, 1 );
+        pushMatrix();
+        mat4.rotate(modelview,modelview,(-frameNumber)/180*Math.PI,[ 0, 1, 0]);
+        mat4.translate(modelview,modelview,[0,0.3,4]);
+        mat4.scale(modelview,modelview,[0.3,0.3,.3]);
+        pushMatrix();
+        mat4.translate(modelview,modelview,[-3,0.6,-1]);
+        mat4.rotateY(modelview,modelview,-Math.PI/12);  // (bogus rotation to point headlights more along road)
+        setLightPosition(u_lights[2].position, modelview, [0,0,0,1]);
+        setSpotlightDirection(u_lights[2].spotDirection, modelview, [-1,0,0]);
+        popMatrix();
+        pushMatrix();
+        mat4.translate(modelview,modelview,[-3,0.6,1]);
+        mat4.rotateY(modelview,modelview,-Math.PI/12);
+        setLightPosition(u_lights[3].position, modelview, [0,0,0,1]);
+        setSpotlightDirection(u_lights[3].spotDirection, modelview, [-1,0,0]);
+        popMatrix();        
+        popMatrix();
+    }
+}
+
+/**
+ * Draws a "world" consisting of a disk holding some trees and a road, and a car that
+ * drives along the road.  A tree in the middle grows from frame 0 to frame 1000.
+ */
+function world() {
+	pushMatrix();
+	mat4.translate(modelview,modelview,[0,-0.05,0]);
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[1,0,0]);
+	currentColor = [0.1,0.4,0.1,1];
+	disk.render();
+	popMatrix();
+    pushMatrix();
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[-1,0,0]);
+    mat4.scale(modelview,modelview,[0.15,0.15,1.5]);
+    currentColor = [0.8,0.8,1,1];
+    cylinder.render();
+    popMatrix();
+	pushMatrix();
+	currentColor = [0.7,0.7,0.8,1];
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[-1,0,0]);
+	ringM.render();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(-frameNumber)/180*Math.PI,[ 0, 1, 0]);
+	mat4.translate(modelview,modelview,[0,0.3,4]);
+	mat4.scale(modelview,modelview,[0.3,0.3,.3]);
+	car();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[1,0,0]);
+	mat4.scale(modelview,modelview,[0.7,0.7,0.7]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[-0.5,0,-1]);
+	mat4.scale(modelview,modelview,[0.5,0.5,0.5]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[-1.5,0,2]);
+	mat4.scale(modelview,modelview,[0.7,0.7,0.7]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[-1,0,5.2]);
+	mat4.scale(modelview,modelview,[0.25,0.25,0.25]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[5.1,0,0.5]);
+	mat4.scale(modelview,modelview,[0.3,0.3,0.3]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[5.1,0,-0.5]);
+	mat4.scale(modelview,modelview,[0.35,0.35,0.35]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[5.3,0,0]);
+	mat4.scale(modelview,modelview,[0.5,0.5,0.5]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(70)/180*Math.PI,[0,1,0]);
+	pushMatrix();
+	mat4.translate(modelview,modelview,[5.1,0,0.5]);
+	mat4.scale(modelview,modelview,[0.3,0.3,0.3]);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[5.1,0,-0.5]);
+	mat4.scale(modelview,modelview,[0.35,0.35,0.35]);
+	tree();
+	popMatrix();
+	mat4.rotate(modelview,modelview,(53)/180*Math.PI,[0,1,0]);
+	pushMatrix();
+	mat4.translate(modelview,modelview,[5.3,0,0]);
+	mat4.scale(modelview,modelview,[0.5,0.5,0.5]);
+	tree();
+	popMatrix();
+	popMatrix();
+}
+
+/**
+ * Draws a tree consisting of a green cone with a brown cylinder for a trunk.
+ */
+function tree() {
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[-1,0,0]);
+	pushMatrix();
+	currentColor = [0.5,0.3,0.1,1];
+	mat4.scale(modelview,modelview,[0.5,0.5,1]);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	currentColor = [0,0.8,0,1];
+	mat4.translate(modelview,modelview,[0,0,0.8]);
+	mat4.scale(modelview,modelview,[1.5,1.5,2]);
+	cone.render();
+	popMatrix();
+	popMatrix();
+}
+
+/**
+ * Draws a car consisting of two scaled red cubes with headlights
+ * and four wheels on two axels.
+ */
+function car() {
+	pushMatrix();
+	mat4.translate(modelview,modelview,[2.5,0,0]);
+	axel();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[-2.5,0,0]);
+	axel();
+	popMatrix();
+	currentColor = [1,0,0,1];
+	pushMatrix();
+	mat4.translate(modelview,modelview,[0,0.6,0]);
+	mat4.scale(modelview,modelview,[6,1.2,3]);
+	cubeM.render();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[0.5,1.4,0]);
+	mat4.scale(modelview,modelview,[3,1,2.8]);
+	cubeM.render();
+	popMatrix();
+	currentColor = [1,1,0.3,1];
+    if (!daytime) {
+       gl.uniform3f(u_material.emissiveColor, 0.4,0.4,0);
+    }
+	pushMatrix();
+	mat4.translate(modelview,modelview,[-3,0.6,-1]);
+	mat4.scale(modelview,modelview,[0.1,0.25,0.25]);
+	sphere.render();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[-3,0.6,1]);
+	mat4.scale(modelview,modelview,[0.1,0.25,0.25]);
+	sphere.render();
+	popMatrix();
+    gl.uniform3f(u_material.emissiveColor, 0,0,0);
+}
+
+/**
+ *  Draw an axel that consists of a long yellow cylinder with
+ *  a wheel on each end.
+ */
+function axel() {
+	currentColor = [0.8,0.7,0,1];
+	pushMatrix();
+	mat4.scale(modelview,modelview,[0.2,0.2,4.3]);
+	mat4.translate(modelview,modelview,[0,0,-0.5]);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[0,0,2]);
+	wheel();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,modelview,[0,0,-2]);
+	wheel();
+	popMatrix();
+}
+
+/**
+ * Draw a rotating wheel that consists of a torus with three
+ * cylinders to make the spokes of the wheel.
+ */
+function wheel() {
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(frameNumber*10)/180*Math.PI,[0,0,1]);
+	currentColor = [0,0,0.7,1];
+	torus.render();
+	currentColor = [0.9,0.9,0.6,1];
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[-1,0,0]);
+	mat4.scale(modelview,modelview,[0.1,0.1,1.8]);
+	mat4.translate(modelview,modelview,[0,0,-0.5]);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(60)/180*Math.PI,[0,0,1]);
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[-1,0,0]);
+	mat4.scale(modelview,modelview,[0.1,0.1,1.8]);
+	mat4.translate(modelview,modelview,[0,0,-0.5]);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,modelview,(-60)/180*Math.PI,[0,0,1]);
+	mat4.rotate(modelview,modelview,(90)/180*Math.PI,[-1,0,0]);
+	mat4.scale(modelview,modelview,[0.1,0.1,1.8]);
+	mat4.translate(modelview,modelview,[0,0,-0.5]);
+	cylinder.render();
+	popMatrix();
+	popMatrix();
+}
+
+
+/**
+ *  Push a copy of the current modelview matrix onto the matrix stack.
+ */
+function pushMatrix() {
+    matrixStack.push( mat4.clone(modelview) );
+}
+
+
+/**
+ *  Restore the modelview matrix to a value popped from the matrix stack.
+ */
+function popMatrix() {
+    modelview = matrixStack.pop();
+}
+
+/**
+ *  Create one of the basic objects.  The modelData holds the data for
+ *  an IFS using the structure from basic-objects-IFS.js.  This function
+ *  creates VBOs to hold the coordinates, normal vectors, and indices
+ *  from the IFS, and it loads the data into those buffers.  The function
+ *  creates a new object whose properties are the identities of the
+ *  VBOs.  The new object also has a function, render(), that can be called to
+ *  render the object, using all the data from the buffers.  That object
+ *  is returned as the value of the function.  (The second parameter,
+ *  xtraTranslate, is there because this program was ported from a Java
+ *  version where cylinders were created in a different position, with
+ *  the base on the xy-plane instead of with their center at the origin.
+ *  The xtraTranslate parameter is a 3-vector that is applied as a
+ *  translation to the rendered object.  It is used to move the cylinders
+ *  into the position expected by the code that was ported from Java.)
+ */
+function createModel(modelData, xtraTranslate) {
+    let model = {};
+    model.coordsBuffer = gl.createBuffer();
+    model.normalBuffer = gl.createBuffer();
+    model.indexBuffer = gl.createBuffer();
+    model.count = modelData.indices.length;
+    if (xtraTranslate)
+        model.xtraTranslate = xtraTranslate;
+    else
+        model.xtraTranslate = null;
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.coordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexPositions, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, model.normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, modelData.vertexNormals, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, modelData.indices, gl.STATIC_DRAW);
+    model.render = function() {  // This function will render the object.
+           // Since the buffer from which we are taking the coordinates and normals
+           // change each time an object is drawn, we have to use gl.vertexAttribPointer
+           // to specify the location of the data. And to do that, we must first
+           // bind the buffer that contains the data.  Similarly, we have to
+           // bind this object's index buffer before calling gl.drawElements.
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.coordsBuffer);
+        gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+        gl.vertexAttribPointer(a_normal_loc, 3, gl.FLOAT, false, 0, 0);
+        gl.uniform4fv(u_material.diffuseColor, currentColor);
+        if (this.xtraTranslate) {
+            pushMatrix();
+            mat4.translate(modelview,modelview,this.xtraTranslate);
+        }
+        gl.uniformMatrix4fv(u_modelview, false, modelview );
+        mat3.normalFromMat4(normalMatrix, modelview);
+        gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
+        if (this.xtraTranslate) {
+            popMatrix();
+        }
+    };
+    return model;
+}
+
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    gl.enable(gl.DEPTH_TEST);
+    
+    /* Get attribute and uniform locations */
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    gl.enableVertexAttribArray(a_coords_loc);
+    gl.enableVertexAttribArray(a_normal_loc);
+    
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    u_material = {
+        diffuseColor: gl.getUniformLocation(prog, "material.diffuseColor"),
+        specularColor: gl.getUniformLocation(prog, "material.specularColor"),
+        emissiveColor: gl.getUniformLocation(prog, "material.emissiveColor"),
+        specularExponent: gl.getUniformLocation(prog, "material.specularExponent")
+    };
+    u_lights = new Array(4);
+    for (let i = 0; i < 4; i++) {
+        u_lights[i] = {
+            enabled: gl.getUniformLocation(prog, "lights[" + i + "].enabled"),
+            position: gl.getUniformLocation(prog, "lights[" + i + "].position"),
+            color: gl.getUniformLocation(prog, "lights[" + i + "].color"),
+            spotDirection: gl.getUniformLocation(prog, "lights[" + i + "].spotDirection"),
+            spotCosineCutoff: gl.getUniformLocation(prog, "lights[" + i + "].spotCosineCutoff"),
+            spotExponent: gl.getUniformLocation(prog, "lights[" + i + "].spotExponent"),
+            attenuation: gl.getUniformLocation(prog, "lights[" + i + "].attenuation")
+        };
+    }
+            
+    gl.uniform3f( u_material.specularColor, 0.1, 0.1, 0.1 );  // specular properties don't change
+    gl.uniform1f( u_material.specularExponent, 16 );
+    gl.uniform3f( u_material.emissiveColor, 0, 0, 0);  // default, will be changed temporarily for some objects
+    
+
+    for (let i = 1; i < 4; i++) { // set defaults for lights
+        gl.uniform1i( u_lights[i].enabled, 0 ); 
+        gl.uniform4f( u_lights[i].position, 0, 0, 1, 0 );
+        gl.uniform1f( u_lights[i].spotCosineCutoff, 0); // not a spotlight
+        gl.uniform3f( u_lights[i].spotDirection, 0,0,-1);
+        gl.uniform1f( u_lights[i].spotExponent, 5);
+        gl.uniform1f( u_lights[i].attenuation, 0); // no attenuation
+        gl.uniform3f( u_lights[i].color, 1,1,1 ); 
+    }
+    
+    gl.uniform1i( u_lights[0].enabled, 1 );   // viewpoint light
+    gl.uniform4f( u_lights[0].position, 0,0,0,1 ); // positional, at viewpoint
+    gl.uniform3f( u_lights[0].color, 0.2,0.2,0.2 );  // dim
+    
+    gl.uniform1i( u_lights[1].enabled, 1 );   // the sun during the day, the lamp at night
+    
+    gl.uniform1f( u_lights[2].spotCosineCutoff, Math.cos(Math.PI/8) ); // lights 2 and 3 are headlights,
+    gl.uniform1f( u_lights[3].spotCosineCutoff, Math.cos(Math.PI/8) ); //    which are spotlights
+    gl.uniform3f( u_lights[2].color, 0.5, 0.5, 0.4 );  
+    gl.uniform3f( u_lights[3].color, 0.5, 0.5, 0.4 );
+    
+    // Note: position and spot direction for lights 1 to 4 are managed by modeling transforms.
+    
+} // end initGL()
+
+
+
+//--------------------------------- animation framework ------------------------------
+
+let animating = false;
+let prevTime;  // time since previous call to frame()
+// Note: To avoid having the animation play too fast on computers
+// where requestAnimationFrame is called more than 60 times per
+// second, the frame number has been converted into an elapsed
+// time measured in sixtieths of a second.
+
+function frame(time) {
+    if (!animating) {
+        return;  // stops the animation
+    }
+    if (prevTime == null) { // Just save the start time.
+        prevTime = time;
+    }
+    else {
+        let elapsedTimeInSecs = (time - prevTime)/1000;
+        prevTime = time;
+        let delta = elapsedTimeInSecs * 60;  // time change in units of 1/60 second.
+        frameNumber += delta;
+        sunAngle += delta * Math.PI/360;
+        if (sunAngle > 2*Math.PI) {
+            sunAngle -= 2*Math.PI;
+        }
+        daytime = sunAngle < Math.PI;
+        draw();
+    }
+    requestAnimationFrame(frame);
+}
+
+function setAnimating(run) {
+    if (run != animating) {
+        animating = run;
+        if (animating) {
+            prevTime = null;
+            requestAnimationFrame(frame);
+        }
+    }
+}
+
+//-------------------------------------------------------------------------
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("animCheck").checked = false;
+    document.getElementById("reset").onclick = function() {
+       rotator.setView(17,[0,1,2]);
+       frameNumber = 0;
+       sunAngle = Math.PI/2;
+       daytime = true;
+       animating = false;
+       document.getElementById("animCheck").checked = false;
+       draw();
+    };
+    
+    torus = createModel(uvTorus(0.5,1,16,8));   // Create all the basic objects.
+    sphere = createModel(uvSphere(1));
+    cone = createModel(uvCone(),[0,0,.5]);
+    cylinder = createModel(uvCylinder(),[0,0,.5]);
+    disk = createModel(uvCylinder(5.5,0.5,64),[0,0,.25]);
+    ringM = createModel(ring(3.3,4.8,40));
+    cubeM = createModel(cube());
+ 
+    rotator = new TrackballRotator(canvas,function() {
+        if (!animating)
+           draw();
+    },17,[0,1,2]);
+    draw();
+}
+
+window.onload = init;
+
+</script>
+
+</head>
+<body>
+
+<h2>DiskWorld 2: WebGL Lighting and Hierarchical Modeling</h2>
+
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p id="message" style="font-weight:bold">Drag your mouse (or finger on a touchscreen) on the model to rotate it.<br>
+Make sure to try the animation, and let it run long enough to see the nighttime view!</p>
+
+<p>
+   <label><input type="checkbox" id="animCheck" onchange="setAnimating(this.checked)">Animate</label>
+   <button id="reset" style="margin-left:40px">Reset</button>
+</p>
+
+
+<div>
+
+    <canvas width=600 height=600 id="webglcanvas" style="background-color:blue"></canvas>
+
+</div>
+</body>
+</html>
+

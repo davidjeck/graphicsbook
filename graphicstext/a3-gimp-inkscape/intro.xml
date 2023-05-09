@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>Gimp and Inkscape are free and open-source programs for creating and
+manipulating two-dimensional images.  Gimp is a <word>painting program</word>;
+that is, it is primarily concerned with setting the colors of individual
+pixels in an image.  Inkscape is a <word>drawing program</word>; that is,
+it represents an image as a data structure that contains information
+about the objects in a 2D scene.  The difference between painting and
+drawing is discussed in <localref href="introduction.1"/>.
+</p1>
+
+<p>Even though the main focus of this book is on programming for three-dimensional
+graphics, it can be useful to get some experience with 2D image manipulation programs.
+Such programs illustrate some important concepts, such as color manipulation,
+transparency, shape creation and editing, <word term="Bezier curve">Bezier curves</word>,
+and (in drawing programs) grouping graphical objects into hierarchical structures.  And the
+programs are often useful even in 3D graphics, for working with <word>texture</word> images.
+This appendix offers just a very brief introduction to Gimp and Inkscape, but maybe
+enough to let you start experimenting with the programs and to inspire you to learn more
+about them from other sources.</p>
+
+<p>When I teach computer graphics, I often include a few labs on Gimp and Inkscape. The material 
+in this appendix was adapted from those labs.  While Gimp and Inkscape
+are not quite the equivalent of the commercial programs Photoshop and Illustrator, they are
+free, they can be used in serious graphics projects, and they already have far more features than
+can be covered in a couple of labs.</p>
+
+</intro>

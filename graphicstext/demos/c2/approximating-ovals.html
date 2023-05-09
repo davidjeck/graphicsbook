@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Approximating an Oval with Line Segments</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var sliders;
+var canvas;
+var graphics;
+
+function draw() {
+    var i;
+    graphics.clearRect(0,0,canvas.width,canvas.height);
+    var r1 = sliders.value(0);
+    var r2 = sliders.value(1);
+    var sides = sliders.value(2);
+    var cx = canvas.width/2;
+    var cy = canvas.height/2;
+    if (document.getElementById("radii").checked) {
+        graphics.beginPath();
+        for (i = 0; i < sides; i++) {
+            var angle = i * (2*Math.PI)/sides;
+            graphics.moveTo(cx,cy);
+            graphics.lineTo(cx + r1*Math.cos(angle), cy + r2*Math.sin(angle));
+        }
+        graphics.closePath();
+        graphics.strokeStyle = "#CCCCFF";
+        graphics.lineWidth = 1;
+        graphics.stroke();
+    }
+    graphics.beginPath();
+    graphics.moveTo(cx + r1, cy);
+    for (i = 1; i < sides; i++) {
+        var angle = i * (2*Math.PI)/sides;
+        graphics.lineTo(cx + r1*Math.cos(angle), cy + r2*Math.sin(angle));
+    }
+    graphics.closePath();
+    graphics.strokeStyle = "blue";
+    graphics.lineWidth = 3;
+    graphics.lineJoin = "round";
+    graphics.stroke();
+}
+
+function init() {
+    sliders = new SliderCanvas(document.getElementById("sliders"));
+    sliders.addSlider({label:"r1", min: 5, max:145, step:1, value:145 });
+    sliders.addSlider({label:"r2", min: 5, max:145, step:1, value: 100});
+    sliders.addSlider({label:"sides", min: 3, max:64, step:1, value: 16});
+    sliders.draw();
+    sliders.onChange = draw;
+    canvas = document.getElementById("maincanvas");
+    if (!canvas.getContext) {
+        document.getElementById("headline").innerHTML = "ERROR: Canvas not supported";
+        return;
+    }
+    graphics = canvas.getContext("2d");
+    document.getElementById("radii").checked = true;
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3>Approximating Ovals with Lines</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools" style="border:none; background: none">
+<canvas id="sliders" width = "250" height="160"></canvas>
+<p style="text-indent: 0px">
+<label><input type="checkbox" id="radii" onchange="draw()">Draw Radii</label>
+</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>Not much to say here.  The demo uses a regular polygon
+to approximate a circle.  With a larger number of sides,
+you get a better approximation.</p>
+<p>The first two sliders control the size of the oval.  The
+third controls the number of sides.  Note how the number of
+sides that you need to get a good approximation depends
+on the size of the oval.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

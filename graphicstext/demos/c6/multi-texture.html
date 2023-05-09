@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>POINTS Primitive With Textures</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+    #tools p {
+        margin-top: 22px;
+    }
+    select {
+        margin-left: 15px;
+    }
+</style>
+
+<script src="../script/demo-core.js"></script>
+
+<script>
+
+"use strict";
+
+var vertexShaderSource =
+       "attribute vec2 a_coords;\n" +
+       "attribute vec2 a_texCoords;\n" +
+       "varying vec2 v_texCoords;\n" +
+       "void main() {\n" +
+       "   gl_Position = vec4(a_coords, 0.0, 1.0);\n" +
+       "   v_texCoords = a_texCoords;\n" +
+       "}\n";
+
+var fragmentShaderSource =
+       "precision mediump float;\n" +
+       "varying vec2 v_texCoords;\n" +
+       "uniform sampler2D u_texture1;\n" +
+       "uniform sampler2D u_texture2;\n" +
+       "uniform int u_tex2Mode;\n" +
+       "uniform bool u_wavy;\n" +
+       "vec3 blend( vec3 color1, vec3 color2, int blendMode ) {\n" +
+       "   if ( blendMode == 0 )\n" +
+       "       return color1 * color2;\n" +
+       "   if ( blendMode == 1 )\n" +
+       "       return (color1 + color2) / 2.0;\n" +
+       "   if ( blendMode == 2 )\n" +
+       "       return clamp(color1 - color2, 0.0, 1.0);\n" +
+       "   if ( blendMode == 3 )\n" +
+       "       return color2;\n" +
+       "   return color1;\n" +
+       "}\n" +
+       "void main() {\n" +
+       "   vec2 texCoords = v_texCoords;\n" +
+       "   if ( u_wavy )\n" +
+       "       texCoords.y += 0.25 * sin(6.28*texCoords.x);" +
+       "   vec3 texColor1 = texture2D( u_texture1, texCoords).rgb;\n" +
+       "   vec3 texColor2 = texture2D( u_texture2, texCoords ).rgb;\n" +
+       "   vec3 color =  blend(texColor1, texColor2, u_tex2Mode);\n" +
+       "   gl_FragColor = vec4( color, 1.0 );\n" +
+       "}\n";
+
+var canvas;  // The canvas where WebGL draws.
+var gl;  // The WebGL graphics context.
+
+var u_texture1_location;   // locations of uniformas
+var u_texture2_location;
+var u_tex2Mode_location;
+var u_wavy_location;
+
+var a_coords_location;      // locations and buffers for attributes
+var square_coords_buffer;
+var ring_coords_buffer;
+var a_texCoords_location; 
+var square_texCoords_buffer;
+var ring_texCoords_buffer;
+
+
+var texturesLoaded = false;  // set to true after all textures have been loaded.
+
+var textureObjects;
+
+var textureURL = [  // URLs of the available textures.
+       "textures/house.jpg",
+       "textures/Earth-1024x512.jpg",
+       "textures/NightEarth-512x256.jpg",
+       "textures/marble.jpg",
+       "textures/metal003.gif",
+       "textures/mandelbrot.jpeg",
+       "textures/brick.gif",
+       "textures/gradient.png",
+       "textures/cloth.gif",
+       "textures/cloud.gif",
+       "textures/jigsaw.gif",
+   ];
+
+
+/**
+ *  Draws the content of the canvas, in this case, a textured POINTS primitive
+ */
+function draw() {
+
+    gl.clearColor(1,1,1,1);  // specify the color to be used for clearing
+    gl.clear(gl.COLOR_BUFFER_BIT);  // clear the canvas (to black)
+        
+    if (! texturesLoaded) {
+        return;
+    }
+    
+    /* Set values of uniform variables, based on values from user interface elements */
+    
+    var mode = Number(document.getElementById("modeChoice").value);
+    gl.uniform1i( u_tex2Mode_location, mode);
+    
+    var wavy = document.getElementById("wavyCheckbox").checked; 
+    gl.uniform1i( u_wavy_location, wavy? 1 : 0 ); 
+    
+    /* bind texture objects, based on selected textures in user interface */
+    
+    var tex1Num = Number(document.getElementById("textureChoice1").value);
+    gl.activeTexture( gl.TEXTURE0 );
+    gl.bindTexture( gl.TEXTURE_2D, textureObjects[tex1Num] );
+    
+    var tex2Num = Number(document.getElementById("textureChoice2").value);
+    gl.activeTexture( gl.TEXTURE1 );
+    gl.bindTexture( gl.TEXTURE_2D, textureObjects[tex2Num] );
+        
+    /* Draw the selected object. */
+    
+    if (document.getElementById("objectChoice").value == "Ring") {
+        gl.bindBuffer(gl.ARRAY_BUFFER, ring_coords_buffer);
+        gl.vertexAttribPointer(a_coords_location, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, ring_texCoords_buffer);
+        gl.vertexAttribPointer(a_texCoords_location, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 130);
+    }
+    else {
+        gl.bindBuffer(gl.ARRAY_BUFFER, square_coords_buffer);
+        gl.vertexAttribPointer(a_coords_location, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, square_texCoords_buffer);
+        gl.vertexAttribPointer(a_texCoords_location, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    }    
+}
+
+/**
+ * Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type String is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ */
+function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+   var vsh = gl.createShader( gl.VERTEX_SHADER );
+   gl.shaderSource( vsh, vertexShaderSource );
+   gl.compileShader( vsh );
+   if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+      throw "Error in vertex shader:  " + gl.getShaderInfoLog(vsh);
+   }
+   var fsh = gl.createShader( gl.FRAGMENT_SHADER );
+   gl.shaderSource( fsh, fragmentShaderSource );
+   gl.compileShader( fsh );
+   if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+      throw "Error in fragment shader:  " + gl.getShaderInfoLog(fsh);
+   }
+   var prog = gl.createProgram();
+   gl.attachShader( prog, vsh );
+   gl.attachShader( prog, fsh );
+   gl.linkProgram( prog );
+   if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+      throw "Link error in program:  " + gl.getProgramInfoLog(prog);
+   }
+   return prog;
+}
+
+function loadTextures() {
+    var loaded = 0;  // number of textures that have been loaded
+    textureObjects = new Array(textureURL.length);
+    for (var i = 0; i < textureURL.length; i++) {
+        load(i,textureURL[i]);
+    }
+    function load(textureNum,url) {
+        var img = new Image();
+        img.onload = function() {
+            loaded++;
+            textureObjects[textureNum] = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, textureObjects[textureNum]);
+            try {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            }
+            catch (e) {
+                // Chrome, at least, gets a security error if it tries to use a local file.
+                document.getElementById("headline").innerHTML =
+                    "Sorry, can't access textures.  Note that some<br>browsers can't use textures from a local disk.";
+                return;
+            }
+            gl.generateMipmap(gl.TEXTURE_2D);
+            if (loaded == textureURL.length) {
+                texturesLoaded = true;
+                document.getElementById("headline").innerHTML = "WebGL Multi-texture Demo";
+                draw();
+            }
+        };
+        img.onerror = function() {
+            document.getElementById("headline").innerHTML = "Sorry, could not load textures.";
+        };
+        img.src = url;
+    }
+}
+
+/**
+ * Initialize the WebGL graphics context
+ */
+function initGL() {
+    var prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    a_coords_location = gl.getAttribLocation(prog, "a_coords");
+    a_texCoords_location = gl.getAttribLocation(prog, "a_texCoords");
+    u_tex2Mode_location= gl.getUniformLocation(prog, "u_tex2Mode");
+    u_wavy_location= gl.getUniformLocation(prog, "u_wavy");
+    u_texture1_location = gl.getUniformLocation(prog, "u_texture1");
+    u_texture2_location = gl.getUniformLocation(prog, "u_texture2");
+    gl.uniform1i(u_texture1_location, 0);
+    gl.uniform1i(u_texture2_location, 1);
+    square_coords_buffer = gl.createBuffer();
+    square_texCoords_buffer = gl.createBuffer();
+    var square_coords = new Float32Array([ -0.9,-0.9, 0.9,-0.9, 0.9,0.9, -0.9,0.9 ]);
+    var square_texCoords = new Float32Array([ 0,0, 1,0, 1,1, 0,1 ]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, square_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, square_coords, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, square_texCoords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, square_texCoords, gl.STATIC_DRAW);
+    ring_coords_buffer = gl.createBuffer();
+    ring_texCoords_buffer = gl.createBuffer();
+    var ringCoords = new Float32Array(260);
+    var ringTexCoords = new Float32Array(260);
+    for (var i = 0; i <= 64; i++) {
+        var angle = i/64 * 2*Math.PI;
+        ringCoords[4*i] = 0.3*Math.cos(angle);
+        ringCoords[4*i+1] = 0.3*Math.sin(angle);
+        ringCoords[4*i+2] = 0.9*Math.cos(angle);
+        ringCoords[4*i+3] = 0.9*Math.sin(angle);
+        ringTexCoords[4*i] = 0;
+        ringTexCoords[4*i+1] = i/16;
+        ringTexCoords[4*i+2] = 1;
+        ringTexCoords[4*i+3] = i/16;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, ring_coords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, ringCoords, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, ring_texCoords_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, ringTexCoords, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(a_coords_location); 
+    gl.enableVertexAttribArray(a_texCoords_location);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+    loadTextures();
+}
+
+
+
+/*-------------------------------------------*/
+
+/**
+ * Initialize the program.  This function is called after the page has been loaded.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("webglcanvas");
+        var options = {  // no need for alpha channel or depth buffer in this program
+            alpha: false,
+            depth: false
+        };
+        gl = canvas.getContext("webgl", options) || 
+                         canvas.getContext("experimental-webgl", options);
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context:" + e + "</p>";
+        return;
+    }
+    document.getElementById("textureChoice1").value = "6";
+    document.getElementById("textureChoice2").value = "1";
+    document.getElementById("modeChoice").value = "0";
+    document.getElementById("objectChoice").value = "Square";
+    document.getElementById("wavyCheckbox").checked = false;
+
+    document.getElementById("textureChoice1").onchange =
+        document.getElementById("modeChoice").onchange =
+        document.getElementById("textureChoice2").onchange =
+        document.getElementById("objectChoice").onchange =
+        document.getElementById("wavyCheckbox").onchange =
+           draw;
+    
+    draw();
+}
+
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">WebGL Multi-texture Demo &mdash; LOADING TEXTURES</h3>
+
+<div id="canvas-holder">
+<canvas id="webglcanvas" width="400" height="400"></canvas>
+</div>
+
+<div id="tools">
+<p>
+    <label><b>Texture #1:</b><br>
+    <select id="textureChoice1">
+        <option value="6">Brick</option>
+        <option value="7">Gradient</option>
+        <option value="8">Cloth</option>
+        <option value="9">Cloud</option>
+        <option value="10">Jigsaw</option>
+        <option value="5">Mandelbrot</option>
+    </select></label>
+</p>
+<p>
+    <label><b>Texture #2:</b><br>
+    <select id="textureChoice2">
+        <option value="1">Earth</option>
+        <option value="2">Night Earth</option>
+        <option value="0">House</option>
+        <option value="3">Marble</option>
+        <option value="4">Metal</option>
+        <option value="5">Mandelbrot</option>
+    </select></label>
+</p>
+<p>
+    <label>Mode:<br>
+    <select id="modeChoice">
+        <option value="0">Multiply</option>
+        <option value="1">Average</option>
+        <option value="2">Subtract</option>
+        <option value="3">Replace</option>
+        <option value="4">Ignore</option>
+    </select>
+</p>
+<p>
+    <label>Object:<br>
+    <select id="objectChoice">
+        <option>Square</option>
+        <option>Ring</option>
+    </select>
+</p>
+<p>
+    <label><input type="checkbox" id="wavyCheckbox">Wavy Texture</label>
+</p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This WebGL demo uses two textures in the same shader program.  To do
+this, it uses two texture units, and it used two sampler variables in
+the shader.  One texture provides a basic color for the image.  That
+basic color can then be modified by the color from the second texture.</p>
+<p>The "Mode" popup menu sets the formula that is used to combine the
+colors from the two textures.  The values can be multiplied, they can
+be averaged, or the second color can be subtracted from the first.
+Use the "Replace" mode to see the second texture with no contribution
+from the first texture.  Use the "Ignore" mode to see the first texture
+with no contribution from the second.</p>
+<p>The program uses 11 texture images.  Each texture has been loaded
+into its own VBO. So, to change from one texture to another, it is
+only necessary to bind a different buffer.  The values of the
+sampler variables are set to 0 and 1 during initialization and are
+never changed, since the same two texture units are used in all cases;
+only the VBOs that are bound to the texture units are changed.</p>
+<p>One of the images (Mandelbrot) can be
+used as either the first texture or the second texture; this is done
+just to demonstrate that you can use the same texture VBO with two
+texture units, even at the same time.</p>
+<p>The texture can be displayed either on a square or on a ring.  When
+the ring is used, four copies of the texture are shown around the ring.</p>
+<p>When the "Wavy" checkbox is checked, a distortion is applied to the
+texture. This is done by modifying the texture coordinates, by the
+formula: texCoords.y += 0.25 * sin(6.28*texCoords.x).
+This can be thought of as a non-linear texture transformation.
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

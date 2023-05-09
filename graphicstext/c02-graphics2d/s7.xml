@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="SVG: A Scene Description Language" id="graphics2d.7">
+
+<p1>We finish this chapter with a look at one more 2D graphics system:
+<newword>SVG</newword>, or Scalable Vector Graphics.  So far, we have
+been considering graphics programming APIs.  SVG, on the other
+hand is a <newword>scene description language</newword> rather
+than a programming language.  Where a programming language creates
+a scene by generating its contents procedurally, a scene description
+language specifies a scene "declaratively," by listing its content.
+Since SVG is a <word>vector graphics</word> language, the content of
+of a scene includes shapes, attributes such as color and line width,
+and geometric transforms.  Most of this should be familiar to you,
+but it should be interesting to see it in a new context.</p1>
+
+<p>SVG is an <word>XML</word> language, which means it has a very strict
+and somewhat verbose syntax.  This can make it a little annoying to write,
+but on the other hand, it makes it possible to read and understand
+SVG documents even if you are not familiar with the syntax.  It's possible
+that SVG originally stood for "Simple" Vector Graphics, but it is by
+no means a simple language at this point.  I will cover only a part of it
+here, and there are many parts of the language and many options that I will
+not mention.  My goal is to introduce the idea of a scene description language
+and to show how such a language can use the same basic ideas that are
+used in the rest of this chapter.</p>
+
+<p>SVG can be used as a file format for storing vector graphics
+images, in much the same way that PNG and JPEG are file formats for
+storing pixel-based images.  That means that you can open an SVG
+file with almost any web browser to view the image.   An SVG image can be included in a web page
+by using it as the <i>src</i> of an <tag>img</tag> element.  That's how the
+SVG examples <web>on this page</web><tex>in the 
+<a href="http://math.hws.edu/eck/cs424/graphicsbook2015/c2/s7.html">web version</a> of this
+section</tex> are displayed.  Since SVG documents are written in plain text,
+you can create SVG images using a regular text editor, and you can read the
+source for an SVG image by opening it in a text editor or by viewing the
+source of the image when it is displayed in a web browser.</p>
+
+<subsection title="SVG Document Structure" id="graphics2d.7.1">
+
+<p>An SVG file, like any XML document, starts with some standard code that almost
+no one memorizes.  It should just be copied into a new document.  Here
+is some code that can be copied as a starting point for SVG 
+documents of the type discussed in this section (which, remember use 
+only a subset of the full SVG specification):</p>
+
+<pre>&lt;?xml version="1.0"?&gt;
+&lt;!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" 
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"&gt;
+&lt;svg version="1.1" xmlns="http://www.w3.org/2000/svg" 
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        width="4in" height="4in" 
+        viewBox="0 0 400 400"
+        preserveAspectRatio="xMidYMid"&gt;
+
+    &lt;!-- The scene description goes here!  --&gt;   
+     
+&lt;/svg&gt;</pre>
+
+<np>The first three lines say that this is an XML SVG document.  The rest of
+the document is an <tag>svg</tag> element that acts as a container for the entire
+scene description.  You'll need to know a little about XML syntax.
+First, an XML "element" in its general form looks like this:
+</np>
+
+<pre>&lt;elementname attrib1="value1" attrib2="value2"&gt;
+      ...content... 
+&lt;/elementname&gt;</pre>
+
+<np>The element starts with a "start tag," which begins with a "&lt;" followed by an identifier
+that is the name of the tag, and ending with a&nbsp;"&gt;".  The start tag can include
+"attributes," which have the form <i>name=&leftquote;value"</i>.  The <i>name</i> is an identifier;
+the <i>value</i> is a string.  The value must be enclosed in single or double quotation marks.
+The element ends with an "end tag," which has an element name that matches the element name
+in the start tag and has the form &lt;/<i>elementname</i>&gt;.  Element names and attribute names
+are case-sensitive.  Between the start and end tags
+comes the "content" of the element.  The content can consist of text and nested elements.
+If an element has no content, you can replace the "&gt;" at the end of the start tag with
+"/&gt;", and leave out the end tag.  This is called a "self-closing tag." For example,
+</np>
+
+<pre>&lt;circle cx="5" cy="5" r="4" fill="red"/&gt;</pre>
+
+<np>This is an actual SVG element that specifies a circle.  It's easy to forget the "/"
+at the end of a self-closing tag, but it has to be there to have a legal XML document.</np>
+
+<p>Looking back at the SVG document, the five lines starting with &lt;svg are just a long
+start tag.  You can use the tag as shown, and customize the values of the <i>width</i>,
+<i>height</i>, <i>viewBox</i>, and <i>preserveAspectRatio</i> attributes.  The next line
+is a comment; comments in XML start with "<code>&lt;!--</code>" and end with "<code>--&gt;</code>".</p>
+
+<p>The <i>width</i> and <i>height</i> attributes of the <tag>svg</tag> tag specify a
+natural or preferred size for the image.  It can be forced into a different size, for
+example if it is used in an <tag>img</tag> element on a web page that specifies a different
+width and height.  The size can be specified using units of measure such as <i>in</i> for
+inches, <i>cm</i> for centimeters, and <i>px</i>, for pixels, with 90 pixels to the inch.
+If no unit of measure is specified, pixels are used.  There cannot be any space between
+the number and the unit of measure.</p>
+
+<p>The <i>viewBox</i> attribute sets up the <word>coordinate system</word> that will be used for 
+drawing the image.  It is what I called the <word>view window</word> in <localref href="graphics2d.3.1"/>.
+The value for viewBox is a list of four numbers,
+giving the minimum <i>x-</i>value, the minimum <i>y-value</i>, the width, and the height
+of the view window.  The width and the height must be positive, so <i>x</i> increases from
+left-to-right, and <i>y</i> increases from top-to-bottom.  The four numbers in the list
+can be separated either by spaces or by commas; this is typical for lists of numbers in SVG.</p>
+
+<p>Finally, the <i>preserveAspectRatio</i> attribute tells what happens when the
+<word>aspect ratio</word> of the viewBox does not match the aspect ratio of the rectangle
+in which the image is displayed.  The default value, "xMidYMid", will extend the limts
+on the viewBox either horizontally or vertically to preserve the aspect ratio, and the
+viewBox will appear in the center of the display rectangle.  If you would like your 
+image to stretch to fill the display rectangle, ignoring the aspect ratio, set the
+value of <i>preserveAspectRatio</i> to "none".  (The aspect ratio issue was
+discussed in <localref href="graphics2d.3.7"/>.)</p>
+
+<p>Let's look at a complete SVG document that draws a few simple shapes.  Here's the
+document.  You could probably figure out what it draws even without knowing any more
+about SVG:</p>
+
+<pre>&lt;?xml version="1.0"?&gt;
+&lt;!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" 
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"&gt;
+&lt;svg version="1.1" xmlns="http://www.w3.org/2000/svg" 
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="300px" height="200px" 
+     viewBox="0 0 3 2"
+     preserveAspectRatio="xMidYMid"&gt;
+
+&lt;rect x="0" y="0" width="3" height="2" 
+                            stroke="blue" fill="none" stroke-width="0.05"/&gt;
+&lt;text x="0.2" y="0.5" font-size="0.4" fill="red"&gt;Hello World!&lt;/text&gt;
+&lt;line x1="0.1" y1="0.7" x2="2.9" y2="0.7" stroke-width="0.05" stroke="blue"/&gt;
+&lt;ellipse cx="1.5" cy="1.4" rx=".6" ry=".4" fill="rgb(0,255,180)"/&gt;
+&lt;circle cx="0.4" cy="1.4" r="0.3" 
+                      fill="magenta" stroke="black" stroke-width="0.03"/&gt;
+&lt;polygon points="2.2,1.7 2.4,1 2.9,1.7" 
+                      fill="none" stroke="green" stroke-width="0.02"/&gt;
+  
+&lt;/svg&gt;</pre>
+
+<np>and here's the image that is produced by this example:</np>
+
+<img src="first-svg-example.svg" width="300" height="200" tex="first-svg-example.eps" texscale="0.6"/>
+
+<np>In the drawing coordinate system for this example, <i>x</i> ranges from 0 to 3, and
+<i>y</i> ranges from 0 to 2.  All values used for drawing, including stroke width
+and font size, are given in terms of this coordinate system.  Remember that you can
+use any coordinate system that you find convenient!  Note, by the way, that parts
+of the image that are not covered by the shapes that are drawn will be transparent.</np>
+
+<p>Here's another example, with a larger variety of shapes.  The source code for this
+example has a lot of comments. It uses features that we will discuss in the remainer of
+this section.</p>
+
+<img src="svg-starter.svg" width="300" height="300" tex="svg-starter.eps" texscale="0.6"/>
+
+<np>You can take a look at the source code, <sourceref href="svg/svg-starter.svg"/>.
+(For example, open it in a text editor, or open it in a web browser and use the
+browser's "view source" command.)</np>
+
+</subsection>
+
+
+<subsection title="Shapes, Styles, and Transforms" id="graphics2d.7.2">
+
+<p>In SVG, a basic shape is specified by an element in which the tag name gives the
+shape, and attributes give the properties of the shape.  There are attributes to specify
+the geometry, such as the endpoints of a line or the radius of a circle.
+Other attributes specify style properties, such as fill color and line width.
+(The style properties are what I call <word term="attribute">attributes</word> elsewhere
+in this book; in this section, I am using the term "attribute" in its XML sense.)
+And there is a <i>transform</i> attribute that can be used to apply a
+<word>geometric transform</word> to the shape.</p>
+
+<p>For a detailed example, consider the <i>rect</i> element, which specifies a rectangle.  
+The geometry of the rectangle is given by attributes named <i>x</i>, <i>y</i>, <i>width</i>
+and <i>height</i> in the usual way.  The default value for <i>x</i> and <i>y</i> is zero;
+that is, they are optional, and leaving them out is the same as setting their value to zero.
+The <i>width</i> and the <i>height</i> are required attributes.  Their values must be
+non-negative.  For example, the element</p>
+
+<pre>&lt;rect width="3" height="2"/&gt;</pre>
+
+<np>specifies a rectangle with corner at (0,0), width 3, and height 2, while</np>
+
+<pre>&lt;rect x="100" y="200" height="480" width="640"/&gt;</pre>
+
+<np>gives a rectangle with corner at (100,200), width 640, and height 480.  (Note, by
+the way, that the attributes in an XML element can be given in any order.)  The <i>rect</i>
+element also has optional attributes <i>rx</i> and <i>ry</i> that can be used to make
+"roundRects," with their corners replaced by elliptical arcs.  The values of <i>rx</i>
+and <i>ry</i> give the horizontal and vertical radii of the elliptical arcs.</np>
+
+<p>Style attributes can be added to say how the shape should be stroked and filled.
+The default is to use a black fill and no stroke.  (More precisely, as we will see later,
+the default is for a shape to inherit the values of style attributes from its 
+environment.  Black fill and no stroke is the initial environment.)  Here are some
+common style attributes:</p>
+
+<ul>
+<li><codedef>fill</codedef> &mdash; specifies how to fill the shape.  The value can be
+"none" to indicate that the shape is not filled.  It can be be a color, in the same format
+as the <word>CSS</word> colors that are used in the <word>HTML canvas</word> API.  For example,
+it can be a common color name such as "black" or "red", or an <word>RGB color</word>
+such as "rgb(255,200,180)".  There are also gradient and pattern fills, though I will not
+discuss them here.</li>
+<li><codedef>stroke</codedef> &mdash; specifies how to stroke the shape, with the same
+possible values as "fill".</li>
+<li><codedef>stroke-opacity</codedef> and <codedef>fill-opacity</codedef> &mdash; are numbers
+between 0.0 and 1.0 that specify the opacity of the stroke and fill.  Values less than 1.0
+give a translucent stroke or fill.  The default value, 1.0, means fully opaque.</li>
+<li><codedef>stroke-width</codedef> &mdash; is a number that sets the line width to use
+for the stroke.  Note that the line width is subject to transforms.  The default value
+is&nbsp;"1", which is fine if the coordinate system is using pixels as the unit of measure,
+but often too wide in custom coordinate systems.</li>
+<li><codedef>stroke-linecap</codedef> &mdash; determines the appearance of the endpoints of
+a stroke.  The value can be "square", "round", or "butt".  The default is "butt".
+(See <localref href="graphics2d.2.1"/> for a discussion of line caps and joins.)
+</li>
+<li><codedef>stroke-linejoin</codedef> &mdash; determines the appearance of points where
+two segments of a stroke meet.  The values can be "miter", "round", or "bevel".  The
+default is "miter".</li>
+</ul>
+
+<np>As an example that uses many of these options, let's make a square that is rounded rather than pointed 
+at the corners, with size 1, centered
+at the origin, and using a translucent red fill and a gray stroke:</np>
+
+<pre>&lt;rect x="-0.5" y="-0.5" width="1" height="1" 
+          rx="0.1" ry="0.1"
+          fill="red" fill-opacity="0.5"
+          stroke="gray" stroke-width="0.05" stroke-linejoin="round"/&gt;</pre>
+
+<np>and a simple outline of a rectangle with no fill:</np>
+
+<pre>&lt;rect width="200" height="100" stroke="black" fill="none"/&gt;</pre>
+
+<break/>
+
+<p>The <i>transform</i> attribute can be used to apply a transform or a series of
+transforms to a shape.  As an example, we can make a rectangle tilted 30 degrees from
+the horizontal:</p>
+
+<pre>&lt;rect width="100" height="50" transform="rotate(30)"/&gt;</pre>
+
+<np>The value "rotate(30)" represents a rotation of 30 degrees (not radians!) about the 
+origin, (0,0). The positive direction of rotation, as usual, rotates the positive x-axis in the
+direction of the positive y-axis.  You can specify a different center of rotation by
+adding arguments to <i>rotate</i>.  For example, to rotate the same rectangle about its
+center</np>
+
+<pre>&lt;rect width="100" height="50" transform="rotate(30,50,25)"/&gt;</pre>
+
+<p>Translation and scaling work as you probably expect, with transform values of
+the form "translate(<i>dx,dy</i>)" and "scale(<i>sx,sy</i>)".  There are also
+<word term="shear transform">shear</word> transforms, but they go by the
+names <i>skewX</i> and <i>skewY</i>, and the argument is a skew angle rather
+than a shear amount.  For example, the transform "skewX(45)" tilts the y-axis
+by 45 degrees and is equivalent to an x-shear with shear factor&nbsp;1.
+(The function that tilts the y-axis is called <i>skewX</i> because it modifies,
+or skews, the x-coordinates of points while leaving their y-coordinates unchanged.)
+For example, we can use <i>skewX</i> to tilt a rectangle and make it into a
+parallelogram:</p>
+
+<pre>&lt;rect width="100" height="50" transform="skewX(-30)"/&gt;</pre>
+
+<np>I used an angle of -30 degrees to make the rectangle tilt to the right
+in the usual pixel coordinate system.</np>
+
+<p>The value of the <i>transform</i> attribute can be a list of transforms,
+separated by spaces or commas.  The transforms are applied to the object, as
+usual, in the opposite of the order in which they are listed. So,</p>
+
+<pre>&lt;rect width="100" height="50" 
+         transform="translate(0,50) rotate(45) skewX(-30)"/&gt;</pre>
+
+<np>would first skew the rectangle into a parallelogram, then rotate the parallelogram
+by 45 degrees about the origin, then translate it by 50 units in the y-direction.</np>
+
+<break/>
+
+<p>In addition to rectangles, SVG has lines, circles, ellipses, and text as basic
+shapes.  Here are some details.  A <tag>line</tag> element represents a line segement and
+has geometric attributes <i>x1</i>, <i>y1</i>, <i>x2</i>, and <i>y2</i> to specify the 
+coordinates of the endpoints of the line segment.  These four attributes have
+zero as default value, which makes it easier to specify horizontal and vertical lines.
+For example,</p>
+
+<pre>&lt;line x1="100" x2="300" stroke="black"/&gt;</pre>
+
+<np>Without the <i>stroke</i> attribute, you wouldn't see the line, since the default
+value for <i>stoke</i> is "none".</np>
+
+<p>For a <tag>circle</tag> element, the geometric attributes are <i>cx</i>, <i>cy</i>, and <i>r</i>
+giving the coordinates of the center of the circle and the radius.  The center coordinates
+have default values equal to zero.  For an <tag>ellipse</tag> element, the attributes are
+<i>cx</i>, <i>cy</i>, <i>rx</i>, and <i>ry</i>, where <i>rx</i> and <i>ry</i> give
+the radii of the ellipse in the x- and y-directions.</p>
+
+<p>A <tag>text</tag> element is a little different.  It has attributes <i>x</i> and <i>y</i>,
+with default values zero, to specify the location of the basepoint of the text.  However,
+the text itself is given as the content of the element rather than as an attribute.  That is,
+the element is divided into a start tag and an end tag, and the text that will appear in
+the drawing comes between the start and end tags.  For example,</p>
+
+<pre>&lt;text x="10" y="30"&gt;This text will appear in the image&lt;/text&gt;</pre>
+
+<np>The usual stroke and fill attributes apply to text, but text has additional style
+attributes.  The <i>font-family</i> attribute specifies the font itself.  Its value
+can be one of the generic font names "serif", "sans-serif", "monospace", or the name of
+a specific font that is available on the system.  The <i>font-size</i> can be a number
+giving the (approximate) height of the characters in the coordinate system.  (Font size
+is subject to coordinate and modeling transforms like any other length.)  You can get
+bold and italic text by setting <i>font-weight</i> equal to "bold" and
+<i>font-style</i> equal to "italic".  Here is an example that uses all of these options,
+and applies some additional styles and a transform for good measure:</np>
+
+<pre>&lt;text x="10" y="30" 
+    font-family="sans-serif" font-size="50" 
+    font-style="italic" font-weight="bold"
+    stroke="black" stroke-width="1" fill="rgb(255,200,0)"
+    transform="rotate(20)"&gt;Hello World&lt;/text&gt;</pre>
+
+</subsection>
+
+
+
+<subsection title="Polygons and Paths" id="graphics2d.7.3">
+
+<p>SVG has some nice features for making more complex shapes.  The <tag>polygon</tag> element
+makes it easy to create a polygon from a list of coordinate pairs.  For example,</p>
+
+<pre>&lt;polygon points="0,0 100,0 100,75 50,100 0,75"/&gt;</pre>
+
+<np>creates a five-sided polygon with vertices at (0,0), (100,0), (100,75), (50,100), and
+(0,75).  Every pair of numbers in the <i>points</i> attribute specifies a vertex.  The numbers
+can be separated by either spaces or commas.  I've used a mixture of spaces and commas here to
+make it clear how the numbers pair up.   Of course, you can add the usual style attributes
+for stroke and fill to the polygon element.  A <tag>polyline</tag> is similar to a <tag>polygon</tag>,
+except that it leaves out the last line from the final vertex back to the starting vertex.
+The difference only shows up when a polyline is stroked; a polyline is filled as if the
+missing side were added.</np>
+
+<p>The <tag>path</tag> element is much more interesting. In fact, all of the other basic shapes,
+except text, could be made using path elements.  A path can consist of line segments,
+<word term="Bezier curve">Bezier curves</word>, and elliptical arcs (although I won't
+discuss elliptical arcs here).  The syntax for
+specifying a path is very succinct, and it has some features that we have not seen before.
+A path element has an attribute named <i>d</i> that contains the data for the path.  The
+data consists of one or more commands, where each command consists of a single letter followed
+by any data necessary for the command.  The moveTo, lineTo, cubic Bezier, and quadratic
+Bezier commands that you are already familiar with are coded by the letters M, L, C, and Q.
+The command for closing a path segment is Z, and it requires no data.
+For example the path data "M&nbsp;10&nbsp;20&nbsp;L&nbsp;100&nbsp;200" would draw a line segment
+from the point (10,20) to the point (100,200).  You can combine several connected line segments
+into one L command.  For example, the <tag>polygon</tag> example given above could be created
+using the <tag>path</tag> element</p>
+
+<pre>&lt;path d="M 0,0 L 100,0 100,75 50,100 0,75 Z"/></pre>
+
+<np>The Z at the end of the data closes the path by adding the final side to the polygon.
+(Note that, as usual, you can use either commas or spaces in the data.)</np>
+
+<p>The C command takes six numbers as data, to specify the two control points and the final
+endpoint of the cubic Bezier curve segment.  You can also give a multiple of six values to get
+a connected sequence of curve segements.  Similarly, the Q command uses four data values to
+specify the control point and final endpoint of the quadratic Bezier curve segment.
+The large, curvy, yellow shape shown in the picture earlier in this section was created
+as a path with two line segments and two Bezier curve segments:</p>
+
+<pre>&lt;path 
+   d="M 20,70 C 150,70 250,350 380,350 L 380,380 C 250,380 150,100 20,100 Z"
+   fill="yellow" stroke-width="2" stroke="black"/&gt;</pre>
+   
+<p>SVG paths add flexibility by defining "relative" versions of the path commands,
+where the data for the command is given relative to the current position.
+A relative move command, for example, instead of telling <i>where</i> to move,
+tells <i>how far</i> to move from the current position.  The names of the 
+relative versions of the path commands are lower case letters instead of upper case.
+"M&nbsp;10,20" means to move to the point with coordinates (10,20), while
+"m&nbsp;10,20" means to move 10 units horizontally and 20 units vertically
+from the current position.  Similarly, if the current position is (<i>x,y</i>), then
+the command "l&nbsp;3,5", where the first character is a lower case L, draws a line from (<i>x,y</i>) to
+(<i>x</i>+3,<i>y+5</i>).</p>
+
+
+</subsection>
+
+
+
+<subsection title="Hierarchical Models" id="graphics2d.7.4">
+
+<p>SVG would not be a very interesting language if it could only work with
+individual simple shapes.  For complex scenes, we want to be able to do
+<word>hierarchical modeling</word>, where objects can be constructed from
+sub-objects, and a transform can be applied to an entire complex object.
+We need a way to group objects so that they can be treated as a unit.
+For that, SVG has the <tag>g</tag> element.  The content of a <tag>g</tag>
+element is a list of shape elements, which can be simple shapes or
+nested <tag>g</tag> elements.</p>
+
+<p>You can add style and <i>transform</i> attributes to a <tag>g</tag> element.
+The main point of grouping is that a group can be treated as a single
+object.  A <i>transform</i> attribute in a <tag>g</tag> will transform the
+entire group as a whole.  A style attribute, such as <i>fill</i> or
+<i>font-family</i>, on a <tag>g</tag> element will set a default value 
+for the group, replacing the current default.  Here is an example:</p>
+
+<pre>&lt;g fill="none" stroke="black" stroke-width="2" transform="scale(1,-1)"&gt;
+     &lt;circle r="98"/&gt;
+     &lt;ellipse cx="40" cy="40" rx="20" ry="7"/&gt;
+     &lt;ellipse cx="-40" cy="40" rx="20" ry="7"/&gt;
+     &lt;line y1="20" y2="-10"/&gt;
+     &lt;path d="M -40,-40 C -30,-50 30,-50 40,-40" stroke-width="4"/&gt;
+&lt;/g&gt;</pre>
+
+<np>The nested shapes use fill=&leftquote;none" stroke=&leftquote;black" stroke-width=&leftquote;2" for the
+default values of the attributes.  The default can be overridden by specifying
+a different value for the element, as is done for the stroke-width of the
+<tag>path</tag> element in this example.  Setting transform=&leftquote;scale(1,&minus;1)"
+for the group flips the entire image vertically.  I do this only because
+I am more comfortable working in a coordinate system in which y increases
+from bottom-to-top rather than top-to-bottom.  Here is the simple line
+drawing of a face that is produced by this group:</np>
+
+<img src="svg-face.svg" width="200" height="200" tex="svg-face.eps" texscale="0.5"/>
+
+<p>Now, suppose that we want to include multiple copies of an object in
+a scene.  It shouldn't be necessary to repeat the code for drawing the object.
+It would be nice to have something like reusable subroutines.  In fact,
+SVG has something very similar: You can define reusable objects inside a
+<tag>defs</tag> element.  An object that is defined inside <tag>defs</tag> is
+not added to the scene, but copies of the object can be added to the scene
+with a single command.  For this to work, the object must have an <i>id</i> attribute
+to identify it.  For example, we could define an object that looks like a plus sign:</p>
+
+<pre>&lt;defs&gt;
+   &lt;g id="plus" stroke="black"&gt;
+      &lt;line x1="-20" y1="0" x2="20" y2="0"/&gt;
+      &lt;line x1="0" y1="-20" x2="0" y2="20"/&gt;
+   &lt;/g&gt;
+&lt;/defs&gt;</pre>
+
+<np>A <tag>use</tag> element can then be used to add a copy of the plus sign
+object to the scene.  The syntax is</np>
+
+<pre>&lt;use xlink:href="#plus"/&gt;</pre>
+
+<np>The value of the <i>xlink:href</i> attribute must be the <i>id</i> of the object,
+with a "#" character added at the beginning. (Don't forget the&nbsp;#.  If you leave it out,
+the <tag>use</tag> element will simply be ignored.)  You can add a <i>transform</i> attribute
+to the <tag>use</tag> element to apply a transformation to the copy of the object.  You can also apply
+style attributes, which will be used as default values for the attributes in the copy.  For
+example, we can draw several plus signs with different transforms and stroke widths:</np>
+
+<pre>&lt;use xlink:href="#plus" transform="translate(50,20)" stroke-width="5"/&gt;
+&lt;use xlink:href="#plus" transform="translate(0,30) rotate(45)"/&gt;</pre>
+
+<np>Note that we can't change the color of the plus sign, since it already specifies
+its own stroke color.</np>
+
+<p>An object that has been defined in the <tag>defs</tag> section can also be used
+as a sub-object in other object definitions.  This makes it possible to create
+a hierarchy with multiple levels.  Here is an example from <sourceref href="svg/svg-hierarchy.svg"/>
+that defines a "wheel" object, then uses two copies of the wheel as sub-objects in a 
+"cart" object:</p>
+
+<pre>&lt;defs&gt;
+
+&lt;!-- Define an object that represents a wheel centered at (0,0) and with
+     radius 1.  The wheel is made out of several filled circles, with
+     thin rectangles for the spokes. --&gt;
+
+&lt;g id="wheel"&gt;
+    &lt;circle cx="0" cy="0" r="1" fill="black"/&gt;
+    &lt;circle cx="0" cy="0" r="0.8" fill="lightGray"/&gt;
+    &lt;rect x="-0.9" y="-0.05" width="1.8" height=".1" fill="black"/&gt;
+    &lt;rect x="-0.9" y="-0.05" width="1.8" height=".1" fill="black" 
+                                              transform="rotate(120)"/&gt;
+    &lt;rect x="-0.9" y="-0.05" width="1.8" height=".1" fill="black" 
+                                              transform="rotate(240)"/&gt;
+    &lt;circle cx="0" cy="0" r="0.2" fill="black"/&gt;
+&lt;/g&gt;
+
+&lt;!-- Define an object that represents a cart made out of two wheels,
+      with two rectangles for the body of the cart. --&gt;
+     
+&lt;g id="cart"&gt;
+   &lt;use xlink:href="#wheel" transform="translate(-1.5,-0.1) scale(0.8,0.8)"/&gt;
+   &lt;use xlink:href="#wheel" transform="translate(1.5,-0.1) scale(0.8,0.8)"/&gt;
+   &lt;rect x="-3" y="0" width="6" height="2"/&gt;
+   &lt;rect x="-2.3" y="1.9" width="2.6" height="1"/&gt;
+&lt;/g&gt;
+
+&lt;/defs&gt;</pre>
+
+<np>The SVG file goes on to add one copy of the wheel and four copies of the
+cart to the image.  The four carts have different colors and transforms.
+Here is the image:</np>
+
+<img src="svg-hierarchy.svg" width="300" height="225" tex="svg-hierarchy.eps" texscale="0.5"/>
+
+</subsection>
+
+
+
+<subsection title="Animation" id="graphics2d.7.5">
+
+<p>SVG has a number of advanced features that I won't discuss here, but I do want to
+mention one: <word>animation</word>.  It is possible to animate almost any property
+of an SVG object, including geometry, style, and transforms.  The syntax for animation
+is itself fairly complex, and I will only do a few examples.  But I will tell you enough
+to produce a fairly complex hierarchical animation like the "cart-and-windmills"
+example that was discussed and used as a demo in <localref href="graphics2d.4.1"/>.
+An SVG version of that animation can be found in <sourceref href="svg/cart-and-windmills.svg"/>.
+<web>Here is what it looks like, although some web browsers might not show the animation, 
+since some browsers do not
+implement SVG animations correctly or at all:</web><tex>(But note that some web browsers do not implement
+SVG animations correctly or at all.)</tex></p>
+
+<webdiv><img src="cart-and-windmills.svg" width="350" height="250"/></webdiv>
+
+<p>Many attributes of a shape element can be animated by adding an <tag>animate</tag>
+element to the content of the shape element.   Here is an example that makes a rectangle
+move across the image from left to right:</p>
+
+<pre>&lt;rect x="0" y="210" width="40" height="40"&gt;
+     &lt;animate attributeName="x"
+     from="0" to="430" dur="7s"
+     repeatCount="indefinite"/&gt;
+&lt;/rect&gt;</pre>
+
+<np>Note that the <tag>animate</tag> is nested inside the <tag>rect</tag>.
+The <i>attributeName</i> attribute tells which attribute of the <tag>rect</tag>
+is being animated, in this case,&nbsp;<i>x</i>.  The <i>from</i> and <i>to</i> attributes
+say that <i>x</i> will take on values from 0 to 430.  The <i>dur</i> attribute is the
+"duration", that is, how long the animation lasts; the value "7s" means "7 seconds."
+The attribute <i>repeatCount</i>=&leftquote;indefinite" means that after the animation completes,
+it will start over, and it will repeat indefinitely, that is, as long as the image is
+displayed.  If the <i>repeatCount</i> attribute is omitted, then after the animation
+runs once, the rectangle will jump back to its original position and remain there.
+If <i>repeatCount</i> is replaced by <i>fill</i>=&leftquote;freeze", then after the animation runs,
+the rectangle will be frozen in its final position, instead of jumping back to the starting
+position.  The animation begins when the image first loads.  If you want the animation to
+start at a later time, you can add a <i>begin</i> attribute whose value gives the time
+when the animation should start, as a number of seconds after the image loads.</np>
+
+<p>What if we want the rectangle to move back and forth between its initial and final
+position?  For that, we need something called <newword>keyframe animation</newword>,
+which is an important idea in its own right.  The <i>from</i> and <i>to</i> attributes
+allow you to specify values only for the beginning and end of the animation.  In a keyframe
+animation, values are specified at additional times in the middle of the animation.
+For a keyframe animation in SVG, the <i>from</i> and <i>to</i> attributes are replaced
+by <i>keyTimes</i> and <i>values</i>.  Here is our moving rectangle example,
+modified to use keyframes:</p>
+
+<pre>&lt;rect x="0" y="210" width="40" height="40"&gt;
+     &lt;animate attributeName="x"
+     <newcode>keyTimes="0;0.5;1" values="0;430;0"</newcode> dur="7s"
+     repeatCount="indefinite"/&gt;
+&lt;/rect&gt;</pre>
+
+<np>The <i>keyTimes</i> attribute is a list of numbers, separated by semicolons.
+The numbers are in the range 0 to 1, and should be in increasing order.  The first number
+should be 0 and the last number should be 1.  A number specifies a time during the animation,
+as a fraction of the complete animation.  For example, 0.5 is a point half-way through the
+animation, and 0.75 is three-quarters of the way.  The <i>values</i> attribute is a list
+of values, with one value for each key time.  In this case, the value for <i>x</i> is
+0 at the start of the animation, 430 half-way through the animation, and 0 again at the
+end of the animation.  Between the key times, the value for <i>x</i> is obtained by interpolating
+between the values specified for the key times.  The result in this case is that the rectangle
+moves from left to right during the first half of the animation and then back from right to
+left in the second half.</np>
+
+<p>Transforms can also be animated, but you need to use the <tag>animateTransform</tag>
+tag instead of <tag>animate</tag>, and you need to add a <i>type</i> attribute to specify
+which transform you are animating, such as "rotate" or "translate".  Here, for example,
+is a transform animation applied to a group:</p>
+
+<pre>&lt;g transform="scale(0,0)"&gt;
+    &lt;animateTransform attributeName="transform" type="scale"
+           from="0,0" to="0.4,0.7"
+           begin="3s" dur="15s" fill="freeze"/&gt;
+    &lt;rect x="-15" y="0" width="30" height="40" fill="rgb(150,100,0)"/&gt;
+    &lt;polygon points="-60,40 60,40 0,200" fill="green"/&gt;
+&lt;/g&gt;</pre>
+
+<np>The animation shows a growing "tree" made from a green triangle and a brown rectangle.
+In the animation, the transform goes from <i>scale</i>(0,0) to <i>scale</i>(0.4,0.7).
+The animation starts 3 seconds after the image loads and lasts 15 seconds.  At the end
+of the animation, the tree freezes at its final scale.  The <i>transform</i> attribute
+on the <tag>g</tag> element specifies the scale that is in effect until the animation
+starts.  (A scale factor of 0 collapses the object to size zero, so that it is invisible.)
+You can find this example, along with a moving rectangle and a keyframe animation, in 
+the sample file <sourceref href="svg/first-svg-animation.svg"/>.<web> Here is the
+animation itself.  To see the growing trees, you might have to reload this page or view
+the image in a separate window:</web></np>
+
+<webdiv><img src="first-svg-animation.svg" width="376" height="200"/></webdiv>
+
+<p>You can create animated objects in the <tag>defs</tag> section of an SVG file,
+and you can apply animation to <tag>use</tag> elements.  This makes it possible
+to create hierarchical animations.  <web>Here is a simple example:</web><tex>A simple example can be
+found in the sample file <sourceref href="svg/hierarchical-animation.svg"/>.</tex></p>
+
+<webdiv><img src="hierarchical-animation.svg" width="300" height="180"/></webdiv>
+
+<p>The example shows a rotating hexagon with a rotating square at each vertex of the
+hexagon.  The hexagon is constructed from six copies of one object, with a different rotation
+applied to each copy.  (A copy of the basic object is shown in the image to the right of the
+hexagon.)  The square is defined as an animated object with its own rotation.  It is used
+as a sub-object in the hexagon.  The rotation that is applied to the hexagon applies to the
+square, on top of its own built-in rotation.  That's what makes this an example of
+hierarchical animation.</p>
+
+<p>If you look back at the <sourceref href="svg/cart-and-windmills.svg">cart-and-windmills</sourceref> 
+example now, you can probably see how to do the animation.  Don't forget to check out the source code,
+which is surprisingly short!</p>
+
+</subsection>
+
+
+
+</section>

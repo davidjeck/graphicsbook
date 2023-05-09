@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section id="introduction.2" title="Elements of 3D Graphics">
+
+<p1>When we turn to 3D graphics, we find that the most common approaches have more
+in common with <word>vector graphics</word> than with <word>raster graphics</word>.  
+That is, the content of an image is specified as a list of geometric objects. 
+The technique is referred to as <newword>geometric modeling</newword>. The starting point
+is to construct an "artificial 3D world" as a collection of simple geometric shapes, arranged in
+three-dimensional space.  The objects can have <word term="attribute">attributes</word> that, combined with
+global properties of the world, determine the appearance of the objects.
+Often, the range of basic shapes is very limited, perhaps including only points, line segments,
+and triangles.  A more complex shape such as a polygon or sphere can be built or
+approximated as a collection of more basic shapes, if it is not itself considered
+to be basic.  To make a two-dimensional image of the scene,
+the scene is <word term="projection">projected</word> from three dimensions 
+down to two dimensions.  Projection is the equivalent of
+taking a photograph of the scene.  Let's look at how it all works in a
+little more detail.</p1>
+
+<p><b>First, the geometry&dots;.</b>
+We start with an empty 3D space or "world." Of course, this space exists only conceptually, but it's 
+useful to think of it as real and to be able to visualize it in your mind.  The space needs
+a <word>coordinate system</word> that associates each point in the space with three numbers, 
+usually referred to as the <i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point.
+This coordinate system is referred to as "world coordinates."</p>
+
+<p>We want to build a scene inside the world, made up of geometric objects.  For example, 
+we can specify a line segment in the scene by giving the coordinates of its two endpoints, 
+and we can specify a triangle by giving the coordinates of its three vertices.  The smallest building
+blocks that we have to work with, such as line segments and triangles, are called
+<newword term="geometric primitive">geometric primitives</newword>.  Different graphics
+systems make different sets of primitive available, but in many cases only very basic
+shapes such as lines and triangles are considered primitive.  A complex scene can contain
+a large number of primitives, and it would be very difficult to create the scene by
+giving explicit coordinates for each individual primitive.  The solution, as any programmer
+should immediately guess, is to chunk together primitives into reusable components.
+For example, for a scene that contains several automobiles, we might create a geometric
+model of a wheel.  An automobile can be modeled as four wheels together with models of
+other components.  And we could then use several copies of the automobile model in the
+scene.  Note that once a geometric model has been designed, it can be used as a
+component in more complex models.  This is referred to as <newword>hierarchical modeling</newword>.</p>
+
+<p>Suppose that we have constructed a model of a wheel out of geometric primitives.
+When that wheel is moved into position in the model of an automobile, the coordinates of
+all of its primitives will have to be adjusted.  So what exactly have we gained by building
+the wheel?  The point is that all of the coordinates in the wheel are adjusted
+<i>in the same way</i>.  That is, to place the wheel in the automobile, we just have to
+specify a single adjustment that is applied to the wheel as a whole.  The type of "adjustment"
+that is used is called a <newword>geometric transform</newword> (or geometric
+transformation).  A geometric transform
+is used to adjust the size, orientation, and position of a geometric object.  When making
+a model of an automobile, we build <i>one</i> wheel.  We then apply four different
+transforms to the wheel model to add four copies of the wheel to the automobile.
+Similarly, we can add several automobiles to a scene by applying different transforms
+to the same automobile model.</p>
+
+<p>The three most basic kinds of geometric transform are called <newword>scaling</newword>,
+<newword>rotation</newword>, and <newword>translation</newword>.
+A scaling transform is used to set the size of an object, that is, to make it bigger or smaller
+by some specified factor.
+A rotation transform is used to set an object's orientation, by rotating it by some  angle
+about some specific axis.  A translation transform is used to set the position of an
+object, by displacing it by a given amount from its original position.
+In this book, we will meet these transformations first in two dimensions, where they
+are easier to understand. But it is in 3D graphics that they become truly essential.</p>
+
+
+<break/>
+
+<p><b>Next, appearance&dots;.</b>
+Geometric shapes by themselves are not very interesting.  You have to be able
+to set their appearance.  This is done by assigning <word term="attribute">attributes</word>
+to the geometric objects.  An obvious attribute is color, but getting a realistic 
+appearance turns out to be a lot more complicated than simply specifying a color
+for each primitive.  In 3D graphics, instead of color, we usually talk about
+<newword>material</newword>.   The term material here refers to the properties that determine the
+intrinsic visual appearance of a surface.  Essentially, this means how the surface
+interacts with light that hits the surface.  Material properties can include a basic
+color as well as other properties such as shininess, roughness, and transparency.
+</p>
+
+<p>One of the most useful kinds of material property is a <newword>texture</newword>.
+In most general terms, a texture is a way of varying material properties from point-to-point
+on a surface.  The most common use of texture is to allow different colors for different
+points.  This is often done by using a 2D image as a texture.  The image can be applied to a surface
+so that the image looks like it is "painted" onto the surface.
+However, texture can also refer to changing values for things like transparency or
+"bumpiness."  Textures allow us to add detail to a scene without using a huge number of
+geometric primitives; instead, you can use a smaller number of textured primitives.</p>
+
+<p>A material is an intrinsic property of an object, but the actual appearance of the
+object also depends on the environment in which the object is viewed.
+In the real world, you don't see anything unless there is some light in the environment.
+The same is true in 3D graphics:  you have to add simulated <newword>lighting</newword>
+to a scene.  There can be several sources of light in a scene.  Each light source can have 
+its own color, intensity, and direction or position.  The light from those sources will 
+then interact with the material properties of the objects in the scene.  Support for
+lighting in a graphics system can range from fairly simple to very complex and computationally
+intensive.</p>
+
+<break/>
+
+<p><b>Finally, the image&dots;.</b>
+In general, the ultimate goal of 3D graphics is to produce 2D images of the 3D world.  
+The transformation from 3D to 2D involves <newword>viewing</newword> and
+<newword>projection</newword>.  The world looks different when seen from different
+points of view.  To set up a point of view, we need to specify the position of the viewer 
+and the direction that the viewer is looking.  It is also necessary to specify
+an "up" direction, a direction that will be pointing upwards in the final image.
+This can be thought of as placing a "virtual camera" into the scene.  Once the
+view is set up, the world as seen from that point of view can be projected into
+2D.  Projection is analogous to taking a picture with the camera.</p>
+
+<p>The final step in 3D graphics is to assign colors to individual pixels in 
+the 2D image. This process is called <newword>rasterization</newword>,
+and the whole process of producing an image is referred to as <newword>rendering</newword>
+the scene.</p>
+
+<p>In many cases the ultimate goal is not to create a single image, but to create an
+<newword>animation</newword>, consisting a sequence of images that show the world
+at different times.  In an animation, there are small changes from one image in the
+sequence to the next.  Almost any aspect of a scene can change during an animation,
+including coordinates of primitives, transformations, material properties, and the view.
+For example, an object can be made to grow over the course of an animation by
+gradually increasing the scale factor in a scaling transformation that is applied to
+the object.  And changing the view during an animation can give the effect of
+moving or flying through the scene.  Of course, it can be difficult to compute
+the necessary changes.  There are many techniques to help with the computation.  One of the most 
+important is to use a "physics engine," which computes the motion 
+and interaction of objects based on the laws of physics.  (However, you won't learn
+about physics engines in this book.)</p>
+
+</section>

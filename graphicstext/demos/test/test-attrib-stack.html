@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>3D Axes</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/teapot-model-IFS.js"></script>
+<script>
+    
+    function drawModelIFS(model) {
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(3,GL_FLOAT,0,model.vertexPositions);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glNormalPointer(GL_FLOAT, 0, model.vertexNormals);
+        glDrawElements(GL_TRIANGLES, model.indices.length, GL_UNSIGNED_BYTE, model.indices);
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
+        
+    }
+
+        
+function draw() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glColor3d(1,0,0);
+    
+    //glRectf(-1,-1,1,1);
+    //glPushAttrib(GL_CURRENT_BIT);
+    //glColor3d(0,1,0);
+    //glRectf(1,1,2,2);
+    //glPopAttrib();
+    //glRectf(2,2,4,4);
+    
+    
+    //glPushAttrib(GL_ENABLE_BIT);
+    //glPushMatrix();
+    //glEnable(GL_LIGHTING);
+    //glEnable(GL_LIGHT0);
+    //glEnable(GL_NORMALIZE);
+    //glScalef(0.2,0.2,0.2);
+    //drawModelIFS(teapotModel);
+    //glPopMatrix();
+    //glPopAttrib();
+    //glRecti(-4,-4,4,4);
+    
+    glPushAttrib(GL_VIEWPORT_BIT);
+    glViewport(0,0,200,200);
+    
+    glPushAttrib(GL_LIGHTING_BIT);
+    
+    glPushMatrix();
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glPushAttrib(GL_LIGHTING_BIT);
+    glScalef(0.2,0.2,0.2);
+    drawModelIFS(teapotModel);
+    glPopMatrix();
+    
+//    glDisable(GL_LIGHT0);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [1,1,0,1]);
+    glPushMatrix();
+    glTranslatef(2,2,0);
+    glScalef(0.2,0.2,0.2);
+    drawModelIFS(teapotModel);
+    glPopMatrix();
+    
+    glPopAttrib();
+    glPushMatrix();
+    glTranslatef(-2,2,0);
+    glScalef(0.2,0.2,0.2);
+    drawModelIFS(teapotModel);
+    glPopMatrix();
+    
+    glPopAttrib();
+    glRecti(-4,-4,4,4);
+
+    glPopAttrib();
+    glColor3d(0,1,0);
+    glRecti(0,0,4,4);
+    
+    
+}
+
+function initGL() {
+    glClearColor(0.5,0.5,0.5,1);
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    glOrtho(-5,5,-5,5,-5,5);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas",null);
+        initGL();
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                 e + "</b></p>";
+                 return;
+    }
+    draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">Demo headline goes here</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="400" height="400"></canvas>
+</div>
+
+<div id="tools">
+<h3 style="margin-top:0pt">Tools</h3>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

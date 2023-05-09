@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="Some Linear Algebra" id="gl1geom.5">
+
+<p1>Linear algebra is a branch of mathematics that is fundamental to
+computer graphics.  It studies <word term="vector">vectors</word>,
+<word term="linear transformation">linear transformations</word>,
+and <word term="matrix">matrices</word>.  We have already encountered
+these topics in <localref href="graphics2d.3.8"/> in a two-dimensional
+context.  In this section, we look at them more closely and extend
+the discussion to three dimensions.</p1>
+
+<p>It is not essential that you know the mathematical details that
+are covered in this section, since they can be handled internally in
+OpenGL or by software libraries.  However, you will need to be familiar
+with the concepts and the terminology. This is especially true for
+modern OpenGL, which leaves many of the details up to your programs.
+Even when you have a software library to handle the details, you still
+need to know enough to use the library.  You might want to skim
+this section and use it later for reference.</p>
+
+<subsection title="Vectors and Vector Math" id="gl1geom.5.1">
+
+<p>A vector is a quantity that has a length and a direction.  A vector can be visualized
+as an arrow, as long as you remember that it is the length and direction of the
+arrow that are relevant, and that its specific location is irrelevant.
+Vectors are often used in computer graphics to represent directions, such as
+the direction from an object to a light source or the direction in which a surface
+faces.  In those cases, we are more interested in the direction of a vector than
+in its length.</p>
+
+<p>If we visualize a 3D vector <i>V</i> as an arrow starting at the origin, (0,0,0), and ending
+at a point <i>P</i>, then we can, to a certain extent, identify <i>V</i>
+with <i>P</i>&mdash;at least as long as we remember that an arrow starting
+at any other point could also be used to represent <i>V</i>.
+If <i>P</i> has coordinates (<i>a,b,c</i>), we can use the same coordinates
+for <i>V</i>.  When we think of (<i>a,b,c</i>) as a vector, the value of <i>a</i> represents
+the <b>change</b> in the <i>x</i>-coordinate between the starting point of the arrow and
+its ending point, <i>b</i> is the change in the <i>y</i>-coordinate, and <i>c</i> is
+the change in the <i>z</i>-coordinate.  For
+example, the 3D point (<i>x,y,z</i>) = (3,4,5) has the
+same coordinates as the vector (<i>dx,dy,dz</i>) = (3,4,5).
+For the point, the coordinates (3,4,5) specify a position in space
+in the <i>xyz</i> coordinate system.  For the vector, the coordinates (3,4,5)
+specify the change in the <i>x</i>, <i>y</i>, and <i>z</i> coordinates along
+the vector.  If we represent the vector with an arrow that starts
+at the origin (0,0,0), then the head of the arrow will be at (3,4,5).
+But we could just as well visualize the vector as an arrow that starts at
+the point (1,1,1), and in that case the head of the arrow would be at
+the point (4,5,6).</p>
+
+<p>The distinction between a point and a vector is subtle.  For some
+purposes, the distinction can be ignored; for other purposes, it is important.
+Often, all that we have is a sequence of numbers, which we can treat 
+as the coordinates of either a vector or a point, whichever is more appropriate in the context.</p>
+
+<p>One of the basic properties of a vector is its <newword term="length of a vector">length</newword>.
+In terms of its coordinates, the length of a 3D vector (<i>x,y,z</i>)
+is given by <i>sqrt</i>(<i>x</i><sup>2</sup>+<i>y</i><sup>2</sup>+<i>z</i><sup>2</sup>).
+(This is just the Pythagorean theorem in three dimensions.)  If <i>v</i> is
+a vector, its length is denoted by&nbsp;<code>|</code><i>v</i><code>|</code>.
+The length of a vector is also called its <newword term="norm of a vector">norm</newword>.
+(We are considering 3D vectors here, but concepts and formulas are similar for other dimensions.)
+</p>
+
+<p>Vectors of length 1 are particularly important.  They are called
+<newword term="unit vector">unit vectors</newword>.  If <i>v</i> = (<i>x,y,z</i>)
+is any vector other than (0,0,0), then there is exactly one unit vector
+that points in the same direction as <i>v</i>.  That vector is given by</p>
+
+<pre>( x/length, y/length, z/length )</pre>
+
+<np>where <i>length</i> is the length of <i>v</i>.  Dividing a vector by its
+length is said to <newword term="normalized vector">normalize</newword> the vector: The result
+is a unit vector that points in the same direction as the original
+vector.</np>
+
+<p>Two vectors can be added.  Given two vectors <i>v1</i> = (<i>x1,y1,z1</i>) and
+<i>v2</i> = (<i>x2,y2,z2</i>), their sum is defined as</p>
+
+<pre>v1 + v2  =  ( x1+x2, y1+y2, z1+z2 );</pre>
+
+<np>The sum has a geometric meaning:</np>
+
+<img src="vector-sum.png" width="473" height="142" bordered="true" tex="vector-sum.eps" texscale="0.75"/>
+
+<p>Multiplication is more complicated.  The obvious definition of the product of two vectors,
+similar to the definition of the sum, does not have geometric meaning and is rarely used.
+However, there are three kinds of vector multiplication that are used: the scalar
+product, the dot produt, and the cross product.</p>
+
+<p>If <i>v</i> = (<i>x,y,z</i>) is a vector and <i>a</i> is a number, then the <newword>scalar product</newword>
+of <i>a</i> and <i>v</i> is defined as</p>
+
+<pre>av  =  ( a*x, a*y, a*z );</pre>
+
+<np>Assuming that <i>a</i> is positive and <i>v</i> is not zero, <i>av</i> is a vector that points in the same
+direction as <i>v</i>, whose length is <i>a</i> times the length of <i>v</i>.  If <i>a</i> is negative,
+<i>av</i> points in the opposite direction from <i>v</i>, and its length is <code>|</code><i>a</i><code>|</code>
+times the length of <i>v</i>.  This type of product is called a scalar product because a number like
+<i>a</i> is also referred to as a "scalar," perhaps because multiplication by <i>a</i> scales <i>v</i>
+to a new length.</np>
+
+
+<p>Given two vectors <i>v1</i> = (<i>x1,y1,z1</i>) and
+<i>v2</i> = (<i>x2,y2,z2</i>), the <newword>dot product</newword>
+of <i>v1</i> and <i>v2</i> is denoted by <i>v1</i>&middot;<i>v2</i> and is defined
+by</p>
+
+<pre>v1&middot;v2  =  x1*x2 + y1*y2 + z1*z2</pre>
+
+<np>Note that the dot product is a number, not a vector.
+The dot product has several very important geometric meanings.  First of
+all, note that the length of a vector <i>v</i> is just the square root of
+<i>v</i>&middot;<i>v</i>.  Furthermore, the dot product of two non-zero
+vectors <i>v1</i> and <i>v2</i> has the property that
+</np>
+
+<pre>cos(angle)  =  v1&middot;v2 / (|v1|*|v2|)</pre>
+
+<np>where <i>angle</i> is the measure of the angle between <i>v1</i> and <i>v2</i>.  In
+particular, in the case of two unit vectors, whose lengths are 1, the dot product of
+two unit vectors is simply the cosine of the angle between them.  Furthermore,
+since the cosine of a 90-degree angle is zero, two non-zero vectors are perpendicular
+if and only if their dot product is zero.  Because of these properties,
+the dot product is particularly important in lighting calculations, where the
+effect of light shining on a surface depends on the angle that the light makes 
+with the surface.</np>
+
+<p>The scalar product and dot product are defined in any dimension.  For vectors in 3D, there is
+another type of product called the <newword>cross product</newword>, which also
+has an important geometric meaning. For vectors <i>v1</i> = (<i>x1,y1,z1</i>) and
+<i>v2</i> = (<i>x2,y2,z2</i>), the cross product of <i>v1</i>
+and <i>v2</i> is denoted <i>v1</i>&times;<i>v2</i> and is the vector defined by
+</p>
+
+<pre>v1&times;v2 = ( y1*z2 - z1*y2, z1*x2 - x1*z2, x1*y2 - y1*x2 )</pre>
+
+<np>If <i>v1</i> and <i>v2</i> are non-zero vectors, then <i>v1</i>&times;<i>v2</i>
+is zero if and only if <i>v1</i> and <i>v2</i> point in the same direction or in
+exactly opposite directions.  Assuming <i>v1</i>&times;<i>v2</i> is non-zero, then
+it is perpendicular both to <i>v1</i> and to <i>v2</i>; furthermore, 
+the vectors <i>v1</i>, <i>v2</i>, <i>v1</i>&times;<i>v2</i> follow the
+<word>right-hand rule</word> (in a right-handed coordinate system); 
+that is, if you curl the fingers of your right hand from 
+<i>v1</i> to <i>v2</i>, then your thumb points in the direction of <i>v1</i>&times;<i>v2</i>. If
+<i>v1</i> and <i>v2</i> are perpendicular unit vectors, then the cross product
+<i>v1</i>&times;<i>v2</i> is also a unit vector, which is perpendicular both
+to <i>v1</i> and to <i>v2</i>.</np>
+
+<p>Finally, I will note that given two points <i>P1</i> = (<i>x1,y1,z1</i>) and
+<i>P2</i> = (<i>x2,y2,z2</i>), the difference <i>P2&minus;P1</i>
+is defined by</p>
+
+<pre>P2 &minus; P1  =  ( x2 &minus; x1, y2 &minus; y1, z2 &minus; z1 )</pre>
+
+<np>This difference is a vector that can be visualized as an arrow that starts at <i>P1</i>
+and ends at <i>P2</i>.</np>
+
+<p>Now, suppose that <i>P1</i>, <i>P2</i>, and <i>P3</i>
+are vertices of a polygon.  Then the vectors <i>P1&minus;P2</i> and
+<i>P3&minus;P2</i> lie in the plane of the polygon, and so the cross product</p>
+
+<pre>(P3&minus;P2) &times; (P1&minus;P2)</pre>
+
+<np>is a vector that is perpendicular to the polygon.</np>
+
+<img src="cross-product.png" width="502" height="198" bordered="true" tex="cross-product.eps" texscale="0.75"/>
+
+<np>This vector is said
+to be a <newword>normal vector</newword> for the polygon.  A normal vector of length one
+is called a <newword>unit normal</newword>.  Unit normals will be important in lighting
+calculations, and it will be useful to be able to calculate a unit normal for a polygon
+from its vertices.</np>
+
+</subsection>
+
+
+<subsection title="Matrices and Transformations" id="gl1geom.5.2">
+
+<p>A matrix is just a two-dimensional array of numbers.  A matrix with <i>r</i> rows and
+<i>c</i> columns is said to be an <i>r</i>-by-<i>c</i> matrix.  If <i>A</i> and <i>B</i>
+are matrices, and if the number of columns in <i>A</i> is equal to the number of
+rows in <i>B</i>, then <i>A</i> and <i>B</i> can be multiplied to give the matrix
+product <i>AB</i>.  If <i>A</i> is an <i>n</i>-by-<i>m</i> matrix and <i>B</i> is
+an <i>m</i>-by-<i>k</i> matrix, then <i>AB</i> is an <i>n</i>-by-<i>k</i> matrix.
+In particular, two <i>n</i>-by-<i>n</i> matrices can be multiplied to give another
+<i>n</i>-by-<i>n</i> matrix.</p>
+
+<p>An <i>n</i>-dimensional vector can be thought of an <i>n</i>-by-<i>1</i> matrix.  If
+<i>A</i> is an <i>n</i>-by-<i>n</i> matrix and <i>v</i> is a vector in <i>n</i> dimensions,
+thought of as an <i>n</i>-by-<i>1</i> matrix, then the product <i>Av</i> is again an
+<i>n</i>-dimensional vector.
+The product of a 3-by-3 matrix <i>A</i> and a 3D vector <i>v</i> = (<i>x,y,z</i>)
+is often displayed like this:</p>
+
+<img src="matrix-times-vector.png" width="327" height="91" tex="matrix-times-vector.eps" texscale="0.8"/>
+
+<np>Note that the <i>i</i>-th coordinate in the product <i>Av</i> is simply the dot product of the
+<i>i</i>-th row of the matrix <i>A</i> and the vector&nbsp;<i>v</i>.</np>
+
+<p>Using this definition of the multiplication of a vector by a matrix, a matrix defines a
+transformation that can be applied to one vector to yield another vector.
+Transformations that are defined in this way are <word term="linear transformation">linear transformations</word>,
+and they are the main object of study in linear algebra.  A linear transformation <i>L</i> has
+the properties that for two vectors <i>v</i> and <i>w</i>, <i>L(v+w)&nbsp;=&nbsp;L(v)&nbsp;+&nbsp;L(w)</i>,
+and for a number <i>s</i>, <i>L(sv)&nbsp;=&nbsp;sL(v)</i>.</p>
+
+<p>Rotation and scaling are linear transformations, but translation is <b>not</b>
+a linear transformaton.
+To include translations, we have to widen our view of transformation to include
+<word term="affine transform">affine transformations</word>.
+An affine transformation can be defined, roughly, as a linear transformation followed by a 
+translation.  Geometrically, an affine transformation is a transformation that preserves
+parallel lines; that is, if two lines are parallel, then their images under an affine
+transformation will also be parallel lines.
+For computer graphics, we are interested in affine transformations in
+three dimensions.  However&mdash;by what seems at first to be a very odd trick&mdash;we
+can narrow our view back to the linear by moving into the fourth dimension.
+</p>
+
+<p>Note first of all that an affine transformation in three dimensions transforms a vector
+(<i>x1,y1,z1</i>) into a vector (<i>x2,y2,z2</i>) given by
+formulas</p>
+
+<pre>x2 = a1*x1 + a2*y1 + a3*z1 + t1
+y2 = b1*x1 + b2*y1 + b3*z1 + t2
+z2 = c1*x1 + c2*y1 + c3*z1 + t3</pre>
+
+<np>These formulas express a linear transformation given by multiplication by the 3-by-3 matrix</np>
+
+<img src="matrix-3x3.png" width="95" height="95" tex="matrix-3x3.eps" texscale="0.75"/>
+
+<np>followed by translation by <i>t1</i> in the <i>x</i> direction, <i>t2</i> in the <i>y</i>
+direction and <i>t3</i> in the <i>z</i> direction.  The trick is to replace each three-dimensional
+vector (<i>x,y,z</i>) with the four-dimensional vector
+(<i>x,y,z,</i>1), adding a "1" as the fourth coordinate.   And instead of 
+the 3-by-3 matrix, we use the 4-by-4 matrix
+</np>
+
+
+<img src="matrix-4x4.png" width="128" height="115" tex="matrix-4x4.eps" texscale="0.75"/>
+
+<np>If the vector (<i>x1,y1,z1</i>,1) is multiplied by this 4-by-4 matrix,
+the result is  precisely the vector (<i>x2,y2,z2,</i>1).  That is,
+instead of applying an <i>affine</i> transformation to the 3D vector (<i>x1,y1,z1</i>),
+we can apply a <i>linear</i> transformation to the 4D vector (<i>x1,y1,z1</i>,1).</np>
+
+<p>This might seem pointless to you, but nevertheless, that is what is done in OpenGL and
+other 3D computer graphics systems:  An
+affine transformation is represented as a 4-by-4 matrix in which the bottom row is
+(0,0,0,1), and a three-dimensional vector is changed into a four dimensional vector
+by adding a 1 as the final coordinate.  The result is that all the affine transformations
+that are so important in computer graphics can be implemented as multiplication of
+vectors by matrices.</p>
+
+<p>The identity transformation, which leaves vectors unchanged, corresponds to multiplication
+by the <newword>identity matrix</newword>, which has ones along its descending diagonal and
+zeros elsewhere. The OpenGL function <i>glLoadIdentity</i>() sets the current matrix to
+be the 4-by-4 identity matrix.  An OpenGL transformation function, such as <i>glTranslatef</i>(<i>tx,ty,tz</i>),
+has the effect of multiplying the current matrix  by the 4-by-4 matrix that
+represents the transformation.  Multiplication is on the right; that is, if <i>M</i> is
+the current matrix and <i>T</i> is the matrix that represents the transformation, then
+the current matrix will be set to the product matrix&nbsp;<i>MT</i>. For the record,
+the following illustration shows the identity matrix and the matrices
+corresponding to various OpenGL transformation functions:</p>
+
+<img src="transform-matrices-3d.png" width="520" height="309" tex="transform-matrices-3d.eps" texscale="0.8"/>
+
+<p>It is even possible to use an arbitrary transformation matrix in OpenGL, using the
+function <i>glMultMatrixf</i>(<i>T</i>) or <i>glMultMatrixd</i>(<i>T</i>). The parameter, <i>T</i>,
+is an array of numbers of type <ptype>float</ptype> or <ptype>double</ptype>,
+representing a transformation matrix.  The array is a one-dimensional array of length 16.
+The items in the array are the numbers from the transformation matrix, stored in <word>column-major order</word>,
+that is, the numbers in the fist column, followed by the numbers in the second
+column, and so on.  These functions multiply the current matrix by the matrix <i>T</i>,
+on the right.  You could use them, for example, to implement a <word>shear transform</word>,
+which is not easy to represent as a sequence of scales, rotations, and translations.</p>
+
+</subsection>
+
+
+
+
+
+<subsection title="Homogeneous Coordinates" id="gl1geom.5.3">
+
+<p>We finish this section with a bit of mathematical detail about the implementation of transformations.
+There is one common transformation in computer graphics that is not an affine transformation:
+In the case of a perspective projection, the projection transformation is not affine.
+In a perspective projection, an object will appear to get smaller as it moves farther away
+from the viewer, and that is a property that no affine transformation can express, since
+affine transforms preserve parallel lines and parallel lines will seem to converge in the
+distance in a perspective projection.
+</p>
+
+<p>Surprisingly, we can still represent a perspective projection as a 4-by-4 matrix, provided
+we are willing to stretch our use of coordinates even further than we have already.  We
+have already represented 3D vectors by 4D vectors in which the fourth coordinate is 1.
+We now allow the fourth coordinate to be anything at all, except for requiring that
+at least one of the four coordinates is non-zero.  When the fourth coordinate, <i>w</i>,
+is non-zero, we consider the coordinates (<i>x,y,z,w</i>) to
+represent the three-dimensional vector (<i>x/w,y/w,z/w</i>).  Note that this
+is consistent with our previous usage, since it considers (<i>x,y,z,1</i>)
+to represent (<i>x,y,z</i>), as before.   When the fourth coordinate is zero,
+there is no corresponding 3D vector, but it is possible to think of (<i>x,y,z</i>,0)
+as representing a 3D "point at infinity" in the direction of (<i>x,y,z</i>).</p>
+
+<p>Coordinates (<i>x,y,z,w</i>) used in this way are referred to
+as <newword>homogeneous coordinates</newword>.  If we use homogeneous coordinates, then any
+4-by-4 matrix can be used to transform three-dimensional vectors, including matrices whose
+bottom row is not (0,0,0,1). Among the transformations
+that can be represented in this way is the projection transformation for a perspective
+projection.  And in fact, this is what OpenGL does internally.  It represents all three-dimensional
+points and vectors using homogeneous coordinates, and it represents all transformations as
+4-by-4 matrices.  You can even specify vertices using homogeneous coordinates.  For example, the
+command
+</p>
+
+<pre>glVertex4f(x,y,z,w);</pre>
+
+<np>with a non-zero value for <i>w</i>, generates the 3D point (<i>x/w,y/w,z/w</i>).  Fortunately, you will almost never
+have to deal with homogeneous coordinates directly.  The only real exception to this is
+that homogeneous coordinates are used, surprisingly, when configuring OpenGL lighting, as
+we'll see in the <localref href="gl1light">next chapter</localref>.</np>
+
+
+</subsection>
+
+
+
+
+</section>

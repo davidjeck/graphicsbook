@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Spotlights</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+        margin-left: 25px;
+    }
+</style>
+
+<!--
+    Shows three spotlights shining on a white square, with
+    the option of a dim viewpoint light
+-->
+
+
+<script src="gl-matrix-min.js"></script>
+<script src="trackball-rotator.js"></script>
+
+<script>
+
+"use strict";
+
+const vertexShaderSource = `
+    attribute vec3 a_coords;
+    attribute vec3 a_normal;
+    uniform mat4 modelview;
+    uniform mat4 projection;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    void main() {
+        vec4 coords = vec4(a_coords,1.0);
+        vec4 eyeCoords = modelview * coords;
+        gl_Position = projection * eyeCoords;
+        v_normal = normalize(a_normal);
+        v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+    }`;
+
+const fragmentShaderSource = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
+    struct MaterialProperties {
+        vec3 diffuseColor;
+        vec3 specularColor;
+        float specularExponent;
+    };
+    struct LightProperties {
+        bool enabled;
+        vec4 position;
+        vec3 color;
+        vec3 spotDirection;  // Note: only a point light can be a spotlight
+        float spotCosineCutoff; // if <= 0, this is not a spotlight, if >= 1, the light cone shrinks to nothing
+        float spotExponent;
+    };
+    uniform MaterialProperties material; // do two-sided lighting, but assume front and back materials are the same
+    uniform LightProperties lights[4]; // Assume that there are exactly four lights.
+    uniform mat3 normalMatrix;
+    varying vec3 v_normal;
+    varying vec3 v_eyeCoords;
+    vec3 lightingEquation( LightProperties light, MaterialProperties material, 
+                                vec3 eyeCoords, vec3 N, vec3 V ) {
+           // N is normal vector, V is direction to viewer.
+        vec3 L, R; // Light direction and reflected light direction.
+        float spotFactor = 1.0;  // multiplier to account for spotlight
+        if ( light.position.w == 0.0 ) {
+            L = normalize( light.position.xyz );
+        }
+        else {
+            L = normalize( light.position.xyz/light.position.w - v_eyeCoords );
+            if (light.spotCosineCutoff > 0.0) { // the light is a spotlight
+                vec3 D = -normalize(light.spotDirection);
+                float spotCosine = dot(D,L);
+                if (spotCosine >= light.spotCosineCutoff) { 
+                    spotFactor = pow(spotCosine,light.spotExponent);
+                }
+                else { // The point is outside the cone of light from the spotlight.
+                    spotFactor = 0.0; // The light will add no color to the point.
+                }
+            }
+        }
+        if (dot(L,N) <= 0.0) {
+            return vec3(0.0);
+        }
+        vec3 reflection = dot(L,N) * light.color * material.diffuseColor;
+        R = -reflect(L,N);
+        if (dot(R,V) > 0.0) {
+            float factor = pow(dot(R,V),material.specularExponent);
+            reflection += factor * material.specularColor * light.color;
+        }
+        return spotFactor*reflection;
+    }
+    void main() {
+        vec3 normal = normalize( normalMatrix*v_normal );
+        vec3 viewDirection = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        vec3 color = vec3(0.0);
+        for (int i = 0; i < 4; i++) {
+            if (lights[i].enabled) {
+                if (gl_FrontFacing) {
+                    color += lightingEquation( lights[i], material, v_eyeCoords,
+                                                    normal, viewDirection);
+                }
+                else {
+                    color += lightingEquation( lights[i], material, v_eyeCoords,
+                                                    -normal, viewDirection);
+                }
+            }
+        }
+        gl_FragColor = vec4(color,1.0);
+    }`;
+
+
+let gl;   // The webgl context.
+
+let a_coords_loc;         // Location of the a_coords attribute variable in the shader program.
+let a_coords_buffer;      // Buffer to hold a_coords for the square.
+let a_normal_loc;         // Location of a_normal attribute (no normla buffer; value set with gl.vertexAttrib3f())
+
+let u_modelview;       // Locations for uniform matrices
+let u_projection;
+let u_normalMatrix;
+
+let u_material;     // An object that holds uniform locations for the material.
+let u_lights;       // An array of objects that holds uniform locations for light properties.
+
+const projection = mat4.create();    // projection matrix
+let modelview;                     // modelview matrix; value comes from rotator
+const normalMatrix = mat3.create();  // matrix, derived from modelview matrix, for transforming normal vectors
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+const SPOT_POSITION = [0,10,10,1];  // Spotlight position and directin before two of them are rotated about the y-axis
+const SPOT_DIRECTION = [0,-10,-4];
+
+
+function draw() {
+
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    /* Set light properties based on settings of checkboxes and popup menus
+       in the user interface. */
+
+    if (document.getElementById("specular").checked) {
+        gl.uniform3f( u_material.specularColor, 0.3, 0.3, 0.3 );
+    }
+    else {
+        gl.uniform3f( u_material.specularColor, 0, 0, 0 );
+    }
+
+    let viewpointLightOn = document.getElementById("viewpointLight").checked? 1 : 0;
+    gl.uniform1i( u_lights[0].enabled, viewpointLightOn );
+
+    let spotCutoff = Number(document.getElementById("cutoff").value);
+    let spotExponent = Number(document.getElementById("exponent").value);
+
+    for (let i = 1; i < 4; i++) { // all spotlights have the same cutoff and exponent
+        gl.uniform1f( u_lights[i].spotCosineCutoff, Math.cos(spotCutoff/180 * Math.PI) );
+        gl.uniform1f( u_lights[i].spotExponent, spotExponent );
+    }
+    
+    /* Get the viewing transformation from the rotator. This will be used for
+       drawing the square, but two of the lights are subject to modeling transforms. */
+    if (document.getElementById("lightsRotate").checked) {
+        modelview = rotator.getViewMatrix(); 
+    }
+    else {
+        modelview = mat4.create(); 
+        mat4.translate(modelview,modelview,[0,0,-40]); // translation part of view transform, so lights are near the square!
+    }
+    
+    
+    /* Set the position and direction for the spotlights.  These properties are affected
+       by the modelview transformation, since the values must be specified in eye coordinates. */
+    
+    let modelviewForLights = mat4.clone(modelview); // so I can apply modeling transforms to lights
+    setSpotlight(u_lights[1],modelviewForLights,SPOT_POSITION,SPOT_DIRECTION);
+    mat4.rotateY(modelviewForLights,modelviewForLights,Math.PI*2/3);
+    setSpotlight(u_lights[2],modelviewForLights,SPOT_POSITION,SPOT_DIRECTION);
+    mat4.rotateY(modelviewForLights,modelviewForLights,Math.PI*2/3);
+    setSpotlight(u_lights[3],modelviewForLights,SPOT_POSITION,SPOT_DIRECTION);
+    
+    /* Set values for the matrix uniform variables, and draw the square. */
+    
+    mat4.perspective(projection,Math.PI/3,1,10,60);
+    gl.uniformMatrix4fv(u_projection, false, projection );
+    modelview = rotator.getViewMatrix();
+    mat3.normalFromMat4(normalMatrix, modelview);
+    
+    gl.uniformMatrix3fv(u_normalMatrix, false, normalMatrix);
+    gl.uniformMatrix4fv(u_modelview, false, modelview );
+
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+} // end draw()
+
+
+/* Set the position and direction vector of a light, in eye coordinates.
+ * (Note: This function sets the value of the global variable normalMatrix.)
+ * @param light an object containg the uniform variable locations for the light
+ * @param modelview the matrix that does object-to-eye coordinate transforms
+ * @param lightPosition the location of the light, in object coordinates (a vec4)
+ * @param lightDirection a vector that points in the direction that the spotlight is pointing (a vec3)
+ */
+function setSpotlight( light, modelview, lightPosition, lightDirection ) {
+    let transformedDirection = new Float32Array(3);
+    let transformedPosition = new Float32Array(4);
+    mat3.normalFromMat4(normalMatrix,modelview);
+    vec3.transformMat3(transformedDirection, lightDirection, normalMatrix);
+    vec4.transformMat4(transformedPosition, lightPosition, modelview);
+    gl.uniform3fv(light.spotDirection, transformedDirection);
+    gl.uniform4fv(light.position, transformedPosition);
+}
+
+
+/* Initialize the WebGL context.  Called from init() */
+function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    gl.useProgram(prog);
+    gl.enable(gl.DEPTH_TEST);
+    
+    /* Get attribute and uniform locations */
+    
+    a_coords_loc =  gl.getAttribLocation(prog, "a_coords");
+    a_normal_loc =  gl.getAttribLocation(prog, "a_normal");
+    
+    u_modelview = gl.getUniformLocation(prog, "modelview");
+    u_projection = gl.getUniformLocation(prog, "projection");
+    u_normalMatrix =  gl.getUniformLocation(prog, "normalMatrix");
+    u_material = {
+        diffuseColor: gl.getUniformLocation(prog, "material.diffuseColor"),
+        specularColor: gl.getUniformLocation(prog, "material.specularColor"),
+        specularExponent: gl.getUniformLocation(prog, "material.specularExponent")
+    };
+    u_lights = new Array(4);
+    for (let i = 0; i < 4; i++) {
+        u_lights[i] = {
+            enabled: gl.getUniformLocation(prog, "lights[" + i + "].enabled"),
+            position: gl.getUniformLocation(prog, "lights[" + i + "].position"),
+            color: gl.getUniformLocation(prog, "lights[" + i + "].color"),
+            spotDirection: gl.getUniformLocation(prog, "lights[" + i + "].spotDirection"),
+            spotCosineCutoff: gl.getUniformLocation(prog, "lights[" + i + "].spotCosineCutoff"),
+            spotExponent: gl.getUniformLocation(prog, "lights[" + i + "].spotExponent")
+        };
+    }
+    
+    /* Create and configure buffer and configure a_normal and a_coords attributes;
+       The square is the only thing that is drawn, so none of this ever changes. */
+       
+    a_coords_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer);
+    let squareCoords = new Float32Array([ -15,0,15, 15,0,15, 15,0,-15, -15,0,-15 ]);
+    gl.bufferData(gl.ARRAY_BUFFER, squareCoords, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords_loc);
+    gl.disableVertexAttribArray(a_normal_loc);
+    gl.vertexAttrib3f(a_normal_loc,0,1,0);
+    
+    /* Set up values for material uniforms. Enable lights and set their color.  Also,
+       all viewpoint light properties. These values don't change in this program. The other
+       spotlight properties do change, and they are set in draw. */
+    
+    gl.uniform3f( u_material.diffuseColor, 0.8, 0.8, 0.8 );
+    gl.uniform3f( u_material.specularColor, 0.25, 0.25, 0.25 );
+    gl.uniform1f( u_material.specularExponent, 32 );
+    
+    for (let i = 0; i < 4; i++) {
+        gl.uniform1i( u_lights[i].enabled, 1 ); 
+    }
+    gl.uniform4f( u_lights[0].position, 0, 0, 0, 1 );
+    gl.uniform1f( u_lights[0].spotCosineCutoff, 0);
+    gl.uniform3f( u_lights[0].color, 0.5, 0.5, 0.5 );
+    gl.uniform3f( u_lights[1].color, 0.8, 0, 0 );
+    gl.uniform3f( u_lights[2].color, 0, 0.8, 0 );
+    gl.uniform3f( u_lights[3].color, 0, 0, 0.8 );
+    
+} // end initGL()
+
+/* Creates a program for use in the WebGL context gl, and returns the
+ * identifier for that program.  If an error occurs while compiling or
+ * linking the program, an exception of type Error is thrown.  The error
+ * string contains the compilation or linking error.  If no error occurs,
+ * the program identifier is the return value of the function.
+ *    The second and third parameters are strings that contain the
+ * source code for the vertex shader and for the fragment shader.
+ */
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
+}
+
+
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.getElementById("webglcanvas");
+        gl = canvas.getContext("webgl") || 
+                         canvas.getContext("experimental-webgl");
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not get a WebGL graphics context.</p>";
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+            "<p>Sorry, could not initialize the WebGL graphics context: " + e.message + "</p>";
+        return;
+    }
+    document.getElementById("viewpointLight").checked = true;
+    document.getElementById("specular").checked = true;
+    document.getElementById("lightsRotate").checked = true;
+    document.getElementById("cutoff").value = "30";
+    document.getElementById("exponent").value = 10;
+    document.getElementById("viewpointLight").onchange = draw;
+    document.getElementById("lightsRotate").onchange = draw;
+    document.getElementById("specular").onchange = draw;
+    document.getElementById("cutoff").onchange = draw;
+    document.getElementById("exponent").onchange = draw;
+    rotator = new TrackballRotator(canvas, draw, 40, [0,1,1]);
+    draw();
+}
+
+window.onload = init;
+
+</script>
+
+</head>
+<body>
+
+<h2>WebGL Spotlights</h2>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p id="message">Drag on the square to rotate it.</p>
+
+<p>
+<label><input type="checkbox" id="viewpointLight">Viewpoint Light</label>
+<label><input type="checkbox" id="specular">Specular Reflection</label>
+<label><input type="checkbox" id="lightsRotate">Spotlights Rotate With Square</label>
+</p>
+<p>
+<label>Spot Cutoff Angle: <select id="cutoff">
+   <option>5</option>
+   <option>10</option>
+   <option>20</option>
+   <option>30</option>
+   <option>40</option>
+   <option>50</option>
+   <option>60</option>
+   <option>70</option>
+   <option>80</option>
+</select></label>
+<label>Spot Exponent: <select id="exponent">
+   <option>0</option>
+   <option>2</option>
+   <option>5</option>
+   <option>10</option>
+   <option>20</option>
+   <option>30</option>
+   <option>50</option>
+   <option>100</option>
+</select></label>
+</p>
+
+<div id="canvas-holder" style="float:left">
+   <canvas width=640 height=640 id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+
+</body>
+</html>
+

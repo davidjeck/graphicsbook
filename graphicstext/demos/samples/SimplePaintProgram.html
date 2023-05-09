@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<!--
+   This page is a simple paint program that lets the user draw on a
+   canvas.  It demonstrates using an "off-screen canvas."  The "smudge
+   tool" demonstrates pixel manipulation in HTML canvas graphics.
+   (I'm not sure that the off-screen canvas technique will work everywhere.)
+-->
+<head>
+<meta charset="UTF-8">
+<title>A Simple Paint Program</title>
+<style>
+    body {
+        background-color: #DDDDDD;
+        -webkit-user-select: none; /* turn off text selection  / Webkit */
+        -moz-user-select: none;    /* Firefox */
+        -ms-user-select: none;     /* IE */
+        user-select: none;
+    }
+    canvas {
+        background-color: white;
+        display: block;
+        cursor: default;
+    }
+    #canvasholder {
+        border:2px solid black;
+        float: left; /* This makes the border exactly fit the canvas. */
+    }
+    #tools {
+        float:left;
+        margin-left: 15px;
+        background-color:white;
+        border: 2px solid black;
+        padding: 8px
+    }
+    #tools p {
+        margin-top: 20px;
+    }
+    #tools select {
+        margin-left: 30px;
+        margin-top: 5px;
+    }
+</style>
+<script>
+
+    "use strict";
+
+    let canvas;    // The canvas element on which the user will draw.
+    let graphics;  // A 2D graphics context for drawing on the canvas.
+    
+    let OSC;  // A canvas element that is not a visible part of the document.
+              // It is created programmatically and serves as an off-screen canvas.
+              // The off-screen canvas holds the "official" copy of the picture
+              // that the user has drawn.
+    let OSG;  // A 2D graphics context for drawing on the off-screen canvas.
+    
+    let tool = "Sketch";  // The current drawing tool.
+    
+    let color = "black";  // The color that is currently being used for drawing
+    let lineWidth = 5;    // The line width that is currently being used for strokes 
+    
+    let dragShape = null;   // When non-null, the user is dragging with
+                            // the Oval, Rectangle, or Line tool.  The
+                            // current shape is drawn in the repaint() function
+                            // over the BufferedImage.  The shape is only added
+                            // to the off-screen image when the drag action ends.
+    let dragStartX, dragStartY;     // Start point of drag for use with dragShape.
+    let dragCurrentX, dragCurrentY; // Current mouse position for use with dragShape.
+
+    let smudgeColorArray = null, smudgeImageData; // Data used by "Smudge" tool.
+    
+    /**
+     *  The main function for drawing the contents of the on-screen canvas.  it simply
+     *  copies the content of the off-screen canvas onto the screen.  If the user is dragging
+     *  to draw a line, oval, or rectangle, then that shape is drawn on top of the picture.
+     *  (The shape is drawn to the off-screen canvas when the drag action ends.)
+     */
+    function repaint() {
+        graphics.drawImage(OSC,0,0);  // Copy the off-screen image onto the screen.
+        if (dragShape) {
+               // The user is performing a drag to draw a shape. Call putShape to
+               // draw the shape over the content of the off-screen canvas.
+            putShape(graphics,dragShape,dragStartX,dragStartY,dragCurrentX,dragCurrentY);
+        }
+    }
+    
+    /**
+     *  Draws a Line, Oval, or Rectangle to the graphics context g. The shape is determined
+     *  by the points (x1,y1) and (x2,y2).  The second parameter is a string nameing the shape.
+     */
+    function putShape(g, shape, x1, y1, x2, y2) { 
+        let x = Math.min(x1,x2); // upper left corner, used for ovals and rectangles.
+        let y = Math.min(y1,y2);
+        let w = Math.abs(x1-x2); // size of rectangle
+        let h = Math.abs(y1-y2);
+        switch (shape) {
+        case "Line":  // stroke a line from (x1,y1) to (x2,y2);
+            g.beginPath();
+            g.moveTo(x1,y1);
+            g.lineTo(x2,y2);
+            g.strokeStyle = color;
+            g.lineWidth = lineWidth;
+            g.stroke();
+            break;
+        case "Rectangle": // fill a rectangle with corners at (x1,y1) and (x2,y2)
+            g.fillStyle = color;
+            g.fillRect(x,y,w,h);
+            break;
+        case "Oval": // fill the oval contained in the rect with corners at (x1,y1) and (x2,y2)
+            g.save();
+            g.translate((x1+x2)/2, (y1+y2)/2);
+            g.scale(Math.abs(x1-x2)/2, Math.abs(y1-y2)/2);
+            g.beginPath();
+            g.arc(0,0,1,0,2*Math.PI,false);
+            g.restore();
+            g.fillStyle = color;
+            g.fill();
+            break;
+        }
+    }
+
+
+    /**
+     *  Read the contents of a 9-by-9 square of pixels centered at (x,y), from the off-screen canvas.
+     *  The data is obtained in an "ImageData" object.  It is copied into a Float32Array that can
+     *  be used for floating-point computations.  If that array does not already exist, it is created.
+     *  A new ImageData object is also created that will be used for putting new color data into the
+     *  image, in the swapSmudgeData function.
+     */
+    function grabSmudgeData(x, y) {
+        let colors = OSG.getImageData(x-5,y-5,9,9);
+        if (smudgeColorArray == null) {
+            smudgeImageData = OSG.createImageData(9,9);
+            smudgeColorArray = new Float32Array(colors.data.length);
+        }
+        for (let i = 0; i < colors.data.length; i++) {
+            smudgeColorArray[i] = colors.data[i];
+        }
+    }
+    
+    
+    /**
+     *  The data in the smudgeColorArray, which was set in the grabSmudgeData function,
+     *  is blended with the colors in a square of pixels centered at (x,y).  Effectively,
+     *  some of the color from the array is moved to the image, and some of the color from
+     *  the image is moved to the array.  The effect is that the smudgeColorArray carries
+     *  color from the point where the mouse was first pressed and drops some of that color
+     *  at each point that is visited by the mouse as it moves (while picking up some
+     *  new color from those points.)
+     */
+    function swapSmudgeData(x, y) {
+        let colors = OSG.getImageData(x-5,y-5,9,9);  // get color data form image
+        for (let i = 0; i < smudgeColorArray.length; i += 4) {
+                // The color arrays contain four numbers for each pixel, giving red, blue,
+                // green, and alpha color components.  An alpha value of 0 means that the
+                // pixel was outside the image; such pixels are ignored.  Otherwise,
+                // the red, green, and blue components in the two color arrays,
+                // smudgeColorArray and colors.data, are replaced by weighted averages
+                // of the existing values.  The alpha component is simply set to 255 (fully
+                // opaque), which is actually what it should already be.
+            if (smudgeColorArray[i+3] && colors.data[i+3]) {
+                for (let j = i; j < i+3; j++) {
+                    let newSmudge = smudgeColorArray[j]*0.8 + colors.data[j]*0.2;
+                    let newImage  = smudgeColorArray[j]*0.2 + colors.data[j]*0.8;
+                    smudgeImageData.data[j] = newImage;
+                    smudgeColorArray[j] = newSmudge;
+                }
+                smudgeImageData.data[i+3] = 255;
+            }
+            else {
+                for (let j = i; j <= i+3; j++) {
+                    smudgeImageData.data[j] = 0; // "transparent black"; will have no effect on the image
+                }
+            }
+        }
+        OSG.putImageData(smudgeImageData,x-5,y-5);
+    }
+    
+    
+    /**
+     *  Applies the "Erase" or "Smudge" tool at the point (x,y), as the mouse is being dragged.
+     */
+    function applyTool(tool, x, y) {
+        if (tool == "Erase") { // Clear a 10-by-10 square, centered at (x,y).
+            OSG.fillStyle = "white";
+            OSG.fillRect(x-5,y-5,10,10);  // Erase the sqaure in the BufferedImage.
+        }
+        else { // For the "Smudge" tool, mix some of the "paint" on the tool with the image,
+               // in a 7-by-7 square centered at x,y.
+            swapSmudgeData(x, y);
+        }
+    }    
+    
+    
+    /**
+     *  Applies the "Erase" or "Smudge" tool to each point along a line from (x1,y1)
+     *  to (x2,y2).  This is used when the user drags the mouse, with (x1,y1) being the
+     *  previous mouse location and (x2,y2) the current location.  This is necessary
+     *  since the mouse can move by several pixels at each step, and it's necessary to
+     *  apply the tools at every point along the path for the tool to work properly.
+     */
+    function applyToolAlongLine(tool, x1, y1, x2, y2) {
+        let x, y, slope;
+        if (Math.abs(x1-x2) >= Math.abs(y1-y2)) {
+               // Horizontal distance is greater than vertical distance.  Apply the
+               // tool once for each x-value between x1 and x2, computing the
+               // y-value for each x-value from the equation of a line. 
+            slope = (y2-y1)/(x2-x1);
+            if (x1 <= x2) { // Increment up from x1 to x2.
+                for (x = x1; x <= x2; x++) {
+                    y = Math.round(y1 + slope*(x-x1));
+                    applyTool(tool,x,y);
+                }
+            }
+            else { // Decrement down from x1 to x2
+                for (x = x1; x >= x2; x--) {
+                    y = Math.round(y1 + slope*(x-x1));
+                    applyTool(tool,x,y);
+                }
+            }
+        }
+        else {
+               // Vertical distance is greater than horizontal distance.  Apply the
+               // tool once for each y-value between y1 and y2, computing the
+               // x-value for each y-value from the equation of a line. 
+            slope = (x2-x1)/(y2-y1);
+            if (y1 <= y2) {  // Increment up from y1 to y2.
+                for (y = y1; y <= y2; y++) {
+                    x = Math.round(x1 + slope*(y-y1));
+                    applyTool(tool,x,y);
+                }
+            }
+            else {  // Decrement down from y1 to y2.
+                for (y = y1; y >= y2; y--) {
+                    x = Math.round(x1 + slope*(y-y1));
+                    applyTool(tool,x,y);
+                }
+            }
+        }
+        repaint();
+    }
+    
+    
+    /**
+     * This is called in init() to set up the respons to mouse actions on the canvas.
+     */
+    function setUpMouseHander() {
+        let dragging = false;
+        let startX, startY;
+        let prevX, prevY;
+        function doMouseDown(evt) {  // responds when the user presses a mouse button on the canvas.
+            if (dragging || evt.button != 0) {
+                return;
+            }
+            let r = canvas.getBoundingClientRect();
+            let x = Math.round(evt.clientX - r.left);  // Firefox, at least, can give non-integer values
+            let y = Math.round(evt.clientY - r.top);
+            prevX = startX = x;
+            prevY = startY = y;
+            dragging = true;
+            if (dragging) {  // install handler functions for mouse move and up, just during drag action
+                document.addEventListener("mousemove",doMouseMove);
+                document.addEventListener("mouseup",doMouseUp);
+            }
+            if (tool == "Line" || tool == "Oval" || tool == "Rectangle") {
+                dragShape = tool;  // Tells repaint() about the drag action.
+                dragStartX = dragCurrentX = startX;
+                dragStartY = dragCurrentY = startY;
+            }
+            else if (tool == "Erase") {
+                applyTool("Erase",startX,startY);
+                repaint();
+            }
+            else if (tool == "Smudge") {
+                grabSmudgeData(startX,startY);
+            }
+            evt.preventDefault();
+        }
+        function doMouseMove(evt) {  // Called when mouse moves during a drag operation.
+            if (dragging) { // (actually, the test should not be necessary)
+                let r = canvas.getBoundingClientRect();
+                let x = Math.round(evt.clientX - r.left);
+                let y = Math.round(evt.clientY - r.top);
+                if (tool == "Line" || tool == "Oval" || tool == "Rectangle") {
+                    dragCurrentX = x;
+                    dragCurrentY = y;
+                    repaint(); // This will draw the shape in its new position on the on-screen canvas.
+                }
+                else if (tool == "Sketch") {
+                    putShape(OSG,"Line",prevX,prevY,x,y);  // Directly draw the line on the off-screen canvas.
+                    repaint();  // Redraws the on-screen canvas, to make the change visible on screen.
+                }
+                else if (tool == "Erase" || tool =="Smudge") {
+                    applyToolAlongLine(tool,prevX,prevY,x,y);
+                }
+                prevX = x;
+                prevY = y;
+            }
+        }
+        function doMouseUp(evt) {
+            if (dragging) { // (actually, the test should not be necessary)
+                document.removeEventListener("mousemove",doMouseMove);
+                document.removeEventListener("mouseup",doMouseUp);
+                dragging = false;
+                if (dragShape) { // Draw the shape into the off-screen canvas.
+                    putShape(OSG,dragShape,dragStartX,dragStartY,dragCurrentX,dragCurrentY);
+                    dragShape = null;
+                    repaint(); // (Just to make sure off-screen and on-screen pictures agree.)
+                }
+            }
+        }
+        canvas.addEventListener("mousedown",doMouseDown);
+    }
+    
+    /**
+     * The init() funciton is called after the page has been
+     * loaded.  It initializes the canvas and graphics variables,
+     * and sets up some event handlers with input elements on
+     * the web page.
+     */
+    function init() {
+        try {
+            canvas = document.getElementById("canvas");
+            graphics = canvas.getContext("2d");
+            OSC = document.createElement("canvas");
+            OSC.width = canvas.width;
+            OSC.height = canvas.height;
+            OSG = OSC.getContext("2d");
+            OSG.fillStyle = "white";
+            OSG.fillRect(0,0,OSC.width,OSC.height);
+            graphics.lineCap = OSG.lineCap = "round";
+            graphics.lineJoin = OSG.lineJoin = "round";
+        } catch(e) {  // In case of error, replace the canvas with an error message.
+            document.getElementById("canvasholder").innerHTML =
+               "Canvas graphics is not supported?<br>" +
+               "An error occurred while initializing graphics.";
+            return;
+        }
+        repaint();  // Just copies the blank white off-screen canvas to the screen.
+        setUpMouseHander();
+        document.getElementById("tool").value = "Sketch";
+        document.getElementById("tool").onchange = function() {
+            tool = document.getElementById("tool").value;
+        };
+        document.getElementById("color").value = "Black";
+        document.getElementById("color").onchange = function() {
+            color = document.getElementById("color").value;
+        };
+        document.getElementById("linewidth").value = "5";
+        document.getElementById("linewidth").onchange = function() {
+            lineWidth = parseInt(document.getElementById("linewidth").value);
+        };
+        document.getElementById("clear").onclick = function() {
+            OSG.fillStyle = "white";
+            OSG.fillRect(0,0,OSC.width,OSC.height);
+            repaint();
+        };
+    }
+    
+    window.onload = init; // arranges for function init to be called when page is loaded
+    
+</script>
+</head>
+<body>
+
+<h2>A Simple Paint Program</h2>
+
+<noscript>
+    <!-- This message will be shown in the page if JavaScript is not available. -->
+<p>JavaScript is required to use this page.</p>
+</noscript>
+
+<div id="canvasholder">
+<canvas id="canvas" width="640" height="480">
+    <!-- This message is shown on the page if the browser doesn't support the canvas element. -->
+Canvas not supported.
+</canvas>
+</div>
+
+<div id="tools">
+
+<p><label><b>Drawing Tool:</b><br>
+    <select id="tool">
+    <option>Sketch</option>
+    <option>Line</option>
+    <option>Rectangle</option>
+    <option>Oval</option>
+    <option>Erase</option>
+    <option>Smudge</option>
+    </select></label></p>
+
+<p><label><b>Drawing Color:</b><br>
+    <select id="color">
+    <option>Black</option>
+    <option>Red</option>
+    <option>Green</option>
+    <option>Blue</option>
+    <option>Yellow</option>
+    <option>Cyan</option>
+    <option>Magenta</option>
+    <option>Gray</option>
+    </select></label></p>
+    
+<p><label><b>Line Width:</b><br>
+    <select id="linewidth">
+    <option>1</option>
+    <option>2</option>
+    <option>3</option>
+    <option>4</option>
+    <option>5</option>
+    <option>7</option>
+    <option>10</option>
+    <option>15</option>
+    <option>20</option>
+    <option>25</option>
+    </select></label></p>
+    
+<p><button id="clear">Clear</button></p>
+    
+</div>
+
+</body>
+</html>

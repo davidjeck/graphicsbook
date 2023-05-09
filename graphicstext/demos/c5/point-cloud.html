@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Three.js Points Demo</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+   input { margin-left:15px; }
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/three.min.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var canvas, scene, renderer, camera;  // Standard basic objects for three.js
+
+var pointCloud;  // The object that represents the visible cloud of points.
+
+var MAX_POINTS = 10000;  // Number of points available
+var pointsInUse = 2500;  // How many points are actually shown.
+var points;  // An array of Vector3, containing all possible points
+var spinSpeeds;  // An array of Quarternians, containing point rotations for "spin" animation
+var driftSpeeds; // An array of Vector3, containing point velocities for "drift" animation
+
+var noAnimateRB, spinRB, driftRB;  // Radio buttons that select among no animation, spin animation, or drift animation
+var animating = false;
+
+var sizeSlider;   // slider for controlling point size
+var countSlider;  // slider for controlling number of points.
+
+var geometry;  // Object of type THREE.BufferGeometry containing the visible points.
+var pointsBuffer;  // A Float32Array used as the position buffer in the geometry object.
+var colorBuffer;  // A Float32Array holding randomly generated colors for the points.
+var material;  // Object of type THREE.PointMaterial for point color and size.
+
+
+/* Render function draws the content of the canvas.
+ * If animating is true, it also updates the vertex locations
+ * for this frame of the animation and calls
+ * requestAnimationFrame(render) to arrange for the next frame.
+ */
+function render() {
+    if (animating) {
+        if (spinRB.checked) {
+            updateForSpin();
+        }
+        else if (driftRB.checked) {
+            updateForDrift();
+        }
+        requestAnimationFrame(render);
+    }
+    renderer.render(scene,camera);
+}
+
+function replacePointsInBuffer() {
+        // Called by updateForSpin() and updateForDrift() to load
+        // the new point positions into the buffer that is used for
+        // drawing the points. 
+    for (var i = 0; i < pointsInUse; i++) {
+        pointsBuffer[3*i] = points[i].x;
+        pointsBuffer[3*i+1] = points[i].y;
+        pointsBuffer[3*i+2] = points[i].z;
+    }
+    geometry.attributes.position.needsUpdate = true;
+}
+
+function updateForSpin() {
+    for (var i = 0; i < pointsInUse; i++) {
+        var v = points[i];
+        v.applyQuaternion( spinSpeeds[i] );  // applies a rotation about the y-axis
+    }
+    replacePointsInBuffer();
+}
+
+function updateForDrift() {
+    for (var i = 0; i < pointsInUse; i++) {
+        var v = points[i];
+        v.add( driftSpeeds[i] );
+        if (v.length() > 1) {
+			    // When outside the sphere, change to a random velocity,
+				// and multiply the point by 0.9997 to move it back
+				// towards the inside of the sphere.  Using a value
+				// close to 1 allows the sphere to get a little
+				// fuzzy.
+            driftSpeeds[i] = randomVelocity();
+			v.multiplyScalar(0.9997);
+        }
+		else if (Math.random() < 0.001) {
+			   // change to a new random velocity, with a small probability
+            driftSpeeds[i] = randomVelocity();
+		}
+    }
+    replacePointsInBuffer();
+}
+
+
+function createWorld() {
+    scene = new THREE.Scene();
+    renderer.setClearColor(0x333333);
+    camera = new THREE.PerspectiveCamera(30,canvas.width/canvas.height,1,10);
+    camera.position.z = 5;
+    points = new Array(MAX_POINTS);
+    spinSpeeds = new Array(MAX_POINTS);
+    driftSpeeds = new Array(MAX_POINTS);
+    pointsBuffer = new Float32Array( 3*MAX_POINTS );
+    colorBuffer = new Float32Array( 3*MAX_POINTS );
+    var i = 0;
+    var yaxis = new THREE.Vector3(0,1,0);
+    while (i < MAX_POINTS) {
+        var x = 2*Math.random() - 1;
+        var y = 2*Math.random() - 1;
+        var z = 2*Math.random() - 1;
+        if ( x*x + y*y + z*z < 1 ) {  // only use points inside the unit sphere
+            var angularSpeed = 0.001 + Math.random()/50;  // angular speed of rotation about the y-axis
+            spinSpeeds[i] = new THREE.Quaternion();
+            spinSpeeds[i].setFromAxisAngle(yaxis,angularSpeed);  // The quaternian for rotation by angularSpeed radians about the y-axis.
+            driftSpeeds[i] = randomVelocity();
+			points[i] = new THREE.Vector3(x,y,z);
+         pointsBuffer[3*i] = x;
+         pointsBuffer[3*i+1] = y;
+         pointsBuffer[3*i+2] = z;
+         colorBuffer[3*i] = 0.25 + 0.75*Math.random();
+         colorBuffer[3*i+1] = 0.25 + 0.75*Math.random();
+         colorBuffer[3*i+2] = 0.25 + 0.75*Math.random();
+			i++;
+        }
+    }
+    geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(pointsBuffer,3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colorBuffer,3));
+    geometry.setDrawRange(0,pointsInUse);
+    material = new THREE.PointsMaterial({
+            color: "yellow",
+            size: 2,
+            sizeAttenuation: false
+        });
+    pointCloud = new THREE.Points(geometry,material);
+	 scene.add(pointCloud);
+}
+
+
+function randomVelocity() {
+    var dx = 0.001 + 0.003*Math.random();
+    var dy = 0.001 + 0.003*Math.random();
+    var dz = 0.001 + 0.003*Math.random();
+    if (Math.random() < 0.5) {
+        dx = -dx;
+    }
+    if (Math.random() < 0.5) {
+        dy = -dy;
+    }
+    if (Math.random() < 0.5) {
+        dz = -dz;
+    }
+    return new THREE.Vector3(dx,dy,dz);
+}
+
+
+/* This will be called when the user changes the setting on the
+ * animation radio buttons.
+ */
+function checkAnimation() {
+    if (noAnimateRB.checked) {
+        animating = false;  // Will stop the animation if one is in progress.
+    }
+    else if ( ! animating ) { // Start animating, if not currently animating.
+        animating = true;
+        requestAnimationFrame(render);
+    }
+}
+
+function init() {
+    try {
+      canvas = document.getElementById("maincanvas");
+         renderer = new THREE.WebGLRenderer({
+         canvas: canvas,
+         antialias: true
+      });
+    }
+    catch (e) {
+        document.getElementById("canvas-holder").innerHTML="<p><b>Sorry, an error occurred:<br>" +
+                e + "</b></p>";
+        return;
+    }
+    noAnimateRB = document.getElementById("noAnimate");
+    spinRB = document.getElementById("spin");
+    driftRB = document.getElementById("drift");
+    noAnimateRB.onchange = checkAnimation;
+    spinRB.onchange = checkAnimation;
+    driftRB.onchange = checkAnimation;
+    noAnimateRB.checked = true;
+    sizeSlider = new SliderCanvas(document.getElementById("slider1"));
+    sizeSlider.addSlider({min:1, max:10, step:0.1, value:2, decimals:1});
+    sizeSlider.draw();
+    sizeSlider.onChange = function() {
+		    // Change the size of the points by modifying the size property of the matrial.
+        material.size = sizeSlider.value(0);
+        if (!animating) {
+            render();
+        }
+    };
+    countSlider = new SliderCanvas(document.getElementById("slider2"));
+    countSlider.addSlider({min:100, max:MAX_POINTS, value: pointsInUse, step:100});
+    countSlider.draw();
+    countSlider.onChange = function() {
+         // Change the number of points that are actaully shown, using the geometry's draw range.
+		pointsInUse = countSlider.value(0);
+      geometry.setDrawRange(0,pointsInUse);
+		if (!animating) {
+			render();
+		}
+    };
+    document.getElementById("colorcheck").checked = false;
+    document.getElementById("colorcheck").onchange = function() {
+           // Change whether the geometry's color buffer is used or not to color the points.
+        var checked = document.getElementById("colorcheck").checked;
+        material.vertexColors = checked;
+        material.color = checked ? new THREE.Color("white") : new THREE.Color("yellow");
+        material.needsUpdate = true;
+        if (!animating) {
+            render();
+        }
+    };
+    createWorld();
+    render();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">A Three.js Points Example</h3>
+
+<div id="canvas-holder">
+<canvas id="maincanvas" width="300" height="300"></canvas>
+</div>
+
+<div id="tools">
+<p><label><input id="colorcheck" type="checkbox"> <b>Random Colors</b></label></p>
+<p><b>Animate:</b><br>
+    <label><input type="radio" name="anim" id="noAnimate">None</label>
+    <label><input type="radio" name="anim" id="spin">Spin</label>
+    <label><input type="radio" name="anim" id="drift">Drift</label>
+</p>
+<p><b>Point size:</b><br><canvas width="270" height="60" id="slider1"></canvas></p>
+<p><b>Number of points:</b><br><canvas width="270" height="60" id="slider2"></canvas></p>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This three.js application uses an object of type <i>THREE.Points</i> to
+create a spherical cloud of points.</p>
+<p>When the "Random Colors" checkbox is unchecked, all the points are yellow.
+When the box is checked, each point has its own randomly generated color.</p>
+<p>The cloud can be animated.
+A "Spin" animation makes the points rotate about the y-axis.  Each
+point rotates with its own random angular velocity.  A "Drift" animation
+gives the points arbitrary random velocities, but points are not allowed
+to move too far out of the sphere.</p>
+<p>The user controls the number of points and the size of each point.
+The size is given in pixels.  Note that a point is rendered as a square.</p>
+<p>The animations look nice with a lot of points of very small size!</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

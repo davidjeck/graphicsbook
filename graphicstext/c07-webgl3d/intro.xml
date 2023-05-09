@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>The previous chapter covered WebGL, but only in the context of
+two-dimensional graphics.   As we move into 3D, we will have to
+work with more complex <word term="geometric transform">transformations</word>.
+For that, we will rely mainly on an open-source JavaScript library for 
+vector and matrix math.  We will also need to implement
+<word>lighting</word> and <word>material</word>, which we will
+do directly in <word>GLSL</word>.</p1>
+
+<p>We begin the chapter by duplicating most of the capabilities of <word>OpenGL</word>&nbsp;1.1
+that were covered in <localref href="gl1geom"/> and <localref href="gl1light"/>.
+But we will soon move beyond that by adding features such as
+<word term="spotlight">spotlights</word>, <word>Phong shading</word>, and
+<word>environment mapping</word>.</p>
+
+</intro>

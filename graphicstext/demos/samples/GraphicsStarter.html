@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<!--
+   This web page does the minimal setup for using 2D canvas graphics. Use
+   it as a starting point for experimenting with simple drawing.  Modify
+   the draw() function to define what is shown in the canvas. 
+-->
+<head>
+<meta charset="UTF-8">
+<title>Canvas Graphics Starter</title>
+<style>
+    /* This style section is here to make the canvas more obvious on the
+       page.  It is white on a light gray page background, with a thin
+       black border. */
+    body {
+        background-color: #DDDDDD;
+    }
+    canvas {
+        background-color: white;
+        display: block;
+    }
+    #canvasholder {
+        border:2px solid black;
+        float: left; /* This makes the border exactly fit the canvas. */
+    }
+</style>
+<script>
+
+    "use strict";  // gives improved error-checking in scripts.
+
+    let canvas;    // The canvas element on which we will draw.
+    let graphics;  // A 2D graphics context for drawing on the canvas.
+    
+    /**
+     *  The draw() function is called by init() after the page loads,
+     *  to draw the content of the canvas.
+     */
+    function draw() {
+        
+        // As an example, draw some text and shapes. First, a string of text.
+        
+        graphics.font = "bold 80px serif";
+        graphics.fillStyle = "rgb(200,200,255)";  // light blue, as a CSS RGB color
+        graphics.strokeStyle = "rgb(0,0,150)";    // dark blue
+        graphics.lineWidth = 3;
+        graphics.fillText("Hello World", 25, 100); 
+        graphics.strokeText("Hello World", 25, 100); // Text can be stroked as well as filled!
+
+        // Stroke a line under the text.  It has to be created as a path.
+        
+        graphics.strokeStyle ="red";
+        graphics.lineWidth = 5;
+        graphics.beginPath();
+        graphics.moveTo(25,120);
+        graphics.lineTo(575,120);
+        graphics.stroke();
+        
+        // Fill and stroke a circle, which has to be created as a path containing a circular arc.
+
+        graphics.beginPath();
+        graphics.moveTo(250,300); // Move to start point of arc.
+        graphics.arc(150,300,100,0,2*Math.PI);  // A complete circle.
+        graphics.closePath();
+        graphics.fillStyle = "#FFFFAA"; // A CSS hexadecimal color code, light yellow.
+        graphics.strokeStyle = "black";
+        graphics.lineWidth = 5;
+        graphics.fill();
+        graphics.stroke();
+        
+        // A rectangle can be stroked or filled with one function call:
+        
+        graphics.strokeStyle = "rgb(0,150,0)";
+        graphics.strokeRect(50,480,200,80);
+        graphics.fillStyle = "blue";
+        graphics.fillRect(350,480,200,80);
+        
+        // Other polygonal shapes can be made as paths.  An octagon, for example:
+        
+        graphics.beginPath();
+        graphics.moveTo(550,300);
+        for (let i = 1; i <= 8; i++) {
+            let angle = (2*Math.PI)/8 * i;
+            let x = 450 + 100*Math.cos(angle);
+            let y = 300 + 100*Math.sin(angle);
+            graphics.lineTo( x, y );
+        }
+        graphics.closePath();
+        let gradient = graphics.createLinearGradient(420,420,550,200);
+        gradient.addColorStop(0,"red");
+        gradient.addColorStop(0.5,"yellow");
+        gradient.addColorStop(1,"green");
+        graphics.fillStyle = gradient;  // Use a linear gradient fill!
+        graphics.strokeStyle = "rgb(100,60,0)";
+        graphics.fill();
+        graphics.stroke();
+        
+     } // end of draw()
+    
+       
+    /**
+     * The init() funciton is called after the page has been
+     * loaded.  It initializes the canvas and graphics variables,
+     * and it calls draw() to draw on the canvas.  If an error
+     * occurs, a message is displayed in place of the canvas.
+     */
+    function init() {
+        try {
+            canvas = document.getElementById("canvas");
+            graphics = canvas.getContext("2d");
+        } catch(e) {
+            document.getElementById("canvasholder").innerHTML =
+               "<p>Canvas graphics is not supported.<br>" +
+               "An error occurred while initializing graphics.</p>";
+            return;
+        }
+        draw();  // Call draw() to draw on the canvas.
+    }
+    
+    window.onload = init; // arranges for function init to be called when page is loaded
+    
+</script>
+</head>
+<body> 
+
+<h2>Canvas Graphics Starter</h2>
+
+<noscript>
+    <!-- This message will be shown in the page if JavaScript is not available. -->
+<p>JavaScript is required to use this page.</p>
+</noscript>
+
+<div id="canvasholder">
+<canvas id="canvas" width="600" height="600">
+    <!-- This message is shown on the page if the browser doesn't support the canvas element. -->
+Canvas not supported.
+</canvas>
+</div>
+
+</body>
+</html>
