@@ -67,6 +67,11 @@
    &advanced_s2;
 </chapter>
 
+<chapter title="Introduction to WebGPU" id="webgpu">
+   &webgpu_intro;
+   &webgpu_s1;
+</chapter>
+
 <appendix title="Programming Languages" id="proglang">
 	&proglang_intro;
 	&proglang_s1;

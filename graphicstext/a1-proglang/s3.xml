@@ -311,7 +311,7 @@ named function that is only going to be used once:</np>
 setTimeout( alertFunc, 5000 );</pre>
 
 <p>The second syntax for anonymous functions, new in ES6, is the "arrow function,"
-which takes the form <bnf>&lt;parameter list&gt; => &lt;definition&gt;</bnf>.
+which takes the form <bnf>parameter_list</bnf> =&gt; <bnf>function_definition</bnf>.
 For example,</p>
 
 <pre>() => { alert("Times Up!"); }</pre>

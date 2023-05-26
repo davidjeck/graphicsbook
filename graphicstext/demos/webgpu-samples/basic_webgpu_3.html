@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<!--
+   This program uses WebGPU to draw a "RGB triangle" with a different color
+   at each vertex.  (It is a very boring program with no user interaction.)
+   
+   This file is a minor modification of basic-webgpu-2.html, which draws
+   the triangle using two vertex buffers, one for vertex coordinates and
+   one for vertex colors.  In this version of the program, just one
+   vertex buffer is used for both attributes.  The values for the two
+   attributes are "interleaved" in the buffer.  All comments on the code
+   concern differences between this program and basic-webgpu-2.html.
+-->
+<head>
+<title>Basic WebGPU Example: RGB Triangle using interleaved vertex attributes</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+   // The shader source code is identical to the shader source in the previous version.
+
+   struct VertexOutput {
+      @builtin(position) position: vec4f,
+      @location(0) color : vec3f  
+   }
+   
+   @vertex
+   fn vertexMain(
+            @location(0) coords : vec2f, 
+            @location(1) color : vec3f  
+         ) -> VertexOutput {  
+      var output: VertexOutput;  
+      output.position = vec4f( coords, 0, 1 );
+      output.color = color; 
+      return output;
+   }
+   
+   @fragment
+   fn fragmentMain(@location(0) fragColor : vec3f) -> @location(0) vec4f{
+      return vec4f(fragColor,1);
+   }
+`;
+
+/* vertexData is an array containing the interleaved vertex data.
+ * There are five floats for each of the three vertices -- two number
+ * for the vertex coordinates and three for teh vertex color.
+ */
+const vertexData = new Float32Array([
+   /* coords */     /* color */
+    -0.8, -0.6,      1, 0, 0,      // data for first vertex
+    0.8, -0.6,       0, 1, 0,      // data for second vertex
+    0.0, 0.7,        0, 0, 1       // data for third vertex
+]);
+
+
+
+let context; 
+let device;
+
+let shader; 
+let pipeline; 
+
+let vertexBuffer;   // A GPU vertex buffer that holds the combined coordinate and color attributes.
+                    //  (In the previous program, separate vertex buffers were used.)
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+function createPipelineConfig() {
+
+   let vertexBufferLayout = [
+      {   // There is only one vertex buffer, containing data for two attributes.
+          // The "offset" property of an attribute specifies the position of the
+          // data for that attribute within the full set of data for a vertex.
+          // Here, the first attribute has offset 0 and is found at the start
+          // of the vertex data.  The second attribute, with offset 8, is found
+          // 8 bytes from the start of the data (after the 8 bytes occupied by
+          // the two 32-bit floats in the first attribute.)  Note tha the
+          // format property specifies two 32-bit floats for the first attribute
+          // and three 32-bit floats for the second attribute.
+         attributes: [
+             { shaderLocation:0, offset:0, format: "float32x2" },
+             { shaderLocation:1, offset:8, format: "float32x3" }
+           ],
+         arrayStride: 20,  // arrayStride is the number of bytes between the
+                           // start of the data for one vertex and the start
+                           // of the data for the next vertex; here, the stride
+                           // is 20 bytes (five 4-byte floats per vertex).
+         stepMode: "vertex" 
+      }
+   ];
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: "auto" 
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);  
+      
+   /* Create the single buffer that holds the two vertex attributes,
+    * can write data into the buffer. */
+      
+   vertexBuffer = device.createBuffer({  // buffer for vertex coords; renamed from previous program
+       size: vertexData.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexData);    
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.85, g: 0.9, b: 1, a: 1 }, 
+          loadOp: "clear",
+          storeOp: "store", 
+          view: context.getCurrentTexture().createView() // for drawing to the canvas
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);  // Assign vertexBuffer to supply data for the first
+                                                 // (and only) buffer specified in the vertexBufferLayout.
+                                                 // This includes data for both vertex attributes.
+   passEncoder.draw(3);
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+
+}
+
+async function init() {
+   try {
+      await initWebGPU();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic WebGPU Example (Interleaved Attributes)</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

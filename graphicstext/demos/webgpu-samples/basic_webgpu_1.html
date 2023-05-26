@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<!--
+   This program uses WebGPU to draw a triangle.  The user can change the
+   color of the triangle and the color of the background on which it is
+   drawn.  It is meant as an introduction to using WebGPU, and it is
+   very extensively commented to explain how to use WebGPU.
+-->
+<head>
+<title>Basic WebGPU Example: Colored Triangle</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+/* shaderSource is a string that contains the source code from which
+ * the shader program will be compiled.  The shader program contains
+ * a vertex shader function, which will be called once for each vertex
+ * a shape is drawn, and a fragment shader function that will be
+ * called once for each fragment (that is, each pixel) in the shape.
+ * The source string could be obtained from any source.  It is
+ * compiled in the initWebGPU() function, below.
+ */
+const shaderSource = `
+
+   // The shader source code, written in WGSL, the WebGPU Shading Language.
+   
+   @group(0) @binding(0) var<uniform> color : vec3f; // declares a "uniform variable"
+       // A uniform variable is accessible in every invocation of the vertex and/or
+       // fragment shader (in this program, just the fragment shader).  "vec3f"
+       // is a the type of the variable, representing a vector of three 32-bit
+       // floats.  "var" is used to declare variables, and the parameter, "<uniform>",
+       // in "var<uniform>" says that the variable is stored in the "uniform address
+       // space".  The value for the uniform variable will come from the JavaScript
+       // side of the program.  The "@group(0)" and "@binding(0)" are "attributes"
+       // that specify the location of the variable on the GPU in a way that
+       // allows JavaScript to provide the value for the variable.  The
+       // createPipelineConfig() JavaScript function, below, uses a BindGroupLayout
+       // to represent the locations of resources such as this uniform variable.
+       
+   
+   // vertexMain is the vertex shader function.  The attribute "@vertex" says that
+   // this function can be used as a vertex shader.  The syntax for declaring a
+   // function is:   fn FUNCTION_NAME( PARAMETER_LIST ) -> RETURN_TYPE
+   // Here, there is one parameter, coords, of type vec2f, and the return
+   // type is vec4f.  The value for the parameter will come from a "vertex buffer"
+   // that gets its values from the JavaScript side of the program.  The
+   // attribute "@location" on the parameter corresponds to "shaderLocation:0" in
+   // the vertexBufferLayout in the JavaScript function createPipelineConfig(), below.
+   // The attribute "@buildin(position)" on the return type means that the output
+   // gives the coordinates of the vector in "normalized device coordinates" (or
+   // "clip coordinates").  The outputs of the vertex shader can be passed to as
+   // inputs to the fragment shader.  (The builtin position output is required, but
+   // the output can include other values as well.)
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {
+      return vec4f( coords, 0, 1 );
+          // The output value is a vector of 4 floats, constructed here from the
+          // two floats in coords, with 0 and 1 added for the z- and w-coordinates.
+   }
+   
+   // fragmentMain is the vertex shader function.  The attribute "@vertex" says that
+   // this function can be used as a vertex shader.  This fragment shader has
+   // no parameters (although it uses the builtin position implicitly).  In this
+   // example, the fragment shader is called once for each pixel in the triangle
+   // that is being drawn.  The output value gives the color of that pixel.
+   // It is possible for a fragment shader to have multiple output values, which
+   // are sent to different destinations.  The attribute "@location(0)" on the return
+   // type allows JavaScript to specify the destination for the output value; it
+   // represents the 0 element in the array of "colorAttachments" specified
+   // in the "renderPipelineDescriptor" in the JavaScript draw() function, below.
+   // (Note that this "@location(0)" has nothing to do with the "@location(0)" in
+   // the parameter list of the vertex shader.  The meaning of @location(0) in
+   // WGSL depends on the context.)
+   @fragment
+   fn fragmentMain() -> @location(0) vec4f {
+      return vec4f( color, 1 ); 
+          // The output is constructed from the three values in the uniform color variable,
+          // with 1 added as the alpha value for the color.
+   }
+`;
+
+const colors = [ // Color RGB values corresponding to entries in "Select Triangle Color" popup menu.
+                 // Each 3-element array is transformed into a Float32Array so that it can be used
+                 // as input to a WebGPU buffer, in a call to device.queue.writeBuffer().  The
+                 // buffer in this case holds the value of the uniform color variable in the
+                 // shader program.
+    new Float32Array([1, 0, 0]),       // red
+    new Float32Array([0, 0.7, 0]),     // green
+    new Float32Array([0, 0, 1]),       // blue
+    new Float32Array([0.4, 0.4, 0.4]), // gray
+    new Float32Array([1, 1, 1])        // white
+];
+
+const bgColors = [ // Color RGB values corresponding to entries in "Select Background Color" popup menu.
+    [1, 0.8, 0.8],    // pink
+    [0.7, 0.9, 0.7],  // light green
+    [0.8, 0.8, 1],    // light blue
+    [0.8, 0.8, 0.8],  // light gray
+    [0, 0, 0]         // black
+];
+
+const vertexCoords = new Float32Array([   // 2D coords for drawing a triangle.
+   -0.8, -0.6,  0.8, -0.6,  0, 0.7
+]);  // Note that in the default coordinate system, the x-coordinate ranges
+     // from -1 at the left edge of the canvas to 1 at the top edge, and the
+     // y-coordinate ranges from -1 at the bottom to 1 at the top.
+
+let context;  // The WebGPU context for the canvas, where the image is displayed.
+let device;   // The WebGPU device, used for all interaction with the GPU.
+
+let shader;   // The shader program, compiled from shaderSource constant, given above.
+let pipeline; // Specifies shader stages for the render pass encoder.
+
+let vertexBuffer;  // A GPU buffer holding the per-vertex data for the shader.
+                   // The data from the above vertexCoords array will be copied to this buffer.
+
+let uniformBuffer;  // A GPU buffer holding the uniform data for the shader.
+                    // It will get its values from one of the elements of the above color array.
+
+let uniformBindGroup;  // Auxiliary buffers (i.e., not vertex buffers) must be part of a "bind group"
+                       // to be used in a render pipeline.  This bind group contains uniformBuffer.
+
+
+/* Obtain the WebGPU device, or throw an error if WebGPU can't be initialized.
+ * Also, contain and configure the canvas, and compile the shader program.
+ * This is an "async" function because it uses "await", and it is called
+ * with "await" in the init() function below.
+ */
+async function initWebGPU() {
+
+   // A "device" is central to using WebGPU.  It is always obtained
+   // in the same way.
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   // For display on the screen. WebGPU draws to an HTML canvas element
+   // on the web page.  You need to call canvas.getContext("webgpu")
+   // and then configure the canvas to use the WebGPU device.  This
+   // is always done in the same way, except possibly for alphaMode.
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"  // Alternative is "opaque", which is the default.
+                                  // Setting it to "premultiplied" allows pixels
+                                  // in the canvas to be translucent.
+   });
+
+   // Compile the shader source code, checking for any errors in the code.
+   // Error checking is done with pushErrorScope/popErrorScope.  Note that
+   // compilation errors do not automatically throw errors; however, a
+   // warning will be shown in the web browser console.  You should
+   // generally keep your web browser console open when running WebGPU
+   // apps during development.  There is really no need to do the error 
+   // check after you have a bug-free app.
+   
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+/* Create the render pipeline and the buffer resources that it uses.  A render
+ * pipeline specifies the computational stages that WebGPU goes through to
+ * compute an image.  Buffers are blocks of memory on the GPU.  They can be
+ * used to provide input for the pipeline.
+ */
+function createPipelineConfig() {
+
+   /* Create "layouts" that describe the data that is used in the shaders.
+    * Layouts do not specify the buffers themselves; they just specify
+    * some information about how the buffers will be used and what kind
+    * of data they contain.  Vertex buffers hold input for the vertex
+    * shader.  Other buffers, such as uniformBuffer in this program, must
+    * be part of a "bind group" to be used. */
+   
+   let vertexBufferLayout = [ // The value is an array of vertex buffer descriptions.
+      { // Just one vertex buffer, for vertex coordinates.
+            // Buffer contains just one attribute.  shaderLocation:0 means that the
+            // attribute provides values for the parameter to the vertex shader function
+            // that is labeled with @location(0).  The format says that the data for
+            // each vertex consist of two 32-bit floating point numbers.  The offset
+            // will be zero as long as the buffer contains only the data for one attribute.
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8,    // Number of bytes between data for one vertex and data for the next.
+                            // This is 8 because the data for one vertex is two 4-byte numbers.
+         stepMode: "vertex" // WebGPU will take one value from the buffer for each vertex.
+      }
+   ];
+   
+   let uniformBindGroupLayout = device.createBindGroupLayout({
+       entries: [ // An array of buffer descriptions.  Here there is just one.
+          {
+             binding: 0,  // Each buffer in the group has a binding number that corresponds to
+                          // the "@binding" attribute for a global variable in the shader source code.
+             visibility: GPUShaderStage.FRAGMENT,  // Buffer is accessible only in the fragment shader.
+             buffer: {
+                type: "uniform"  // This means that the associated variable in the shader will have
+                                 // the same value for all fragments.
+             }
+          }
+       ]
+    });
+   
+   /* Create the pipeline, using the function device.createRenderPipeline().  The parameter
+    * to that function is a "pipeline descriptor" that describes the resources used in
+    * the pipeline, including the vertex shader, fragment shader, and buffers.  Can also
+    * include some other pipeline configuration, such as the primitive topology in this
+    * example. */
+   
+   let pipelineDescriptor = {
+       vertex: { // info about the vertex shader
+          module: shader,  // The compiled shader program that contains the vertex shader function.
+          entryPoint: "vertexMain",  // The name of the function to be called once for each vertex.
+          buffers: vertexBufferLayout  // The layout, defined above, describing the vertex buffers.
+       },
+       fragment: { // info about the fragment shader
+          module: shader, // The compiled shader program that contains the fragment shader function.
+                          //   (Note: Vertex and fragment shader can be in different programs.)
+          entryPoint: "fragmentMain", // The name of the function to be called once for each fragment.
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {  // Specifies that when drawing a list of vertices,
+                     // each set of three vertices specifies a triangle.
+          topology: "triangle-list"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [uniformBindGroupLayout]
+              // Specify the structure of resources (other than vertex buffers)
+              // used in the shader program.  The value is an array of
+              // BindGroupLayouts.  The "@group(0)" attribute on the uniform variable
+              // declaration in the shader program says that the value for that
+              // variable is in the bind group specified by the 0 element of this array.
+       })
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);
+      // This is the render pipeline for use in draw() function, below.
+      // Note that the pipeline only specifies the structure of the
+      // input data used by the pipeline, not that actual data.  The
+      // actual vertex buffer that holds the data are specified in the
+      // draw() method below, using the passEndocer.setVertexBuffer()
+      // function.  The actual buffers for other resources is set
+      // using a combination of the device.greateBindGroup()
+      // and passEncoder.setBindGroup() functions.  This allows the
+      // same pipeline to be used multiple times with different data.
+   
+   /* Create the buffers that hold the actual data used in the shaders,
+    * and load data into the buffers. */
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+           // The "VERTEX" usage says that this is a vertex buffer.  The
+           // "COPY_DST" is required to allow data to be copied to
+           // the buffer by the device.queue.writeBuffer() method.
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);
+       // copies the contents of the vertexCoords Float32Array
+       // into the vertexBuffer, staring at the 0-th byte in
+       // the buffer.  Note that the sizes of the array and the
+       // buffer must be the same.
+   
+   uniformBuffer = device.createBuffer({ 
+      size: colors[0].byteLength, 
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+          // The "UNIFORM" usage is for buffers holding values for
+          // shader variables in the uniform address space.
+   });
+    
+   device.queue.writeBuffer(uniformBuffer, 0, colors[0]);
+   
+   /* A bind group specifies the actual buffers that are bound to the 
+    * the bindings specified by a bind group layout. */
+    
+   uniformBindGroup = device.createBindGroup({
+      layout: uniformBindGroupLayout,
+          // layout is the bind group layout that specifies the structure of this bind group.
+      entries: [  // Each element of this array assigns a buffer for an entry in the bind group layout.
+        {
+           binding: 0,  // the corresponding binding in the entries of the bind group layout.
+           resource: {buffer: uniformBuffer, offset: 0, size: 3*4}  // the buffer that is bound
+              // (The offset and size properties, given in bytes, allow the source of
+              // the data for the binding to be just a region in the buffer.  Here, the
+              // entire buffer is used.)
+        }
+      ]
+   });
+}
+
+
+/* This function draws the actual image.  It is called when the page is first loaded
+ * and when the user changes the color of the triangle or the background color.
+ */
+function draw() {
+   let bgColor = bgColors[ Number(document.getElementById("bgselect").value) ];
+   let commandEncoder = device.createCommandEncoder();
+       // A commandEncoder makes a list of commands to be sent to the GPU
+       // for execution.  Note that it just collects commands.  The commands
+       // are not executed until after the list of commands is shipped to the
+       // GPU by the device.queue.submit() function call at the end of this
+       // draw() function.
+   let renderPassDescriptor = {
+      colorAttachments: [{
+              // Each object in the colorAttachments array specifies a destination
+              // for output from the fragment shader, which can in general have
+              // multiple outputs.  In this example, there is only one output.
+          clearValue: { r: bgColor[0], g: bgColor[1], b: bgColor[2], a: 1 },
+             // The clearValue property specifies the RGBA color components, in the
+             // range 0.0 to 1.0, for the background color of the image that is
+             // used to fill the canvas before anything is drawn.
+          loadOp: "clear", // Alternative is "load", which is used for drawing over existing image.
+          storeOp: "store",  // Alternative is "discard", which means nothing is drawn.
+          view: context.getCurrentTexture().createView() // For drawing to the canvas.
+             // context.getCurrentTexture().createView() returns a "texture view"
+             // representing the image that is drawn in the canvas.  A new
+             // texture view is created each time context.getCurrentTexture().createView()
+             // is called, so it must be called every time a new image is drawn to
+             // the canvas.
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+       // passEncoder is used to encode (but not execute) the commands that
+       // are necessary for one execution of a pipeline.  A commandEncoder
+       // can encode multiple pipeline executions, possible using different
+       // pipelines, or different input buffers for the same pipeline.
+   passEncoder.setPipeline(pipeline);  // which pipeline to execute
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+       // The vertexBufferLayout for the pipeline is an array of
+       // buffer specifications.  The first parameter to passEncoder.setVertexBuffer()
+       // says that we are providing the source buffer for the 0 element
+       // in that array of buffer specifications.
+   passEncoder.setBindGroup(0,uniformBindGroup);
+       // The pipeline specifies an array of bind group layouts.  Here,
+       // we provide the actual bind group for the 0 element of that
+       // array of bind group layouts.
+   passEncoder.draw(3); // Will call the vertex shader function three times
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish(); // Get the list of commands.
+   device.queue.submit([commandBuffer]); // Ship the commands to the GPU.
+      // Note that the draw() function returns immediately, without waiting
+      // for the GPU to finish executing the commands.
+}
+
+
+/* This function is called when the user selects a new color for the triangle
+ * from the Select Color popup menu.  It copies the new value for the color
+ * into the uniformBuffer and calls draw() to draw a new image.  Note that
+ * the only thing that changes between drawing the old image and drawing the
+ * new image is the content of uniformBuffer.  No changes are required to the
+ * pipeline, bind group layout, or bind group.
+ */
+function doColorChange() {
+   let colorNum = Number(document.getElementById("colorselect").value);
+   device.queue.writeBuffer(uniformBuffer, 0, colors[colorNum]);
+   draw();
+}
+
+
+/* This function is called after the web page has been loaded.  It does
+ * initialization and calls draw() to draw the initial image in the canvas.
+ */
+async function init() {
+   try {
+      await initWebGPU();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("colorselect").value = "0";
+   document.getElementById("colorselect").onchange = doColorChange;
+   document.getElementById("bgselect").value = "3";
+   document.getElementById("bgselect").onchange = draw;
+   draw();
+}
+
+window.onload = init;  // arrange for init() to be called after loading the page
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic WebGPU Example (Colored Triangle)</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label>Select Triangle Color: <select id="colorselect">
+   <option value="0">Red</option>
+   <option value="1">Green</option>
+   <option value="2">Blue</option>
+   <option value="3">Gray</option>
+   <option value="4">White</option>
+</label></select>
+<label style="margin-left:40px">Select Background Color: <select id="bgselect">
+   <option value="0">Pink</option>
+   <option value="1">Light Green</option>
+   <option value="2">Light Blue</option>
+   <option value="3">Light Gray</option>
+   <option value="4">Black</option>
+</label></select>
+</p>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

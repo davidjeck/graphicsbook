@@ -55,6 +55,7 @@ if  $XALAN_COMMAND -xsl convert-web.xsl -in graphicstext.xml ; then
    mv web/demos/glsim-samples web/source/glsim
    mv web/demos/threejs-samples web/source/threejs
    mv web/demos/webgl-samples web/source/webgl
+   mv web/demos/webgpu-samples web/source/webgpu
 #   cp README.txt web/README-full-source.txt
 
    copyfiles c02-graphics2d c2
@@ -64,6 +65,7 @@ if  $XALAN_COMMAND -xsl convert-web.xsl -in graphicstext.xml ; then
    copyfiles c06-webgl c6
    copyfiles c07-webgl3d c7
    copyfiles c08-advanced c8
+   copyfiles c09-webgpu c9
    
    copyfiles a1-proglang a1
    copyfiles a2-blender a2

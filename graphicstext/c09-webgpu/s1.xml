@@ -1,0 +1,737 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section id="webgpu.1" title="WebGPU Basics">
+
+<p1>WebGPU is a new API for computer graphics on the Web.  Where <word>WebGL</word>
+was based on OpenGL, WebGPU has been completely designed from scratch.  It is similar
+to more modern computer graphics APIs such as <word>Vulkan</word>, <word>Metal</word>, 
+and <word>Direct3D</word>.  WebGPU is a very low-level API, which makes the programmer
+do more work but also offers more power and efficiency.  On the other hand,
+you might find that WebGPU is a cleaner, more logical API than WebGL, which
+is filled with strange remnants of old OpenGL features.</p1>
+
+<p>We begin the chapter with an overview of WebGPU.  For now, we will stick to
+basic 2D graphics, with no <word term="geometric transform">transformations</word>
+or <word>lighting</word>.  Although I will make some references to WebGL,
+I will try to make the discussion accessible even
+for someone who has not already studied WebGL or OpenGL; however, if you are not
+familiar with computer graphics, you might need to refer to earlier sections
+of this book for background information.</p>
+
+<p>Our WebGPU examples will be programmed in <word>JavaScript</word>.
+A short introduction to JavaScript can be found in <localref href="proglang.3">Section&nbsp;3</localref>
+of Appendix&nbsp;A.  WebGPU makes extensive use of <word term="typed array">typed arrays</word>
+such as <i>Float32Array</i> and of the notations for creating objects (using <code>{&dots;}</code>)
+and arrays (using <code>[&dots;]</code>).
+And it uses <word term="async function">async</word> functions and 
+<word term="promise (in JavaScript)">promises</word>, advanced JavaScript
+features that are discussed in <localref href="proglang.4">Section&nbsp;4</localref>
+of that appendix.</p>
+
+<p>The environment for a WebGPU application has two parts that I will call the JavaScript side
+and the GPU side.   The JavaScript side is executed on the <word>CPU</word> (the Central
+Processing Unit of the computer), while WebGPU computational and rendering operations are 
+executed on the <word>GPU</word> (Graphical Processing Unit).  The CPU and GPU each have
+their own dedicated memory, but they also have some shared memory that can be used for
+sharing data and sending messages.  Communication between the JavaScript side and 
+the GPU side of the application is relatively slow and inefficient.  A lot of the
+design of WebGPU, which can seem cumbersome and a little strange, can be explained by
+the need to manage that communication as efficiently as possible.  Now, WebGPU can
+in fact be implemented in many ways on many different systems.  It can even be emulated
+entirely in software with no physical GPU involved.  But the design has to be 
+efficient for all cases, and the case that you should keep in mind when trying
+to understand the design is one with separate CPU and GPU that have access to 
+some shared memory.</p>
+
+<p>In this section we will mostly be looking at one sample program:
+<sourceref href="webgpu/basic_webgpu_1.html">basic_webgpu_1.html</sourceref>,
+which simply draws a color triangle.
+The source code for this example is extensively commented, and you are
+encouraged to read it.  You can run it to test whether your browser supports WebGPU.
+<tex>A demo version is also available.
+If you would like to see the code without all the comments, read the source code for 
+the demo version.</tex><web>Here is a demo version (with source code that does not
+include all the comments):</web></p>
+
+<demo height="450" width="390" src="c9/first-webgpu-demo.html"/>
+
+<subsection title="Adapter, Device, and Canvas" id="webgpu.1.1">
+
+<p>Any WebGPU application must begin by obtaining a WebGPU "device," which represents the
+programmer's interface to almost all WebGPU features. To produce visible graphics images 
+on a web page, WebGPU <word term="rendering">renders</word> to an <word>HTML canvas</word> 
+element on the page.  For that, the application will need a WebGPU context for the canvas.
+(WebGPU can do other things besides render to a canvas, but we will stick to that for now).
+The code for obtaining the device and context can be the same in any application:</p>
+
+<pre>async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied" // (the alternative is "opaque")
+   });
+    .
+    .
+    .</pre>
+    
+<np>Here, <code>device</code> and <code>context</code> are global variables,
+<code>navigator</code> is a predefined variable representing the web browser, and
+The other variables, <code>adapter</code> and <code>canvas</code>, are probably
+not needed outside the initialization function.  (If a reference to the
+canvas is needed, it is available as <code>context.canvas</code>.)
+The functions <code>navigator.gpu.requestAdapter()</code> and
+<code>adapter.requestDevice()</code> return promises.
+The function is declared as <code>async</code> because it uses <code>await</code>
+to wait for the results from those promises.  (Async functions are used in the
+same way as other functions, except that sometimes you have to take into account that
+other parts of the program can in theory run while <code>await</code>
+is waiting for a result.)</np>
+
+<p>The only thing you might want to change in this initialization is the
+<code>alphaMode</code> for the <code>context</code>.  The value
+"premultiplied" allows the <word term="alpha color component">alpha</word> 
+value of a pixel in the canvas to
+determine the degree of transparency of that pixel when the canvas
+is drawn on the web page.  The alternative value, "opaque" means that
+the alpha value of a pixel is ignored, and the pixel is opaque.</p>
+
+<p>This initialization code does some error checking and can throw an
+error if a problem is encountered.  Presumably, the program would catch
+that error elsewhere and report it to the user.  However, as a WebGPU
+developer, you should be aware that WebGPU does extensive
+validity checks on programs and reports all errors and warnings 
+to the web browser console.  So, it is a good idea to keep 
+the console open when testing your work.</p>
+
+</subsection>
+
+
+<subsection title="Shader Module" id="webgpu.1.2">
+<p>Like WebGL and OpenGL, WebGPU draws <word term="geometric primitive">primitives</word>
+(points, lines, and triangles) that are defined by <word term="vertex">vertices</word>.
+The rendering process involves some computation for each vertex of a primitive, and
+some computation for each pixel (or "fragment") that is part of the primitive.  A
+WebGPU programmer must define functions to specify those computations.  Those functions
+are <word term="shader">shaders</word>.  To render an image, a WebGPU program must
+provide a vertex shader function and a fragment shader function.  Shader functions and
+supporting code for WebGPU are written in <newword>WGSL</newword>, the WebGPU Shader Language.
+Shader source code is given as an ordinary JavaScript string. The
+<code>device.createShaderModule()</code> method, in the WebGPU device object,
+is used to compile the source code, check it for syntax errors, and package it
+into a shader module that can then be used in a rendering pipeline:</p>
+
+<pre>shader = device.createShaderModule({
+    code: shaderSource
+});</pre>
+
+<np>The parameter here is an object that in this example has just one property, named <code>code</code>;
+<code>shaderSource</code> is the string that contains the shader source code; and the return value,
+<code>shader</code>, represents the compiled source code, which will be used later, when configuring
+the render pipeline.  Syntax errors in the source code will not throw an exception.  However,
+compilation errors and warnings will be reported in the web console. You should always check the
+console for WebGPU messages during development.</np>
+
+<break/>
+
+<p>We will look at WGSL in some detail in <localref href="webgpu.3"/>.  WGSL is 
+similar in many ways to <word>GLSL</word>, the shading language for WebGL,
+but its variable and function declarations are very different.  I will give
+just a short discussion here, to help you understand the relationship between
+the JavaScript part and the WGSL part of a WebGPU application.  Here is the short
+shader source code from our <sourceref href="webgpu/basic_webGPU_1.html">first WebGPU example</sourceref>.
+It is defined (on the JavaScript side) as a template string, which can extend over
+multiple lines:</p>
+
+<pre>const shaderSource = `
+   
+   @group(0) @binding(0) var&lt;uniform&gt; color : vec3f;
+
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -&gt; @builtin(position) vec4f {
+      return vec4f( coords, 0, 1 );
+   }
+   
+   @fragment
+   fn fragmentMain() -&gt; @location(0) vec4f {
+      return vec4f( color, 1 ); 
+   }
+`;</pre>
+
+<np>The syntax for a function definition in WGSL is</np>
+
+<pre>fn <bnf>function_name</bnf> ( <bnf>parameter_list</bnf> ) -&gt; <bnf>return_type</bnf></pre>
+
+<np>The types used in this example&mdash;<code>vec2f</code>, <code>vec3f</code>, and
+<code>vec4f</code> &mdash;represent vectors of two, three, and four 32-bit floating point numbers.
+Variable declarations can have several forms.  The one example in this code has the
+form</np>
+
+<pre>var&lt;uniform&gt; <bnf>variable_name</bnf> : <bnf>type</bnf></pre>
+
+<np>This declares a global variable in the "uniform address space," which will be discussed below.
+A variable in the uniform address space gets its value from the JavaScript side.</np>
+
+<p>The words beginning with "@" are annotations or modifiers.  For example, 
+<code>@vertex</code> means that the following function can be used as a vertex shader
+function, and <code>@fragment</code> means that the following function can be used as a fragment shader
+function.  <code>@builtin(position)</code> says that the return value from
+<code>vertexMain()</code> gives the coordinates of the
+vertex in the standard WebGPU coordinate system.  And <code>@location(0)</code>,
+<code>@group(0)</code>, and <code>@binding(0)</code> in this example are used to specify
+connections between data in the shader and data on the JavaScript side, as will be
+discussed below.</p>
+
+<p>The vertex and fragment shader functions that are used here are very simple.  
+The vertex shader simply takes the (x,y) coordinates from its parameter, which
+come from the JavaScript side, and adds z- and w-coordinates to get the
+final <word>homogeneous coordinates</word> for the vertex.
+The expression <code>vec4f(coords,0,1)</code> for the return value constructs
+a <code>vec4f</code> (a vector of four floats) from the four floating-point
+values in its parameter list.  The fragment shader, which outputs an
+<word term="RGBA color">RGBA</word> color for the pixel that it is processing, simple uses
+the three RGB components from the uniform <code>color</code> variable, which
+comes from the JavaScript side, and adds a 1 for the alpha value of the color.</p>
+
+</subsection>
+
+
+<subsection title="Render Pipeline" id="webgpu.1.3">
+
+<p>In WebGPU, an image is produced as the output of a series of processing stages that
+make up a "render pipeline."  The vertex shader and fragment shader are programmable stages
+in the pipeline, but there are other fixed function stages that are built into WebGPU.
+Input to the pipeline comes from data structures in the <word>GPU</word>.  If the data originates 
+on the JavaScript side of the application, it must be copied to the GPU before 
+it can be used in the pipeline.  Here is an illustration of the general structure 
+of a render pipeline:</p>
+
+<img src="webgpu-render-pipeline.png" width="601" height="274" tex="webgpu-render-pipeline.eps" texscale="0.7" 
+   alt="Data flow in a WebGPU render pipeline."/>
+   
+<np>This diagram shows two types of input to the pipeline, <newword term="vertex buffer">vertex buffers</newword>
+and <newword term="bind group">bind groups</newword>.  Recall that when a primitive is drawn, the vertex shader is called once for
+each vertex in the primitive.  Each invocation of the vertex shader can get different values
+for the parameters in the vertex shader function.  Those values come from vertex buffers.
+The buffers must be loaded with values for the parameters&mdash;one set of parameter values
+for each vertex.  A fixed function stage of the pipeline, shown as the dots between the 
+vertex buffers and the vertex shader, calls the vertex shader once for each vertex, pulling
+the appropriate set of parameter values for that vertex from the buffers.  (Vertex buffers
+also hold data for <word>instanced drawing</word>, which will be covered in the
+<localref href="webgpu.1.2">next section</localref>; see also <localref href="webgl.1.8"/>).</np>
+
+<p>The vertex shader outputs some values, which must include the coordinates of the vertex
+but can also include other values such as color, <word>texture coordinates</word>,
+and <word>normal vector</word> for the vertex.  Intermediate stages of the pipeline between
+the vertex shader and the fragment shader process the values in various ways.  For example,
+the coordinates of the vertices are used to determine which pixels lie in the primitive.
+Coordinates for the pixels are computed by <word term="interpolation">interpolating</word>
+the vertex coordinates.  Values like color and texture coordinates are also generally 
+interpolated to get different values for each pixel.  All these values are available
+as inputs the the fragment shader, which will be called once for each pixel in the
+primitive with appropriate values for its parameters.</p>
+   
+<p>Vertex buffers are special because of the way that they are used to supply
+vertex shader parameters.  Other kinds of of input are stored in the data structures 
+called bind groups.  Values from bind groups are made available to vertex and
+fragment shaders as global variables in the shader programs.</p>
+
+<p>The fragment shader can output several values.  The destinations for those
+values lie outside the pipeline and are referred to as the "color attachments"
+for the pipeline.  In the most common case, there is just one output that
+represents the color to be assigned to the pixel, and the associated color
+attachment is the image that is being rendered (or, rather, the block of
+memory that holds the color data for that image).  Multiple outputs
+can be used for advanced applications such as <word>deferred shading</word>
+(see <localref href="webgl3d.5.3"/>).</p>
+
+<p>A WebGPU program is responsible for creating pipelines and providing
+many details of their configuration.  (Fortunately, a lot of the detail
+can be handled by the tried-and-true method of cut-and-paste.)
+Let's look at the relatively simple example from our first sample program.
+The goal is to create a render pipeline in the final line of this code
+excerpt.  Before that, the program creates some objects to
+specify the pipeline configuration:</p>
+
+<pre>let vertexBufferLayout = [ // An array of vertex buffer specifications.
+   { 
+      attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+      arrayStride: 8, 
+      stepMode: "vertex"
+   }
+ ];
+
+let uniformBindGroupLayout = device.createBindGroupLayout({
+    entries: [ // An array of resource specifications.
+       {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: {
+             type: "uniform"
+          }
+       }
+    ]
+  });
+ 
+let pipelineDescriptor = {
+    vertex: { // Configuration for the vertex shader.
+       module: shader, 
+       entryPoint: "vertexMain", 
+       buffers: vertexBufferLayout 
+    },
+    fragment: { // Configuration for the fragment shader.
+       module: shader, 
+       entryPoint: "fragmentMain", 
+       targets: [{
+         format: navigator.gpu.getPreferredCanvasFormat()
+       }]
+    },
+    primitive: {
+       topology: "triangle-list"
+    },
+    layout: device.createPipelineLayout({
+       bindGroupLayouts: [uniformBindGroupLayout]
+    })
+ };
+ 
+pipeline = device.createRenderPipeline(pipelineDescriptor);</pre>
+
+<np>(You can read the same code with more comments in the source code
+for the <sourceref href="webgpu/basic_webgpu_1.html">program</sourceref>.)</np>
+
+<p>There is a lot going on here!
+The <code>vertex</code> and <code>fragment</code> properties of
+the pipeline descriptor describe the shaders that are used in the
+pipeline.  The <code>module</code> property is the compiled shader
+module that contains the shader function.  The <i>entryPoint</i>
+property gives the name used for the shader function in the shader
+source code.  The <code>buffers</code> and <code>targets</code>
+properties are concerned with inputs for the vertex shader function
+and outputs from the fragment shader function.</p>
+
+<p>The vertex buffer and bind group "layouts" specify what inputs will
+be required for the pipeline.  They specify only the structure of the
+inputs. They basically create attachment points where actual input sources
+can be plugged in later.  This allows one pipeline to draw different 
+things by providing it with different inputs.</p>
+
+<p>Note the use of arrays 
+throughout the specification.  For example, a pipeline can be configured
+to use multiple vertex buffers for input. The vertex buffer layout is
+an array, in which each element of the array specifies one input buffer.
+The index of an element in the array is important, since it identifies
+the attachment point for the corresponding buffer.  The index will
+be used later, when attaching an actual buffer.</p>
+
+<p>Similarly, a pipeline can take inputs from multiple bind groups.
+In this case, the index for a bind group comes from the <code>bindGroupLayouts</code>
+property in the <code>pipelineDescriptor</code>, and that index will be
+required when attaching an actual bind group to the pipeline.
+The index is also used in the shader program. For example, if you look
+back at the shader source code above, you'll see that the uniform
+variable declaration is annotated with <code>@group(0)</code>.  This 
+means that the value for that variable will be found in the bind
+group with index&nbsp;0.</p>
+
+<p>Furthermore, each bind group can hold a 
+list of resources, which are specified by the <code>entries</code> 
+property of the bind group layout for that bind group.  An entry
+can provide the value for a global variable in the shader.
+In this case, confusingly, it is not the index of the entry in
+the <code>entries</code> array that is important; instead, 
+the entry has a <code>binding</code> property to identify it.
+In the sample program, the double annotation <code>@group(0) @binding(0)</code>
+on the uniform variable declaration says that the value for the variable
+comes specifically from the entry with binding number 0 in the
+bind group at index&nbsp;0.</p>
+
+<p>The pipeline also has outputs, which come from the fragment shader function,
+and the pipeline needs attachment points for the destinations of those outputs.
+The <code>targets</code> property inside the <code>pipelineDescriptor</code>
+is an array with one entry for each attachment point.   When the shader
+source code defines the fragment shader with
+<code>fn&nbsp;fragmentMain() -&gt; @location(0)&nbsp;vec4f</code>,
+the annotation <code>@location(0)</code> on the output says that that
+output will be sent to color attachment number&nbsp;0, corresponding to
+the element at index&nbsp;0 in the <code>targets</code> array.
+The value for the <code>format</code> property in that element specifies 
+that the output will be in the appropriate format for colors
+in a canvas.  (The system will automatically translate the shader output,
+which uses a 32-bit float for each color component, into the canvas
+format, which uses an 8-bit unsigned integer for each component.)</p>
+
+<p>That leaves the <code>primitive</code> property of the <code>pipelineDescriptor</code>
+to be explained: It specifies the kind of <word>geometric primitive</word> that the
+pipeline can draw.  The <code>topology</code> specifies the primitive type, which in
+this example is "triangle-list."  That is, when the pipeline is executed, each
+group of three vertices will define a triangle.  WebGPU has only five primitive types: 
+"point-list", "line-list", "line-strip", "triangle-list", and "triangle-strip",
+corresponding to <code>POINTS</code>, <code>LINES</code>, <code>LINE_STRIP</code>, 
+<code>TRIANGLES</code>, and <code>TRIANGLE_STRIP</code> in WebGL or OpenGL.
+This illustration shows how the same six vertices would be interpreted in
+each topology (except that outlines of triangles and endpoints of line segments
+would not be part of the actual output):</p>
+
+<img src="webgpu-primitives.png" width="511" height="133"
+   tex="webgpu-primitives.eps" texscale="0.8" alt="Pictures of the five WebGPU primitive topologies." />
+
+<np>(See <localref href="gl1geom.1.1"/> for more discussion of how primitives 
+are rendered.)</np>
+
+<p>You don't have to create a pipeline every time you draw an image.
+A pipeline can be used any number of times.  It can be used to draw different
+things by attaching different input sources.  Drawing a single image
+might require several pipelines, each of which might be executed several
+times.  It is common for programs to create pipelines during initialization
+and store them in global variables.</p>
+
+</subsection>
+
+
+<subsection title="Buffers" id="webgpu.1.4">
+
+<p>Inputs to a pipeline come from vertex buffers and from general purpose buffers and
+other resources in bind groups.  (The other possible resources relate to <word term="texture">textures</word>,
+which we will not encounter until <localref href="webgpu.5"/>).  You need to know how
+to create a buffer, fill it with data, and attach it to a pipeline.</p>
+
+<p>The function <code>device.createBuffer()</code> is used for creating buffers.  It takes
+a parameter that specifies the size of the buffer in bytes and how the buffer will be used.
+For example, the sample program creates a vertex buffer with</p>
+
+<pre>vertexBuffer = device.createBuffer({
+     size: vertexCoords.byteLength,
+     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+});</pre>
+
+<np>The purpose of a vertex buffer is to hold inputs for a vertex shader on the
+GPU side of the program.  The data will come from a <word>typed array</word>, such as
+a <code>Float32Array</code>, or from a related JavaScript data type such as
+<code>ArrayBuffer</code>. In this case,
+<code>vertexCoords</code> is a <code>Float32Array</code> that holds the xy-coordinates
+of the vertices of a triangle, and <code>vertexCoords.byteLength</code> gives the
+number of bytes in that array.  (Alternatively, the size could be specified as
+<code>4*vertexCoords.length</code> or as the constant&nbsp;24.)</np>
+
+<p>The <code>usage</code> property in this example says that the buffer is a vertex 
+buffer and that it can be used as a destination for copying data.  The value for
+the <code>usage</code> can be given as a usage constant such as <code>GPUBufferUsage.VERTEX</code>
+or by the bitwise <code>OR</code> of several such constants.</p>
+
+<p>The program also uses a buffer to hold the value for the uniform <code>color</code>
+variable in the shader.  The color value consists of three four-byte floats, and the
+buffer can be created with</p>
+
+<pre>uniformBuffer = device.createBuffer({
+   size: 3*4,
+   usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+});</pre>
+
+<np>Only vertex buffers are attached directly to pipelines.  Other buffers
+must be part of a bind group that is attached to the pipeline.  The sample
+program creates a bind group to hold <code>uniformBuffer</code>:</np>
+
+<pre>uniformBindGroup = device.createBindGroup({
+   layout: uniformBindGroupLayout,
+   entries: [ 
+     {
+        binding: 0, // Corresponds to the binding 0 in the layout.
+        resource: { buffer: uniformBuffer, offset: 0, size: 3*4 }
+     }
+   ]
+});</pre>
+
+<np>Recall that <code>uniformBindGroupLayout</code> was created to specify 
+the structure of the bind group.  The bind group layout has <code>entries</code>
+that specify resources; a corresponding bind group has <code>entries</code>
+the provide the actual resources. The resource in this case is a 
+<code>buffer</code>.  The <code>offset</code> and <code>size</code>
+properties of the <code>resource</code> make it possible to use just
+a segment of a buffer; <code>offset</code> is the starting bye number of
+the segment, and <code>size</code> is the number of bytes in the segment.</np>
+
+<p>To be useful, a buffer must loaded with data.  The buffer exists on
+the GPU side of the program.  For data that originates
+on the JavaScript side, the function <code>device.queue.writeBuffer()</code> 
+is the easiest way to copy the data into a GPU buffer.  For example the function call</p>
+
+<pre>device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);</pre>
+
+<p>Copies the entire contents of the <code>vertexCoords</code> array
+into <code>vertexBuffer</code>, starting at byte number 0 in the buffer.
+It is possible to a copy a subarray of a typed array to any position in the buffer.
+The general form is</p>
+
+<pre>device.queue.writeBuffer(<bnf>buffer</bnf>,<bnf>startByte</bnf>,<bnf>array</bnf>,<bnf>startIndex</bnf>,<bnf>count</bnf>)</pre>
+
+<np>where <code>count</code> gives the number of elements of <code>array</code> to be
+copied into <code>buffer</code>.  (This is when the data source is a typed
+array; for other data sources, the starting position in the source and the size
+of the data to be copied are measured in bytes.)</np>
+
+<p>In the sample program, the buffers and bind group are created just once, during initialization. And
+<code>vertexBuffer</code> and <code>uniformBuffer</code> are global variables&mdash;
+<code>vertexBuffer</code> because it must be attached to the pipeline each time
+the pipeline is used to draw a triangle, and <code>uniformBuffer</code> 
+so that its value can be changed.  A new value is written to <code>uniformBuffer</code>
+every time the color of the triangle is to be changed.
+Similarly, <code>uniformBindGroup</code> is a global variable because it
+must be attached to the pipeline each time a triangle is drawn.</p>
+
+<break/>
+
+<p>It is interesting to think about why the <code>writeBuffer()</code> function is
+a method in the object <code>device.queue</code>.  The queue in question is
+a queue of operations to be performed on the GPU.  When <code>writeBuffer()</code>
+returns, it is not necessarily true that the data has been written to the buffer.
+However, the operation that does the copying has been added to the queue.  What you
+are guaranteed is that the data will be copied to the buffer before it is needed
+by operations that come later in the queue.  That can include drawing operations
+that use the buffer.  It is also possible that the queue already contains
+operations that depend on the previous value in the buffer, so the new
+data can't be copied into the buffer until those operations have completed.</p>
+
+<p>When <code>device.queue.writeBuffer()</code> is called, it immediately
+copies the data into an intermediate "staging" buffer that exists in memory
+that is shared by the JavaScript and GPU sides.  This means that you are
+free to reuse the array immediately; you don't have to wait for the data
+to be copied to its final destination.  Instead of calling <code>writeBuffer()</code>,
+its possible to do the work yourself&mdash;create a staging buffer, copy
+the data into the staging buffer, enqueue a command to copy the data from
+the staging buffer to the destination buffer&mdash;but
+<code>writeBuffer()</code> makes the process much easier.</p>
+
+
+</subsection>
+
+
+<subsection title="Drawing" id="webgpu.1.5">
+
+<p>With the pipeline set up and the input buffers ready, it's time to 
+actually draw the triangle!  The drawing commands are specified on the
+JavaScript side but executed on the GPU side.   A "command encoder"
+is used on the JavaScript side to create a list of commands in a
+form that can be added to the queue of commands for processing on
+the GPU.  The command encoder is created by the WebGPU device:</p>
+
+<pre>let commandEncoder = device.createCommandEncoder();</pre>
+
+<np>For drawing, we need to encode a "render pass," and for
+that, we need a render pass descriptor:</np>
+
+<pre>let renderPassDescriptor = {
+   colorAttachments: [{
+       clearValue: { r: 0.5, g: 0.5, b: 0.5, a: 1 },  // gray background
+       loadOp: "clear", // Alternative is "load".
+       storeOp: "store",  // Alternative is "discard".
+       view: context.getCurrentTexture().createView()  // Draw to the canvas.
+   }]
+};</pre>
+
+<np>The <code>colorAttachments</code> property of the <code>renderPassDescriptor</code>
+corresponds to the output <code>targets</code> of the pipeline.  Each element of
+the <code>colorAttachments</code> array specifies the destination for the
+corresponding element in the array of output targets.  In this case, we want
+to draw to the canvas on the web page.  The value for the <code>loadOp</code> property 
+is "clear" if the canvas is to be filled with the clear
+color before drawing; it is "load" if you want to draw over the previous
+contents of the canvas.  The <code>clearValue</code> gives the <word term="RGBA color">RGBA</word>
+components of the clear color as floating point values in the range 0.0 to&nbsp;1.0.
+The <code>storeOp</code> will almost always be "store".  The <code>view</code>
+property specifies where the image will be drawn.  In this case, the ultimate
+destination is the canvas, but the actual destination is a texture that
+will be copied to the canvas when the content of the web page is refreshed.
+The function <code>context.getCurrentTexture()</code> has to be called each
+time the canvas is redrawn, so we can't simply make a render pass descriptor
+and use it unchanged for every render.</np>
+
+<p>The drawing commands themselves are encoded by a render pass encoder,
+which is obtained from the command encoder.  The pass encoder in our example
+assembles the resources required for the drawing (pipeline, vertex buffer, and
+bind group), and it issues the command that actually does the drawing.
+A call to <code>passEncoder.end()</code> terminates the render pass:</p>
+
+<pre>let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+passEncoder.setPipeline(pipeline);            // Specify pipeline.
+passEncoder.setVertexBuffer(0,vertexBuffer);  // Attach vertex buffer.
+passEncoder.setBindGroup(0,uniformBindGroup); // Attach bind group.
+passEncoder.draw(3);                          // Generate vertices.
+passEncoder.end();</pre>
+
+<np>The draw command in this case, <code>passEncoder.draw(3)</code>, will
+simply generate three vertices when it is executed.  Since the pipeline uses the "triangle-list"
+topology, those vertices form a triangle.  The vertex shader function,
+which was specified as part of the pipeline, will be called three times,
+with inputs that are pulled from the vertex buffer.  The outputs from the
+three invocations of the vertex shader specify the positions of the three
+vertices.  The fragment shader function is then called for each pixel
+in the triangle. The fragment shader gets the color for the pixel from the uniform
+buffer that is part of the bind group.  All the set up that was done
+earlier in the program will finally be used to produce an image!
+This is a simple example.  More generally, a render pass can involve 
+other options, multiple draw commands, and other commands.</np>
+
+<p>You should note that all of this has not actually done any drawing!
+It has just encoded the commands that are needed to do the drawing, and has
+added them to the command encoder.  The final step is to get
+the list of encoded commands from the command encoded and submit
+them to the GPU for execution:</p>
+   
+<pre>let commandBuffer = commandEncoder.finish();
+device.queue.submit( [ commandBuffer ] );</pre>
+
+<np>The parameter to <code>device.queue.submit()</code> is an array
+of command buffers, although in this case there is only one.
+(The command encoder cannot be reused; if you want to submit
+multiple command buffers, you will need to create a new command
+encoder for each one.)</np>
+
+<p>Note that commands are submitted to the device queue.  The
+<code>submit()</code> function returns immediately after enqueueing
+the commands.  They will be executed in a separate process on the
+GPU side of the application.</p>
+
+</subsection>
+
+
+<subsection title="Multiple Vertex Inputs" id="webgpu.1.6">
+
+<webdiv>
+<img src="rgb-triangle.png" width="100" height="83" align="right" alt="The standarad RGB triangle example"/>
+</webdiv>
+
+<p>We finish this section by looking at two variations on our basic example:
+<sourceref href="webgpu/basic_webgpu_2.html">basic_webgpu_2.html</sourceref> 
+and <sourceref href="webgpu/basic_webgpu_3.html">basic_webgpu_3.html</sourceref>.
+Instead of drawing a solid colored triangle, these programs draw a triangle in which
+each vertex has a different color.  The colors for the interior pixels are interpolated
+from the vertex colors.  This is the standard "RGB triangle" example.</p>
+
+<p>Since each vertex has a different color, the color is a vertex attribute that
+has to be passed as a parameter the vertex shader function.  That function now has two
+parameters, the 2D vertex coordinates and the vertex RGB color.  Interpolated
+versions of these two values are used by the fragment shader, so the 
+the vertex shader also needs two outputs.  Since a function can have only one
+return value, the two outputs have to be combined into a single data structure.
+In WGSL, as in <word>GLSL</word>, that data structure is a <code>struct</code>
+(see <localref href="webgl.3.2"/>).  Here is the shader source code that is used
+in both of the new examples:</p>
+
+<pre>struct VertexOutput {  // type for return value of vertex shader
+   @builtin(position) position: vec4f,
+   @location(0) color : vec3f  
+}
+
+@vertex
+fn vertexMain(
+         @location(0) coords : vec2f, 
+         @location(1) color : vec3f  
+      ) -> VertexOutput {  
+   var output: VertexOutput;  
+   output.position = vec4f( coords, 0, 1 );
+   output.color = color; 
+   return output;
+}
+
+@fragment
+fn fragmentMain(@location(0) fragColor : vec3f) -> @location(0) vec4f {
+   return vec4f(fragColor,1);
+}</pre>
+
+<np>The <code>fragColor</code> parameter to the fragment shader function is
+the interpolated version of the <code>color</code> output from the vertex shader,
+even though the name is not the same.  In fact, the names don't matter at all;
+the association between the two values is specified by the <code>@location(0)</code>
+modifier on both the <code>color</code> vertex shader output and the <code>fragColor</code>
+fragment shader parameter.  Note that the meaning of <code>@location(0)</code>
+here is very different from the <code>@location(0)</code> annotation on
+the vertex shader <code>coords</code> parameter.  (Recall that a
+<code>@location</code> annotation on a vertex shader parameter corresponds
+to a <code>shaderLocation</code> in the vertex buffer layout on the JavaScript
+side, and it specifies where the values for that parameter come from.)</np>
+
+<p>I will note again that even though the <code>position</code> output
+from the vertex shader is not used explicitly in the fragment shader 
+function in this example, it is used implicitly.  A vertex shader
+function is always required to have a <code>@bulitin(position)</code>
+output.</p>
+
+<break/>
+
+<p>The JavaScript side of the application must now provide two inputs
+for the vertex shader function.  In the first variation, the two inputs
+are provided in two separate vertex buffers, and the new vertex buffer
+layout reflects this, with two array elements corresponding to the
+two vertex buffers:</p>
+
+<pre>let vertexBufferLayout = [
+   { // First vertex buffer, for coords (two 32-bit floats per vertex).
+      attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+      arrayStride: 8,  // 8 bytes between values in the buffer
+      stepMode: "vertex" 
+   },
+   { // Second vertex buffer, for colors (three 32-bit floats per vertex).
+      attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+      arrayStride: 12,  // 12 bytes between values in the buffer
+      stepMode: "vertex" 
+   }
+];</pre>
+
+<np>The second variation does something more interesting: It uses just one
+vertex buffer that contains the values for both parameters.  The values for
+the colors are interleaved with the values for the coordinates.  Here
+is what the data looks like on the JavaScript side:</np>
+
+<pre>const vertexData = new Float32Array([
+   /* coords */     /* color */
+    -0.8, -0.6,      1, 0, 0,      // data for first vertex
+    0.8, -0.6,       0, 1, 0,      // data for second vertex
+    0.0, 0.7,        0, 0, 1       // data for third vertex
+]);</pre>
+
+<np>This array will be copied into the single vertex buffer.  The
+vertex buffer layout reflects the layout of the data in the buffer:</np>
+
+<pre>let vertexBufferLayout = [
+   {   // One vertex buffer, containing values for two attributes.
+      attributes: [
+          { shaderLocation:0, offset:0, format: "float32x2" },
+          { shaderLocation:1, offset:8, format: "float32x3" }
+        ],
+      arrayStride: 20,
+      stepMode: "vertex" 
+   }
+];</pre>
+
+<np>Note that the data for each buffer takes up 20 bytes (five 4-byte floats).
+This becomes the <code>arrayStride</code> in the layout, which gives the distance,
+in bytes, from the values for one vertex to the values for the next vertex.
+The <code>offset</code> properties for each <code>attribute</code> tells
+where to find the value for that attribute within the block of data for
+a given vertex: The offset for <code>coords</code> is 0 because it
+is found at the start of the data; the offset for <code>color</code>
+is 8 because it is found 8 bytes from the start of the data.</np>
+
+<p>There are other differences between our first example
+and the two new variations.  I encourage you to look at the source code 
+for the two new programs and read the comments.  Only the new features 
+of each program are commented.</p>
+
+</subsection>
+
+
+
+</section>

@@ -401,9 +401,26 @@ From <localref href="webgl3d.5"/>.</li>
 </ul>
 </subsection>
 
+<subsection title="WebGPU Examples" id="source.7">
 
+<p><word>WebGPU</word> is a new <word>API</word> for graphics on the Web.  It has been designed from
+scratch to incorporate some of the features of more modern APIs such as 
+<word>Vulkan</word>, <word>Direct3D</word>, and <word>Metal</word>.  It is covered
+in <localref href="webgpu"/>.  These programs require a web browser that supports WebGPU.</p>
 
-<subsection title="Live Demos" id="source.7">
+<ul>
+<li><sourceref href="webgpu/basic_webgpu_1.html"/> &mdash; A first WebGPU example, which just
+draws a colored triangle.  The source code has extensive comments to explain WebGPU.
+From <localref href="webgpu.1"/>.</li>
+<li><sourceref href="webgpu/basic_webgpu_2.html"/> and <sourceref href="webgpu/basic_webgpu_3.html"/> &mdash;
+Variations on the previous example that draw a triangle with different colored vertices.  This requires
+adding a second parameter to the vertex shader program. The first program does this by using two
+vertex buffers; the second, by using a single vertex buffer with interleaved values for the two
+input parameters.  From <localref href="webgpu.1.6"/>.</li>
+</ul>
+</subsection>
+
+<subsection title="Live Demos" id="source.8">
 
 <p><web>This book</web><tex>The web site version of this book</tex> 
 includes "live" or "interactive" demos that are embedded in the web pages.  The
@@ -419,11 +436,12 @@ files on which it depends.</p>
 
 <p>The demos from <localref href="graphics2d"/> use the 2D canvas graphics API,
 which will work in almost all modern web browsers, 
-Demos from the remaining chapters use WebGL, which will also work with almost all
+Demos from Chapters&nbsp;3 through&nbsp;8 use WebGL, which will also work with almost all
 modern desktop browsers, and many browsers
 on mobile devices.  (However, WebGL might still have
 problems in some of these browsers on some machines.)  All demo programs that use
-WebGL will work with WebGL&nbsp;1.0.</p>
+WebGL will work with WebGL&nbsp;1.0.  The demos in Chapter&nbsp;9 require
+a web browser that supports WebGPU.</p>
 
 <p>The demos in <localref href="gl1geom"/> and <localref href="gl1light"/>
 use <sourceref href="glsim/glsim.js">glsim.js</sourceref>, a JavaScript library that I wrote
@@ -582,6 +600,9 @@ Demonstrates several 2D and 3D procedural textures.</li>
 Essentially a copy of the sample WebGL program <sourceref href="webgl/cube-camera.html"/>.
 Shows a skybox and moving cubes reflected on the surface of a teapot or other object.
 Uses a dynamic cubemap texture that is redrawn for every frame.</li>
+<li><demoref href="c9/first-webgpu-demo.html"/> &mdash; from <localref href="webgpu.1"/>.
+A WebGPU demo that just draws a colored triangle.  It is also meant as a test to check
+whether a browser supports WebGPU.</li>
 </ul>
 
 

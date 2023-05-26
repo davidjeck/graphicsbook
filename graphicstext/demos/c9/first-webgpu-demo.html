@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGPU Triangle</title>
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+<script>
+const shaderSource = `
+   
+   @group(0) @binding(0) var<uniform> color : vec3f;
+       
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {
+      return vec4f( coords, 0, 1 );
+   }
+   
+   @fragment
+   fn fragmentMain() -> @location(0) vec4f {
+      return vec4f( color, 1 ); 
+   }
+`;
+
+const colors = [
+    new Float32Array([1, 0, 0]), 
+    new Float32Array([0, 0.7, 0]),
+    new Float32Array([0, 0, 1]),
+    new Float32Array([0.4, 0.4, 0.4]),
+    new Float32Array([1, 1, 1])
+];
+
+const bgColors = [ 
+    [1, 0.8, 0.8],
+    [0.7, 0.9, 0.7],
+    [0.8, 0.8, 1],
+    [0.8, 0.8, 0.8],
+    [0, 0, 0]
+];
+
+const vertexCoords = new Float32Array([ 
+   -0.8, -0.6,  0.8, -0.6,  0, 0.7
+]);
+
+let context;
+let device;
+let shader;
+let pipeline;
+let vertexBuffer;
+let uniformBuffer;
+let uniformBindGroup;
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpucanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+function createPipelineConfig() {
+   
+   let vertexBufferLayout = [ 
+      {
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8, 
+         stepMode: "vertex"
+      }
+   ];
+   
+   let uniformBindGroupLayout = device.createBindGroupLayout({
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.FRAGMENT,
+             buffer: {
+                type: "uniform"
+             }
+          }
+       ]
+    });
+      
+   let pipelineDescriptor = {
+       vertex: { 
+          module: shader, 
+          entryPoint: "vertexMain", 
+          buffers: vertexBufferLayout 
+       },
+       fragment: { 
+          module: shader,
+          entryPoint: "fragmentMain", 
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: { 
+          topology: "triangle-list"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [uniformBindGroupLayout]
+       })
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);
+   
+   uniformBuffer = device.createBuffer({ 
+      size: colors[0].byteLength, 
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+   });
+    
+   device.queue.writeBuffer(uniformBuffer, 0, colors[0]);
+    
+   uniformBindGroup = device.createBindGroup({
+      layout: uniformBindGroupLayout,
+      entries: [ 
+        {
+           binding: 0, 
+           resource: {buffer: uniformBuffer, offset: 0, size: 3*4} 
+        }
+      ]
+   });
+}
+
+function draw() {
+   let bgColor = bgColors[ Number(document.getElementById("bgselect").value) ];
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: bgColor[0], g: bgColor[1], b: bgColor[2], a: 1 },
+          loadOp: "clear", 
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline); 
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setBindGroup(0,uniformBindGroup);
+   passEncoder.draw(3); 
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish(); 
+   device.queue.submit([commandBuffer]); 
+}
+
+function doColorChange() {
+   let colorNum = Number(document.getElementById("colorselect").value);
+   device.queue.writeBuffer(uniformBuffer, 0, colors[colorNum]);
+   draw();
+}
+
+async function init() {
+   try {
+      await initWebGPU();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("canvas-holder").innerHTML =
+          "<p style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</p>";
+       return;
+   }
+   document.getElementById("colorselect").value = "0";
+   document.getElementById("colorselect").onchange = doColorChange;
+   document.getElementById("bgselect").value = "2";
+   document.getElementById("bgselect").onchange = draw;
+   draw();
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<div id="content">
+
+<h3 id="headline">First WebGPU Demo</h3>
+
+<p><label>Color: <select id="colorselect">
+   <option value="0">Red</option>
+   <option value="1">Green</option>
+   <option value="2">Blue</option>
+   <option value="3">Gray</option>
+   <option value="4">White</option>
+</label></select>
+<label style="margin-left:35px">Background: <select id="bgselect">
+   <option value="0">Pink</option>
+   <option value="1">Light Green</option>
+   <option value="2">Light Blue</option>
+   <option value="3">Light Gray</option>
+   <option value="4">Black</option>
+</label></select>
+</p>
+
+<div id="canvas-holder">
+<canvas id="webgpucanvas" width="350" height="350"></canvas>
+</div>
+
+</div>
+
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>This demo uses WebGPU to draw a triangle. The popup
+menus control the color of the triangle and the background
+color of the canvas on which the canvas is drawn.</p>
+<p>The main purpose of the demo is to check whether your
+web browser can do WebGPU.  If not, instead of seeing
+a triangle, you see an error message.  If your browser
+is not already set up to use WebGPU, it might be possible
+to enable it.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+</body>
+</html>

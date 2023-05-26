@@ -235,3 +235,6 @@
 <!ENTITY advanced_intro SYSTEM "c08-advanced/intro.xml">
 <!ENTITY advanced_s1 SYSTEM "c08-advanced/s1.xml">
 <!ENTITY advanced_s2 SYSTEM "c08-advanced/s2.xml">
+
+<!ENTITY webgpu_intro SYSTEM "c09-webgpu/intro.xml">
+<!ENTITY webgpu_s1 SYSTEM "c09-webgpu/s1.xml">

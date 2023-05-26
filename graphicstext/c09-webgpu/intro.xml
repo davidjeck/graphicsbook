@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE intro SYSTEM "../graphicstext.dtd" >
+
+<intro>
+
+<p1>This chapter introduces <newword>WebGPU</newword>, 
+the new graphics <word>API</word> for the web.
+WebGPU has been under development for several years, but it is only
+recently that it has begun to be included as a standard feature in
+web browsers.  In some browsers, you might find that it is
+available as an experimental feature that has to be explicitly 
+enabled before it can be used.  Some browsers might not support
+it at all.</p1>
+
+<p>WebGPU will not replace <word>WebGL</word>, which will continue to be well-supported
+in almost all browsers for the foreseeable future.  However, WebGL,
+like the OpenGL API on which it is based, is not likely to see much
+further development.  WebGPU, on the other hand, is inspired by and
+similar to modern graphics APIs such as <word>Vulkan</word>, <word>Direct3D</word>,
+and <word>Metal</word>, and it is likely to evolve along with those APIs.
+So WebGPU should be thought of as the Web graphics API of the future.</p>
+
+<p>WebGPU is similar to WebGL in many ways. For example, it has
+<word term="vertex shader">vertex shaders</word> and 
+<word term="fragment shader">fragment shaders</word>,
+and a lot of the programmer's work involves managing the flow
+of data into and through the rendering <word>pipeline</word>.
+But WebGPU is an even lower level API than WebGL.
+It is more verbose, and it puts more responsibility on the 
+programmer for managing details of the rendering process.  At
+the same time, however, it gives the programmer more control,
+access to more powerful capabilities of modern <word term="GPU">GPUs</word>, 
+and the possibility of more efficient code.</p>
+
+</intro>

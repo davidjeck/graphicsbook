@@ -88,7 +88,8 @@ or rendering a 3D image are done in the GPU, which is optimized to perform such 
 quickly.</gitem>
 <gitem term="shader">A program to be executed at some stage of the rendering pipeline.  OpenGL
 shaders are written in the GLSL programming languages.  For WebGL, only vertex shaders
-and fragment shaders are supported.</gitem>
+and fragment shaders are supported.  WebGPU also has compute shaders, which are used
+in compute pipelines.</gitem>
 <gitem term="vertex shader">A shader program that will be executed once for each vertex in a primitive.
 A vertex shader must compute the vertex coordinates in the clip coordinate system.
 It can also compute other properties, such as color.</gitem>
@@ -718,6 +719,10 @@ is intersected with the texture cube.  Environment mapping is also called reflec
 <gitem term="refraction">The bending of light as it passes from one transparent or translucent
 medium into another.</gitem>
 
+<gitem term="pipeline">A sequence of computational stages in a GPU that are applied to
+incoming data to produce some result.  Some of the stages can be programmable shaders,
+such as vertex shaders, fragment shaders, and compute shaders.  In a graphics rendering 
+pipeline, the output is the colors of the pixels in an image.</gitem>
 <gitem term="fixed-function pipeline">A graphics processing pipeline with a fixed set of processing
 stages that cannot be modified by a programmer.  Data for an image passes through a sequence of
 processing stages, with the image as the end product.  The sequence is called a "pipeline."
@@ -915,8 +920,8 @@ All of the settings can then be selected simply by binding the VAO.</gitem>
 with a single function call.  Each copy can have its own values for certain attributes, such as
 color or transformation.</gitem>
 
-<gitem term="WebGPU">A JavaScript API under development that is designed to let web programs access
-GPU computational capabilities as well as graphics.</gitem>
+<gitem term="WebGPU">A new JavaScript graphics API, similar to WebGL, but designed to let web programs access
+modern GPU capabilities such as compute shaders.</gitem>
 
 <gitem term="global illumination">The goal of 3D rendering algorithms that take into account all the interactions
 of light in a scene, including indirect illumination by light that bounces off other objects.</gitem>
@@ -931,5 +936,23 @@ amount of displacement.</gitem>
 <gitem term="HDR image">A high dynamic range image.  An HDR image has more color information
 than the usual eight bits per color channel per pixel.  This makes it more suitable to
 uses that require calculation with the color values.</gitem>
+
+<gitem term="promise (in JavaScript)">In JavaScript programming, a promise represents a result
+that might be available immediately or at some time in the future.  A programmer can provide
+a function to be called if and when the promise is fulfilled (that is when the result becomes
+available).  A programmer can also provide a function to be called when the promise is
+rejected (for example, if some error occurs).  Promises are asynchronous since the function
+that handles success or failure will be called at some unpredictable time.</gitem>
+<gitem term="async function">In JavaScript, an async function is one that can use
+an "await" statement to wait for the result of a promise.  When an await statement is
+executed, the execution of the async function is suspended until the promise has either
+been fulfilled or rejected, giving other JavaScript code a chance to run in the
+meantime.</gitem>
+<gitem term="vertex buffer">In WebGPU, a vertex buffer is a GPU data structure that
+holds values to be used as input the vertex shader.</gitem>
+<gitem term="WGSL">The WebGPU Shader Language, the programming language in which 
+shaders for use in WebGPU are written.</gitem>
+<gitem term="bind group (in WebGPU)">A data structure that can hold resources
+such as buffers, textures, and samples, for input into a pipeline.</gitem>
 
 </glossary>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<head>
+<!--
+   Shows an animation of colored disks moving around in the canvas and
+   bouncing off the edges.  The user can turn the animation on and off.
+
+   This program is a modification of basic-webgpu-4.html, which used instanced
+   drawing to draw a set of moving colored disks.  This program draws
+   exactly the same thing, but it uses a separate pipeline execution and
+   draw command for each disk.  
+   
+   The only comments in this program are for explaining the changes from the
+   previous version that are needed to implement multisampling.
+-->   
+<title>Basic WebGPU Example: Multiple Draws 1</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+   
+   struct DiskInfo {
+       color : vec3f,
+       offset : vec2f
+   }
+   
+   @group(0) @binding(0) var<uniform> diskInfo : DiskInfo;
+   
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {
+      return vec4f( coords + diskInfo.offset, 0, 1 );;
+   }
+   
+   @fragment
+   fn fragmentMain() -> @location(0) vec4f{
+      return vec4f( diskInfo.color, 1 );
+   }
+`;
+
+const VERTEX_COUNT = 32;
+const INSTANCE_COUNT = 50;
+
+let vertexCoords = new Float32Array(2*VERTEX_COUNT);
+let diskInfo = new Float32Array(6);
+
+let instanceOffsets = new Float32Array(2*INSTANCE_COUNT);
+let instanceColors = new Float32Array(3*INSTANCE_COUNT);
+let velocities = new Float32Array(2*INSTANCE_COUNT);
+
+let context;
+let device; 
+
+let shader;
+let pipeline;
+
+let vertexBuffer;
+
+let uniformBuffer = [];
+let bindGroup = [];
+
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+
+function createPipelineConfig() {
+
+   let vertexBufferLayout = [
+      { 
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "vertex" 
+      }
+   ];
+   
+   let uniformBindGroupLayout = device.createBindGroupLayout({
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
+             buffer: {
+                type: "uniform" 
+             }
+          }
+       ]
+    });
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-strip"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [uniformBindGroupLayout]
+       })
+   };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);  
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords); 
+   
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+      uniformBuffer[i] = device.createBuffer({ 
+         size: 32, 
+         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      });
+      
+      diskInfo[0] = instanceColors[3*i];
+      diskInfo[1] = instanceColors[3*i+1];
+      diskInfo[2] = instanceColors[3*i+2];
+      diskInfo[4] = instanceOffsets[2*i];
+      diskInfo[5] = instanceOffsets[2*i+1];
+      device.queue.writeBuffer(uniformBuffer[i], 0, diskInfo);
+       
+      bindGroup[i] = device.createBindGroup({
+         layout: uniformBindGroupLayout,
+         entries: [
+           {
+              binding: 0,
+              resource: {buffer: uniformBuffer[i], offset: 0, size: 32} 
+           }
+         ]
+      });
+   }   
+}
+
+
+function initializeDataArrays() {
+
+   vertexCoords[0] = 0.1;
+   vertexCoords[1] = 0;
+   for (let i = 1; i <= VERTEX_COUNT/2 - 1; i++) {
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[4*(i-1)+2] = 0.1 * Math.cos(angle);
+      vertexCoords[4*(i-1)+3] = -0.1 * Math.sin(angle);
+      vertexCoords[4*(i-1)+4] = 0.1 * Math.cos(angle);
+      vertexCoords[4*(i-1)+5] = 0.1 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT-2] = -0.1;
+   vertexCoords[2*VERTEX_COUNT-1] = 0;
+   
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       instanceOffsets[2*i] = 1.8*Math.random() - 0.9;
+       instanceOffsets[2*i+1] = 1.8*Math.random() - 0.9;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       velocities[2*i] = speed*Math.cos(theta);
+       velocities[2*i+1] = speed*Math.sin(theta);
+       instanceColors[3*i] = Math.random();
+       instanceColors[3*i+1] = Math.random();
+       instanceColors[3*i+2] = Math.random();
+   }   
+}
+
+
+function draw() {
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.9, g: 0.9, b: 0.9, a: 1 }, 
+          loadOp:"", // to be set below 
+          storeOp: "store", 
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   let commandBuffers = [];
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+      let commandEncoder = device.createCommandEncoder();
+      renderPassDescriptor.colorAttachments[0].loadOp = (i == 0 ? "clear" : "load");
+      let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+      passEncoder.setPipeline(pipeline);
+      passEncoder.setVertexBuffer(0,vertexBuffer);
+      passEncoder.setBindGroup(0,bindGroup[i]);
+      passEncoder.draw(VERTEX_COUNT);  // NOT instanced
+      passEncoder.end();
+      let commandBuffer = commandEncoder.finish();
+      commandBuffers.push(commandBuffer);
+   }
+   device.queue.submit(commandBuffers);
+}
+
+
+let running = false;
+let previousTime;
+
+
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000;
+   previousTime = now;
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       let x = 2*i;
+       let y = 2*i+1;
+       instanceOffsets[x] += velocities[x] * dt;
+       instanceOffsets[y] += velocities[y] * dt;
+       if (instanceOffsets[x] > 0.9) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = 1.8 - instanceOffsets[x];
+       }
+       else if (instanceOffsets[x] < -0.9) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = -1.8 - instanceOffsets[x];
+       }
+       if (instanceOffsets[y] > 0.9) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = 1.8 - instanceOffsets[y];
+       }
+       else if (instanceOffsets[y] < -0.9) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = -1.8 - instanceOffsets[y];
+       }
+       let data = new Float32Array([instanceOffsets[x],instanceOffsets[y]]);
+       device.queue.writeBuffer(uniformBuffer[i],16,data);  // update offset in i-th buffer
+   }
+   draw();
+   requestAnimationFrame(doFrame);
+}
+
+
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) { // Animation is being started.
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+}
+   
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic WebGPU Example (Multisampling)</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<!--
+   This program uses WebGPU to draw a "RGB triangle" with a different
+   color at each vertex.  The use can change the set of colors for
+   the vertices by selecting a new value from a popup menu.
+   
+   This file is a modification of basic-webgpu-1.html, which draws a
+   solid-colored triangle.  It shows how to use multiple vertex buffers
+   to store vertex attributes.  All comments on the code are about
+   differences between the two programs.  A third program,
+   basic-webgpu-3.html, shows how to store multiple vertex attributes
+   in a single vertex buffer.
+-->
+<head>
+<title>Basic WebGPU Example: Triangle with interpolated color</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+   // This vertex shader program gets the vertex color from JavaScript as
+   // an attribute. It must pass along that value to the fragment shader,
+   // so  color must be one of the outputs of the vertex shader.  But
+   // all vertex shaders are required to include @builtin(position)
+   // among its outputs, even if the position is not explicitly used
+   // by the fragment shader.  In order for the vertex shader output
+   // to include two values, position and color, the two values must
+   // be bundled into a struct.  Here, a new data type, VertexOutput,
+   // is created to specify the data type of the output.
+
+   struct VertexOutput {
+      @builtin(position) position: vec4f,
+      @location(0) color : vec3f  // @location(0) specifies the ID or position
+   }                              // of this value among outputs of the vertex
+                                  // shader.  It corresponds to @location(0)
+                                  // among inputs to the fragment shader.  Note
+                                  // that the correspondence between vertex shader
+                                  // outputs and fragment shader inputs is purely
+                                  // by location number, not name.  In fact,
+                                  // different names ("color" and "fragColor") are used.
+    
+   
+   @vertex
+   fn vertexMain(
+            @location(0) coords : vec2f,  // @location(0) corresponds to shaderLocation 0 in JavaScript
+            @location(1) color : vec3f    // @location(1) corresponds to shaderLocation 1 in JavaScript
+         ) -> VertexOutput {  // Note return value of this function is of type VertexOutput
+      var output: VertexOutput;   // declares a variable of type VertexOutput
+      output.position = vec4f( coords, 0, 1 );
+      output.color = color; // passes (interpolated) color to fragment shader 
+      return output;
+   }
+   
+   @fragment
+   fn fragmentMain(@location(0) fragColor : vec3f) -> @location(0) vec4f{
+         // When this shader is called for a vertex in the triangle, the fragColor input
+         // corresponds to the color output from the vertex shader.  The correspondence
+         // is set up by the @location(0) attribute on the "color" and "fragColor"
+         // variables.  Color values from the three vertices of the triangle are
+         // interpolated to get the value for the fragColor.
+      return vec4f(fragColor,1);
+   }
+`;
+
+const vertexCoords = new Float32Array([
+   -0.8, -0.6,  0.8, -0.6,  0, 0.7
+]);
+
+/* An array of color arrays.  Each element contains 9 numbers, which represent
+ * three sets of RGB color components.  Each of the Float32Arrays holds data
+ * that can be copied into the vertex buffer for the vertex color attribute.
+ * vertexColors[0] is loaded into the buffer when it is first created.  When the
+ * user selects an item from the vertex color popup menu, the corresponding
+ * Float32Array is copied to the vertex buffer and the triangle is redrawn to
+ * show the new vertex colors.
+ */
+const vertexColors = [
+     new Float32Array([ 1,0,0,  0,1,0,  0,0,1 ]),   // Red/Green/Blue
+     new Float32Array([ 0,1,1,  1,0,1,  1,1,0 ]),   // Cyan/Magenta/Yellow
+     new Float32Array([ 0.2,0.2,0.2,  0.5, 0.5, 0.5,  0.8, 0.8, 0.8 ]),  // Grays
+     new Float32Array([ 1,0.75,0.75,  0.75,1,0.75,  0.75,0.75,1 ]), // Pastel RGB
+     new Float32Array([ 1,1,1,  1,1,1,  1,1,1 ])    // All White
+];
+
+
+
+let context; 
+let device;
+
+let shader; 
+let pipeline; 
+
+let vertexCoordsBuffer;   // A GPU vertex buffer that holds the vertex coordinates.
+                          //   (This variable was renamed from previous program,
+                          //    since now there is a second vertex buffer.)
+
+let vertexColorBuffer;    // A GPU vertex buffer that holds the vertex colors.
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+/* Creates the configuration for the pipeline and the buffers that it uses.
+ * (Note that, compared to the previous program, all reference to a
+ * uniformBuffer have been removed, since the shaders for this application
+ * does not use any uniform data in its shaders.)
+ */
+function createPipelineConfig() {
+
+   let vertexBufferLayout = [
+      { // first vertex buffer, for coords (two 32-bit floats per vertex)
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "vertex" 
+      },
+      { // second vertex buffer, for colors (three 32-bit floats per vertex)
+           // (Note that this attribute uses shaderLocation 1, corresponding to
+           // @location(1) in the input to the vertex shader function.)
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      }
+   ];
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: "auto"  // The previous program specified a uniform buffer here.
+                       // Since there is no uniform buffer for this program,
+                       // it can use "automatic" layout.
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);  
+      
+   /* Create the buffers for the two vertex attributes, and write
+    * data into each buffer. */
+      
+   vertexCoordsBuffer = device.createBuffer({  // buffer for vertex coords; renamed from previous program
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexCoordsBuffer, 0, vertexCoords); 
+   
+   vertexColorBuffer = device.createBuffer({  // buffer for vertex colors; new in this program
+       size: 9*4,  // 9 4-byte floats; could also have been specified as vertexColors[0].bytelength 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexColorBuffer, 0, vertexColors[0]); 
+   
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.85, g: 0.9, b: 1, a: 1 }, // Note: this program does not let the user change background color
+          loadOp: "clear",
+          storeOp: "store", 
+          view: context.getCurrentTexture().createView() 
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setVertexBuffer(0,vertexCoordsBuffer);  // Assign vertexCoordsBuffer to supply
+                                                       // the data for the first vertex buffer
+                                                       // specified in the vertexBufferLayout.
+                                                       // (Note that the zero corresponds to a
+                                                       // position in the "attributes" property
+                                                       // of vertexBufferLayout, not to @location(0)
+                                                       // in the input to the vertex shader.)
+   passEncoder.setVertexBuffer(1,vertexColorBuffer);   // Assign vertexColorBuffer to supply
+                                                       // the data for the second vertex buffer
+                                                       // specified in vertexBufferLayout.
+   passEncoder.draw(3);
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+
+}
+
+
+function doColorChange() {
+       // When the user selects a new set of triangle vertex colors, the
+       // corresponding set of color values is copied to the vertexColorBuffer,
+       // and the triangle is redrawn using the new data in the buffer.
+       // (In the previous program, it was the value in a uniform buffer
+       // that was replaced.)
+   let colorSetNum = Number(document.getElementById("colorselect").value);
+   device.queue.writeBuffer(vertexColorBuffer, 0, vertexColors[colorSetNum]);
+   draw();
+}
+
+
+async function init() {
+   try {
+      await initWebGPU();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("colorselect").value = "0";
+   document.getElementById("colorselect").onchange = doColorChange;
+   draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic WebGPU Example (triangle with vertex colors)</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label>Select Triangle Vertex Colors: <select id="colorselect">
+   <option value="0">RBG (red/blue/green)</option>
+   <option value="1">CMY (cyna/magenta/yellow)</option>
+   <option value="2">Grays</option>
+   <option value="3">Pastel RGB</option>
+   <option value="4">All White</option>
+</label></select>
+</p>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

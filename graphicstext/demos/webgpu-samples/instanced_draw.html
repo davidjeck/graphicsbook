@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<!--
+   Shows an animation of colored disks moving around in the canvas and
+   bouncing off the edges.  The user can turn the animation on and off.
+   
+   This program illustrates "instanced drawing," in which the computer
+   processes several copies of the same set of vertices.  Each copy
+   is an "instance."  Although the (untransformed) set of vertices is
+   the same for each instance, the final appearance and position of
+   different instances can be different because the GPU can apply
+   different values for properties, such as color an transformation,
+   to each instance.  The values for these instance properties can
+   be read from a vertex buffer.  In this program, each colored disk
+   is an instance; the color and position of a disk are its instance
+   properties.
+   
+   Much of the code in this program is similar to basic-webgpu-2.html.
+   All of the comments on this program are related to new features:
+   instanced drawing, drawing disks instead of triangles, and animation.
+-->
+<head>
+<title>Basic WebGPU Example: Instanced Drawing</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+   // This shader program differs from the one in basic-webgpu-2.html
+   // only in the addition of the "offset" parameter in the vertex shader
+   // function.  The value of this parameter is added to the coords for
+   // the vertex.  The "offset" and "color" parameters are used as
+   // instance properties; their values will be the same for every
+   // vertex in the same instance, but different instances can have
+   // different values.  Note that there is nothing in the shader code
+   // to indicate that offset and color are instance properties -- that
+   // is set up on the JavaScript side.
+   
+   struct VertexOutput {
+       @builtin(position) position : vec4f,
+       @location(0) color : vec4f
+   }
+   
+   @vertex
+   fn vertexMain( 
+          @location(0) coords : vec2f,
+          @location(1) offset : vec2f,
+          @location(2) color : vec3f ) -> VertexOutput {
+      var output : VertexOutput;
+      output.position = vec4f( coords + offset, 0, 1 );
+      output.color = vec4f(color,1);
+      return output;
+   }
+   
+   @fragment
+   fn fragmentMain( @location(0) color : vec4f) -> @location(0) vec4f{
+      return color;
+   }
+`;
+
+const VERTEX_COUNT = 32;  // Each instance will be a disk, approximated as a polygon
+                          // with INSTANCE_COUNT vertices.  (The value must be even.)
+
+const INSTANCE_COUNT = 50;  // The number of instances (that is, how may colored disks.)
+
+let vertexCoords = new Float32Array(2*VERTEX_COUNT); // Vertex coordinates for a disk with
+                                                     //     radius 0.1 and center (0,0).
+
+let instanceOffsets = new Float32Array(2*INSTANCE_COUNT); // Values for "offset" property.
+let instanceColors = new Float32Array(3*INSTANCE_COUNT);  // RGB values for "color" property.
+
+     /* The effect of rendering the image will be something like this:
+      * 
+      *     for (i = 0; i < INSTANCE_COUNT; i++) {
+      *         let offset = (instanceOffsets[2*i], instanceOffsets[2*i+1])
+      *         let color = (instanceColors[3*i], instanceColors[3*i+1], instanceColors[3*i+2])
+      *         for (j = 0; j < VERTEX_COUNT; j++) {
+      *            let coords = (vertexCoords[2*i], vertexCoords[2*i+1])
+      *            call vertexMain(coords,offset,color)
+      *         }
+      *         use all the outputs from vertexMain to draw one instance
+      *      }
+      */
+
+let velocities = new Float32Array(2*INSTANCE_COUNT); // Velocities of the moving disks.  (Used
+                                                     // in JavaScript only, not in the shader.)
+
+let context; 
+let device; 
+
+let shader;
+let pipeline;
+
+let vertexBuffer;  // holds the vertex coords for a disk of radius 0.1 centered at (0,0)
+
+let instanceOffsetBuffer;  // holds per-instance data; the amounts by which instances are translated
+let instanceColorBuffer;   // holds per-instance data; the colors of the instances
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+   
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+function createPipelineConfig() {
+   
+   let vertexBufferLayout = [
+      { // first vertex buffer, for vertex coords
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "vertex"  // This buffer provides one value for each vertex.
+      },
+      { // second vertex buffer, for instance offsets
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "instance" // stepMode: "instance" means that the GPU will
+                              // pull one value from this buffer for each instance
+                              // that is drawn.  That value will be the same
+                              // for all vertices in the instance.
+      },
+      { // third vertex buffer, for instance colors
+         attributes: [ { shaderLocation:2, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "instance" // This buffer provides one value for each instance.
+                              // (Try changing this to stepMode: "vertex"!)
+      }
+      // Note:  I chose to use two vertex buffers for the offset and color, but it
+      // would also be possible to put them in one buffer with interleaved values,
+      // similarly to the vertex buffer used in basic-webgpu-3.html.
+   ];
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-strip"  // Disk is drawn as a triangle-strip, not triangle-list.
+       },
+       layout: "auto"
+   };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);  
+   
+   // Create the buffers that hold the actual data used in the shaders,
+   // and load data from the corresponding Float32Arrays into the buffers.
+   // This is done in the same way for instance properties as for
+   // vertex properties.
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords); 
+   
+   instanceOffsetBuffer =  device.createBuffer({ 
+       size: instanceOffsets.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(instanceOffsetBuffer, 0, instanceOffsets); 
+   
+   instanceColorBuffer =  device.createBuffer({ 
+       size: instanceColors.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(instanceColorBuffer, 0, instanceColors); 
+}
+
+
+/*  This function is called in init() to fill the Float32Arrays
+ *  that hold the data for the application.  The arrays are used
+ *  in createPipelineConfig(), so this function has to be called
+ *  first.
+ */
+function initializeDataArrays() {
+   
+   /* Fill vertexCoords array with vertex coordinates for a regular
+    * polygon to be drawn using triangle-strip topology as an
+    * approximation of a disk of radius 0.1 centered at (0,0).
+    * The number of vertices is VERTEX_COUNT, which must be even. */
+   
+   vertexCoords[0] = 0.1;
+   vertexCoords[1] = 0;
+   for (let i = 1; i <= VERTEX_COUNT/2 - 1; i++) {
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[4*(i-1)+2] = 0.1 * Math.cos(angle);
+      vertexCoords[4*(i-1)+3] = -0.1 * Math.sin(angle);
+      vertexCoords[4*(i-1)+4] = 0.1 * Math.cos(angle);
+      vertexCoords[4*(i-1)+5] = 0.1 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT-2] = -0.1;
+   vertexCoords[2*VERTEX_COUNT-1] = 0;
+   
+   /* Fill the instanceOffsets array with INSTANCE_COUNT (x,y)
+    * coordinate pairs, with x and y random values in the
+    * range -0.9 to 0.9.  Fill instanceColors with
+    * INSTANCE_COUNT colors, where each color has three
+    * random RGB color components in the range 0.0 to 1.0.
+    * The velocities array, which is used on the JavaScript
+    * side to update the instanceOffsets array between frames
+    * of the animation, is also filled with random values. */
+   
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       instanceOffsets[2*i] = 1.8*Math.random() - 0.9;
+       instanceOffsets[2*i+1] = 1.8*Math.random() - 0.9;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       velocities[2*i] = speed*Math.cos(theta);
+       velocities[2*i+1] = speed*Math.sin(theta);
+       instanceColors[3*i] = Math.random();
+       instanceColors[3*i+1] = Math.random();
+       instanceColors[3*i+2] = Math.random();
+   }   
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.9, g: 0.9, b: 0.9, a: 1 }, 
+          loadOp: "clear", 
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setVertexBuffer(1,instanceOffsetBuffer);  // Add the two vertex buffers that hold
+   passEncoder.setVertexBuffer(2,instanceColorBuffer);   //      values for the instance properties.
+   passEncoder.draw(VERTEX_COUNT,INSTANCE_COUNT); // A second parameter has been added to draw(),
+                                                  // giving the number of instances to be generated. 
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+}
+
+
+//------------------------------------- Animation support -------------------------
+
+let running = false;  // Controls whether animation is running.
+let previousTime; // The time, in milliseconds, since the previous frame.
+
+
+/* If the animation is still running, update the instance offset values for the
+ * next frame of the animation and draw the image using the updated offsets.
+ */
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000;  // Change in time since previous frame, in seconds.
+   previousTime = now;
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+          // Move the center of disk number i by a distance equal to the velocity for
+          // instance i, multiplied by the change in time since the previous frame.
+          // Then if the disk has poked out of the edge of the canvas in any direction,
+          // bounce it back onto the canvas, heading in the opposite direction.
+       let x = 2*i;
+       let y = 2*i+1;
+       instanceOffsets[x] += velocities[x] * dt;
+       instanceOffsets[y] += velocities[y] * dt;
+       if (instanceOffsets[x] > 0.9) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = 1.8 - instanceOffsets[x];
+       }
+       else if (instanceOffsets[x] < -0.9) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = -1.8 - instanceOffsets[x];
+       }
+       if (instanceOffsets[y] > 0.9) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = 1.8 - instanceOffsets[y];
+       }
+       else if (instanceOffsets[y] < -0.9) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = -1.8 - instanceOffsets[y];
+       }
+   }
+   device.queue.writeBuffer(instanceOffsetBuffer,0,instanceOffsets); // Copy new offset values to buffer.
+   draw();  // Draw the disks, with their new offsets.
+   requestAnimationFrame(doFrame); // Arrange for doFrame to be called for the next frame in the animation.
+}
+
+
+/* This function is called when the user checks or unchecks the "Animate"
+ * checkbox.  It starts or stops the animation, depending on the
+ * current state of the checkbox.
+ */
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) { // Animation is being started.
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+   // Note:  If the animation was running, setting the value of the
+   // global variable, running, will stop the animation by causing the
+   // next invocation of doFrame() to return without doing anyting.
+}
+
+//---------------------------------------------------------------------------
+
+
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays(); // Must be done before createPipelineConfig().
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic WebGPU Example (Instanced Drawing)</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

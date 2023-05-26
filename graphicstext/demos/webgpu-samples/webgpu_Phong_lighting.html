@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+<title>Specular Lighting with Phong Shading, using WebGPU</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+    }
+</style>
+
+<!--
+    
+    
+
+    Shows objects using simple lighting, with diffuse and
+    specular color and a single white light.  The lighting
+    uses Phong shading; that is, the lighting calculations
+    are done in the fragment shader using interpolated
+    normal vetors.  
+-->
+
+
+<script src="wgpu-matrix.js"></script>
+<script src="trackball-rotator.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+<script>
+
+"use strict";
+
+const shaderSource = `
+    struct UniformData {
+        modelview : mat4x4f,   // size 16, offset 0  (floats)
+        projection : mat4x4f,  // size 16, offset 16
+        normalMatrix : mat3x3f,// size 12, offset 32
+        lightPosition : vec4f, // size  4, offset 44
+        diffuseColor : vec3f,  // size  3, offset 48
+        specularColor : vec3f, // size  3, offset 52
+        specularExponent : f32 // size  1, offset 55
+    }
+    
+    @group(0) @binding(0) var<uniform> uniformData : UniformData;
+    
+    struct VertexOut {
+        @builtin(position) position : vec4f,
+        @location(0) normal : vec3f,
+        @location(1) eyeCoords : vec3f
+    }
+    
+    @vertex
+    fn vmain(@location(0) coords: vec3f,
+              @location(1) normal: vec3f) -> VertexOut {
+        var eyeCoords = uniformData.modelview * vec4f(coords,1.0);
+        var output : VertexOut;
+        output.position = uniformData.projection * eyeCoords;
+        output.normal = normalize(normal);
+        output.eyeCoords = eyeCoords.xyz/eyeCoords.w; // (Note: eyeCoords.w is 1 unless modelview is weird)
+        return output;
+    }
+    
+    @fragment
+    fn fmain(@location(0) normal : vec3f, @location(1) eyeCoords : vec3f) -> @location(0) vec4f{
+        var N : vec3f;     // vectors for lighting equation
+        var L : vec3f;
+        var R : vec3f;
+        var V : vec3f;
+        N = normalize( uniformData.normalMatrix * normal );
+        if ( uniformData.lightPosition.w == 0.0 ) {
+            L = normalize( uniformData.lightPosition.xyz );
+        }
+        else {
+            L = normalize( uniformData.lightPosition.xyz/uniformData.lightPosition.w - eyeCoords );
+        }
+        R = -reflect(L,N);
+        V = normalize(-eyeCoords);  // (Assumes a perspective projection.)
+        if ( dot(L,N) <= 0.0 ) {
+            return vec4f(0,0,0,1);
+        }
+        else {
+            var color = 0.8*dot(L,N) * uniformData.diffuseColor;
+            if (dot(R,V) > 0.0) {
+                color += 0.4*pow(dot(R,V),uniformData.specularExponent) * uniformData.specularColor;
+            }
+            return vec4f(color,1.0);
+        }
+    }`;
+
+let canvas;  // The canvas where the image is drawn.
+let context; // The WebGPU context for the canvas.
+let device;  // The WebGPU device.
+
+let shader;    // The shader module containing the shaders.
+let pipelineDescriptor;
+let renderPipeline;
+let uniformBufferLayout;
+let uniformBuffer;
+let depthTexture;
+
+let uniformData = new Float32Array(56); // holds values for transfer to the uniform buffer
+
+const uniforms = { // size and offset of uniform data in the uniform buffer and in uniformData array
+    modelview:        { size: 16, offset: 0  },
+    projection:       { size: 16, offset: 16 },
+    normalMatrix:     { size: 12, offset: 32 },
+    lightPosition:    { size:  4, offset: 44 },
+    diffuseColor:     { size:  3, offset: 48 },
+    specularColor:    { size:  3, offset: 52 },
+    specularExponent: { size:  1, offset: 55 }
+};
+
+const objects = [];  // objects[i] is the model data for the i-th object in the Object menu
+let currentObject;   // an element of objects array, the data for the currently selected object
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+const colors = [  // RGB color arrays for diffuse and specular color values, selected by popup menu
+    [1,1,1], [1,0,0], [0,1,0], [0,0,1], [0,1,1], [1,0,1], [1,1,0], [0,0,0], [0.5,0.5,0.5]
+];
+
+const lightPositions = [  // values for light position, selected by popup menu
+    [0,0,0,1], [0,0,1,0], [0,1,0,0], [0,0,-10,1], [2,3,5,0]
+];
+
+
+async function initGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+}
+
+async function createConfig() {
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }
+   
+   canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   let vertexBufferLayout = [
+      { // first vertex buffer, for coords
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      },
+      { // second vertex buffer, for normals
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      }
+    ];
+
+   uniformBufferLayout = device.createBindGroupLayout({
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+             buffer: {
+                type: "uniform"
+             }
+          }
+       ]
+    });
+
+   pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vmain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fmain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [uniformBufferLayout]
+       })
+    };
+    
+    renderPipeline = await device.createRenderPipelineAsync(pipelineDescriptor);
+    
+    uniformBuffer = device.createBuffer({ 
+       size: 56*4, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    }); 
+
+    depthTexture = device.createTexture({
+       size: [canvas.width, canvas.height],
+       format: 'depth24plus',
+       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+}
+
+
+function installModel() {
+   let modelNum = Number(document.getElementById("object").value);
+   if ( ! objects[modelNum] ) {
+        let model;
+        switch (modelNum) {
+            case 0:  model = cube(5); break;
+            case 1:  model = uvTorus(3,1,64,32); break;
+            case 2:  model = uvCylinder(1.5,5.5); break;
+            case 3:  model = uvCone(2.5,5.5); break;
+            case 4:  model = uvSphere(3); break;
+            default: model = uvSphere(3,12,6); break;
+        }
+        model.count = model.indices.length;
+        model.coordsBuffer = device.createBuffer({ 
+           size: model.vertexPositions.byteLength, 
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        model.normalBuffer = device.createBuffer({ 
+           size: model.vertexNormals.byteLength, 
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        model.indexBuffer = device.createBuffer({ 
+           size: model.indices.byteLength, 
+           usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+        });
+        device.queue.writeBuffer(model.coordsBuffer,0,model.vertexPositions);
+        device.queue.writeBuffer(model.normalBuffer,0,model.vertexNormals);
+        device.queue.writeBuffer(model.indexBuffer,0,model.indices);
+        objects[modelNum] = model;
+   }
+   currentObject = objects[modelNum];
+   draw();
+}
+
+function initializeUniformData() {
+   let viewMatrix = rotator.getViewMatrix();
+   let projectionMatrix = wgpuMatrix.mat4.perspective(Math.PI/5,1,10,20);
+   let normalMatrix = wgpuMatrix.mat3.fromMat4(viewMatrix); // OK for a modelView matrix that is just a rotation
+   let lightPos = lightPositions[ Number(document.getElementById("light").value) ];
+   let diffuse = colors[ Number(document.getElementById("diffuse").value) ];
+   let specular = colors[ Number(document.getElementById("specular").value) ];
+   let exponent = Number(document.getElementById("exponent").value);
+   uniformData.set(viewMatrix,0);
+   uniformData.set(projectionMatrix,16);
+   uniformData.set(normalMatrix,32);
+   uniformData.set(lightPos,44);
+   uniformData.set(diffuse,48);
+   uniformData.set(specular,52);
+   uniformData[55] = exponent;
+   device.queue.writeBuffer(uniformBuffer,0,uniformData);
+}
+
+function updateUniform(itemName, value, redrawNow = true) {
+   let data = uniforms[itemName];
+   if (data.size === 1)
+      uniformData[data.offset] = value;
+   else
+      uniformData.set(value, data.offset);
+   device.queue.writeBuffer(uniformBuffer, 4*data.offset, uniformData, data.offset, data.size);
+   if (redrawNow)
+       draw();
+}
+
+
+function draw() {
+   let uniformBindGroup = device.createBindGroup({
+      layout: uniformBufferLayout,
+      entries: [
+        {
+           binding: 0,
+           resource: {buffer: uniformBuffer, offset: 0, size: 56*4}
+        }
+      ]
+   });
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.15, g: 0.15, b: 0.3, a: 1 },
+          loadOp: "clear",
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }],
+      depthStencilAttachment: {
+        view: depthTexture.createView(),
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      }
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(renderPipeline);
+   passEncoder.setBindGroup(0,uniformBindGroup);
+   passEncoder.setVertexBuffer(0,currentObject.coordsBuffer);
+   passEncoder.setVertexBuffer(1,currentObject.normalBuffer);
+   passEncoder.setIndexBuffer(currentObject.indexBuffer,"uint16");
+   passEncoder.drawIndexed(currentObject.count);
+   passEncoder.end();
+   device.queue.submit([commandEncoder.finish()]);   
+}
+
+async function init() {
+   try {
+      await initGPU();
+      await createConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("object").value = "1";
+   document.getElementById("light").value = "1";
+   document.getElementById("diffuse").value = "0";
+   document.getElementById("specular").value = "8";
+   document.getElementById("exponent").value = "10";
+   document.getElementById("object").onchange = installModel;
+   document.getElementById("light").onchange = 
+          () => updateUniform("lightPosition", lightPositions[ Number(document.getElementById("light").value) ]);
+   document.getElementById("diffuse").onchange =
+          () => updateUniform("diffuseColor", colors[ Number(document.getElementById("diffuse").value) ]);
+   document.getElementById("specular").onchange = 
+          () => updateUniform("specularColor", colors[ Number(document.getElementById("specular").value) ]);
+   document.getElementById("exponent").onchange = 
+          () => updateUniform("specularExponent", Number(document.getElementById("exponent").value));
+   rotator = new TrackballRotator(canvas, () => {
+           let viewMatrix = rotator.getViewMatrix()
+           updateUniform("modelview", viewMatrix, false);
+           updateUniform("normalMatrix", wgpuMatrix.mat3.fromMat4(viewMatrix));
+       }, 15);
+   initializeUniformData();  // Note: must be done after creating rotator.
+   installModel();  // Note: Calls draw().
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic Phong Shading using WebGPU</h2>
+
+<div style="float:left; margin-right:30px">
+
+<noscript><hr><h3>Error: This page requires Javascript and a web browser that supports WebGPU</h3><hr></noscript>
+
+<p id="message">Drag your mouse on the object to rotate it.</p>
+
+<p>
+<label><b>Object:</b> <select id="object">
+    <option value="0">Cube</option>
+    <option value="1">Torus</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Sphere</option>
+    <option value="5">Rough Sphere</option>
+</select></label></p>
+
+<p>
+<label><b>Light Position:</b> <select id="light">
+    <option value="0">[0,0,0,1] (Viewpoint light)</option>
+    <option value="1">[0,0,1,0] (Directional, into screen)</option>
+    <option value="2">[0,1,0,0] (Directional, from above)</option>
+    <option value="3">[0,0,-10,1] (On z-axis, close to object)</option>
+    <option value="4">[2,3,5,0] (Directional from upper right)</option>
+</select></label></p>
+
+<p>
+<label><b>Diffuse Color:</b> <select id="diffuse">
+    <option value="0">White</option>
+    <option value="1">Red</option>
+    <option value="2">Green</option>
+    <option value="3">Blue</option>
+    <option value="4">Cyan</option>
+    <option value="5">Magenta</option>
+    <option value="6">Yellow</option>
+    <option value="7">Black</option>
+</select></label></p>
+
+<p>
+<label><b>Specular Color:</b> <select id="specular">
+    <option value="0">White</option>
+    <option value="1">Red</option>
+    <option value="2">Green</option>
+    <option value="3">Blue</option>
+    <option value="4">Cyan</option>
+    <option value="5">Magenta</option>
+    <option value="6">Yellow</option>
+    <option value="8">Gray</option>
+    <option value="7">Black</option>
+</select></label></p>
+
+
+<p><label><b>Specular Exponent:</b> <select id="exponent">
+    <option>0</option>
+    <option>1</option>
+    <option>2</option>
+    <option>5</option>
+    <option>10</option>
+    <option>20</option>
+    <option>50</option>
+    <option>100</option>
+</select></label></p>
+
+</div>
+
+<div id="canvas-holder">
+   <canvas width=600 height=600 id="webgpuCanvas"></canvas>
+</div>
+
+
+</body>
+</html>
+
