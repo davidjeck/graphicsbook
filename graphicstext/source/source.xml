@@ -19,12 +19,14 @@ In the web site download, they can be found in the folder named <i>demos</i>.
 <a href="http://math.hws.edu/graphicsbook">http://math.hws.edu/graphicsbook</a>.)</p>
 </texdiv>
 
-<p>(Note: Examples and demos for <word>HTML canvas</word> graphics, <word>three.js</word>, and <word>WebGL</word>
-are html files, which can be opened in a web browser.  Many of the html programs use images.
-In certain browsers, the three.js and WebGL programs that use images will not work when the html files
+<p>(Note: Examples and demos for <word>HTML canvas</word> graphics, <word>three.js</word>, <word>WebGL</word>, and
+<word>WebGPU</word>
+are html files, which can be opened in a web browser.  Many of the html programs use images and other files.
+In certain browsers, the  programs that use such resources will not work when the html files
 are loaded from a local hard drive.  That is, they will fail in some web browsers when run
 from the <i>source</i> or <i>demo</i> folder in the web site download of this book.
-The programs should work OK when loaded from a web server.)</p>
+The programs should work OK when loaded through a web server.  It might be possible to configure
+your web browser to use resources in local files.)</p>
 
 <subsection title="Java Graphics2D Examples" id="source.1">
 

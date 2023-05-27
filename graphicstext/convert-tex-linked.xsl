@@ -110,14 +110,14 @@
 <xsl:template match="exercises">
 \begin{exercises}
 <xsl:for-each select="exercise">
-\exercise \marginpar{\small{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/c<xsl:number count="chapter"/>/ex<xsl:number count="exercise"/>-ans.html}{\ \ \ (solution)}}}}\ignorespaces <xsl:apply-templates select="exercise-question"/>
+\exercise \marginpar{\small{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/c<xsl:number count="chapter"/>/ex<xsl:number count="exercise"/>-ans.html}{\ \ \ (solution)}}}}\ignorespaces <xsl:apply-templates select="exercise-question"/>
 </xsl:for-each> 
 
 \end{exercises}
 </xsl:template>
 
 <xsl:template match="quiz">
-\begin{quiz}\marginpar{\small{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/c<xsl:number count="chapter"/>/quiz_answers.html}{\ \ (answers)}}}}
+\begin{quiz}\marginpar{\small{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/c<xsl:number count="chapter"/>/quiz_answers.html}{\ \ (answers)}}}}
 <xsl:for-each select="question">
 \quizquestion <xsl:apply-templates select="ques"/>
 </xsl:for-each>
@@ -200,7 +200,7 @@
 <xsl:template match="gitem"></xsl:template>
 
 <!-- 
-<xsl:template match="start">\<xsl:value-of select="name()"/>{<xsl:apply-templates/>}<xsl:if test="ancestor::section">\marginpar{\small{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/c<xsl:number count="chapter"/>/s<xsl:number count="section"/>.html }{\ \ \ (online)}}}}</xsl:if></xsl:template>
+<xsl:template match="start">\<xsl:value-of select="name()"/>{<xsl:apply-templates/>}<xsl:if test="ancestor::section">\marginpar{\small{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/c<xsl:number count="chapter"/>/s<xsl:number count="section"/>.html }{\ \ \ (online)}}}}</xsl:if></xsl:template>
 -->
 
 <xsl:template match="a"><xsl:choose>
@@ -210,18 +210,18 @@
 </xsl:choose></xsl:template>
    
 <xsl:template match="sourceref"><xsl:variable name="a" select="str:new(@href)"/><xsl:variable name="b" select="str:replaceAll($a,'_','\\_')"/><xsl:choose>
-   <xsl:when test="text()">\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/source/<xsl:value-of select="$b"/>}{<xsl:apply-templates/>}</xsl:when>
-   <xsl:otherwise>\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/source/<xsl:value-of select="$b"/>}{<xsl:value-of select="$b"/>}</xsl:otherwise>
+   <xsl:when test="text()">\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/source/<xsl:value-of select="$b"/>}{<xsl:apply-templates/>}</xsl:when>
+   <xsl:otherwise>\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/source/<xsl:value-of select="$b"/>}{<xsl:value-of select="$b"/>}</xsl:otherwise>
 </xsl:choose></xsl:template>
    
 <xsl:template match="demoref"><xsl:variable name="a" select="str:new(@href)"/><xsl:variable name="b" select="str:replaceAll($a,'_','\\_')"/><xsl:choose>
-   <xsl:when test="text()">\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/demos/<xsl:value-of select="$b"/>}{<xsl:apply-templates/>}</xsl:when>
-   <xsl:otherwise>\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/demos/<xsl:value-of select="$b"/>}{<xsl:value-of select="$b"/>}</xsl:otherwise>
+   <xsl:when test="text()">\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/demos/<xsl:value-of select="$b"/>}{<xsl:apply-templates/>}</xsl:when>
+   <xsl:otherwise>\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/demos/<xsl:value-of select="$b"/>}{<xsl:value-of select="$b"/>}</xsl:otherwise>
 </xsl:choose></xsl:template>
    
 <xsl:template match="jarref"><xsl:variable name="a" select="str:new(@href)"/><xsl:variable name="b" select="str:replaceAll($a,'_','\\_')"/><xsl:choose>
-   <xsl:when test="text()">\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/jars/c<xsl:number count="chapter"/>/<xsl:value-of select="$b"/>}{<xsl:apply-templates/>}</xsl:when>
-   <xsl:otherwise>\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/jars/chapter<xsl:number count="chapter"/>/<xsl:value-of select="$b"/>}{<xsl:value-of select="$b"/>}</xsl:otherwise>
+   <xsl:when test="text()">\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/jars/c<xsl:number count="chapter"/>/<xsl:value-of select="$b"/>}{<xsl:apply-templates/>}</xsl:when>
+   <xsl:otherwise>\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/jars/chapter<xsl:number count="chapter"/>/<xsl:value-of select="$b"/>}{<xsl:value-of select="$b"/>}</xsl:otherwise>
 </xsl:choose></xsl:template>
    
 <xsl:template match="localref">
@@ -271,7 +271,7 @@
 
 <xsl:template match="demo">
 <xsl:apply-templates/>
-\marginpar{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.3/demos/<xsl:value-of select="@src"/>}{\ \ \ (Demo)}}}
+\marginpar{\textit{\href{http://math.hws.edu/eck/cs424/graphicsbook-1.4/demos/<xsl:value-of select="@src"/>}{\ \ \ (Demo)}}}
 </xsl:template>
    
 <xsl:template match="imageclear">

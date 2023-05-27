@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION='graphicsbook-1.3.1'
+VERSION='graphicsbook-1.4'
 PROJECT='graphicstext'
 
 if [ ! -d build_output ] ; then
@@ -31,11 +31,11 @@ fi
 
 if [ -e "web-site" ] ; then
    echo Creating archive of web site and renaming web-site directory to graphicsbook2018
-   mv web-site graphicsbook-1.3.1-web-site
-   zip -r graphicsbook-web-site.zip graphicsbook-1.3.1-web-site > /dev/null
+   mv web-site graphicsbook-1.4-web-site
+   zip -r graphicsbook-web-site.zip graphicsbook-1.4-web-site > /dev/null
    mv graphicsbook-web-site.zip downloads
-   mv graphicsbook-1.3.1-web-site graphicsbook-1.3.1
-   mv graphicsbook-1.3.1/news-for-web.html graphicsbook-1.3.1/news.html
+   mv graphicsbook-1.4-web-site graphicsbook-1.4
+   mv graphicsbook-1.4/news-for-web.html graphicsbook-1.4/news.html
 fi
 
 

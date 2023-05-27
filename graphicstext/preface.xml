@@ -3,7 +3,16 @@
 
 <preface>
 
-<p1><b>About Version 1.3.1:</b> I taught Computer Graphics for the last time
+<p1><b>About Version 1.4:</b> I have decided to add a chapter on WebGPU,
+and I will release Version 1.4 with the new material later this summer.
+There will be no significant revisions aside from the WebGPU chapter
+and a short new section in Appendix&nbsp;A about promises and
+async functions in JavaScript.  In the meantime, you can check out
+what I have so far in the new Chapter&nbsp;9.</p1>
+
+<break/>
+
+<p><b>About Version 1.3.1:</b> I taught Computer Graphics for the last time
 in Fall 2021, using Version 1.3 as the textbook for that course.  In this version
 of the course, instead of using Java or C for the OpenGL&nbsp;1.1 segment of
 the course, we used my JavaScript simulator, glsim.js.  This required fixing
@@ -12,7 +21,7 @@ is included in Version&nbsp;1.3.1.  (The assignments for the course can be found
 <a href="http://math.hws.edu/eck/cs424/index_f21.html">http://math.hws.edu/eck/cs424/index_f21.html</a>.)
 I have used the opportunity to correct a
 few statements about <i>three.js</i> in Chapter&nbsp;5.  There are no
-other changes in Version&nbsp;1.3.1.</p1>
+other changes in Version&nbsp;1.3.1.</p>
 
 <break/>
 
