@@ -173,6 +173,7 @@
 <!ENTITY proglang_s1 SYSTEM "a1-proglang/s1.xml">
 <!ENTITY proglang_s2 SYSTEM "a1-proglang/s2.xml">
 <!ENTITY proglang_s3 SYSTEM "a1-proglang/s3.xml">
+<!ENTITY proglang_s4 SYSTEM "a1-proglang/s4.xml">
 
 <!ENTITY blender_intro SYSTEM "a2-blender/intro.xml">
 <!ENTITY blender_s1 SYSTEM "a2-blender/s1.xml">

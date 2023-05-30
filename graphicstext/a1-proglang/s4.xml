@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section SYSTEM "../graphicstext.dtd" >
+
+<section title="JavaScript Promises and Async Functions" shorttitle="Promises and Async Functions" id="proglang.4">
+
+<p1>This section introduces two new features in JavaScript: 
+<newword term="promise (in JavaScript)">promises</newword> 
+and <newword term="async function">async functions</newword>.
+These features are becoming increasingly common in JavaScript <word term="API">APIs</word>.
+In particular, they are used in <word>WebGPU</word>, which is covered in <localref href="webgpu"/>. 
+However, note that they are not used in any other part of this textbook.</p1>
+
+<p>A JavaScript promise represents a result that might be available at some time.
+If and when the result becomes available, the promise is fulfilled; it is said to
+"resolve."  When that happens, the result can be returned, although in some cases
+the result is simply the knowledge what whatever the promise was waiting for has occurred.
+If something happens that means the promise cannot be fulfilled, then the
+promise is said to "reject."  A programmer can provide functions to be called
+when the promise resolves or rejects.</p>
+
+<p>Promises are a replacement for callback functions.  A callback function is a
+function that is provided by a programmer to be called later, by the system,
+when something happens.  For example in the standard JavaScript function</p>
+
+<pre>setTimeout( callbackFunction, timeToWait );</pre>
+
+<np>The <code>callbackFunction</code> will be called by the system
+<code>timeToWait</code> milliseconds after the <code>setTimeout()</code>
+function is executed.  An important point is that <code>setTimeout()</code>
+returns immediately; it simply sets up the callback function to be 
+called in the future.  The same thing applies to promises: A program
+does not wait for a promise to resolve or reject; it simply arranges
+for something to happen later, when one of those things occurs.</np>
+
+<p>Typical programmers are more likely to use promises created by some API
+than to create them directly.  And they are more likely to use those promises with
+the <code>await</code> operator in <code>async</code> functions than to use them
+directly, so we will cover that case first.</p>
+
+<subsection title="Async Functions and await" id="proglang.4.1">
+
+<p>The <code>await</code> operator is used to retrieve the result of a
+promise, when the promise has resolved.  If, instead, the promise rejects,
+then the <code>await</code> operator will throw an exception.  The syntax
+of an <code>await</code> expression is simply</p>
+
+<pre>await  <bnf>promise</bnf></pre>
+
+<np>where <bnf>promise</bnf> is a promise.  When the promise resolves,
+its result becomes the value of the expression.  Here is an example
+from the WebGPU API (see <localref href="webgpu.1.1"/>):</np>
+
+<pre>let adapter = await navigator.gpu.requestAdapter();</pre>
+
+<np>The return value of <code>navigator.gpu.requestAdapter()</code> is a promise.
+When that promise resolves, the result of the promise becomes the value of
+the <code>await</code> expression, and that value is assigned to <code>adapter</code>.</np>
+
+<p>An important thing to understand is that <code>await</code> does not
+actually stop and wait for the result&mdash;that is, it does not bring the JavaScript program
+to a halt while waiting.  Instead, the function that contains the <code>await</code>
+expression is suspended until the result is available, while other parts of the 
+program can continue to run.</p>
+
+<p>The <code>await</code> operator can only be used inside an async function, that is, one
+whose definition is marked as async:</p>
+
+<pre>async function <bnf>name</bnf>( <bnf>parameters</bnf> ) {
+     // await can be used here
+}</pre>
+
+<np>When an async function is called, it is immediately executed up to the first
+occurrence of <code>await</code> in the function definition.  At that point, the
+execution is suspended until the promise resolves or rejects.  If it resolves, the
+execution resumes and continues until the next <code>await</code>, and so on.
+If at any point a promise rejects instead of resolving, an exception is thrown
+that can be caught and handled in the usual way.  The function does not return
+until all of the promises in <code>await</code> expression have resolved or
+until an exception causes the function to exit.  Note that, necessarily, the function that called
+the async function is also suspended, even if that function is not async.</np>
+
+<p>What this all amounts to is that await expressions are much like ordinary
+expressions and async functions are much like ordinary functions.  They are
+written and used in the same way.  This can make promises easier to use
+than callback functions, and this usage is one of their big advantages.  However, the
+fact that async functions can be suspended introduces a new source of
+potential problems:  You have to remember that other, unrelated things
+can happen in the middle of an async function.</p>
+
+<p>Let's look at a specific example.  The fetch API is an API for retrieving
+files from the Internet.  If <code>url</code> is the <word>URL</word> for 
+some file, the function <code>fetch(url)</code> returns a promise that
+resolves when the file has been located or rejects when the file cannot
+be found.  The expression <code>await&nbsp;fetch(url)</code> waits for
+the file to be located and returns the result.  Curiously, the file has
+been located but not necessarily downloaded.  If <code>response</code>
+is the object returned by <code>await&nbsp;fetch(url)</code>, then
+the function <code>response.text()</code> returns another promise that resolves 
+when the contents of the file are available.  The value of
+<code>await&nbsp;response.text()</code> will be the file contents.
+A function to retrieve a text file and place its content in
+an element on the web page could be written like this:</p>
+
+<pre>async function loadTextFile( textFileURL ) {
+   let response = await fetch(textFileURL);
+   let text = await response.text();
+   document.getElementById("textdisplay").innerHTML = text;
+}</pre>
+
+<np>This will work, but might throw an exception, for example if
+no such file exists.  We might want to catch that exception.
+Furthermore, it can take some time to get the file, and other
+things can happen in the program while the function is waiting.  In particular,
+the user might generate more events, maybe even an event that
+causes <code>loadTextFile()</code> to be called again, with
+a different URL!  Now, there are two files being downloaded.
+Which one will appear on the web page?  Which one <b>should</b>
+appear on the web page?  This is the same sort
+of mess we can get into when doing parallel programming.  
+(To be fair, we can get into a similar sort of mess when using
+callback functions, and there it can be even harder to 
+untangle the mess.)
+</np>
+
+<p>Let's say that a file download is triggered when the user clicks
+a certain button.  One solution to the double-download mess 
+would be to disable that
+button while a download is in progress, to prevent another
+download from being started.  So, an improved
+version of our program might go something more like this:</p>
+
+<pre>async function loadTextFile( textFileURL ) {
+    document.getElementById("downloadButton").disabled = true;
+    document.getElementById("textdisplay").innerHTML = "Loading...";
+    try {
+       let response = await fetch(textFileURL);
+       let text = await response.text();
+       document.getElementById("textdisplay").innerHTML = text;
+    }
+    catch (e) {
+       document.getElementById("textdisplay").innerHTML =
+          "Can't fetch " + textFileURL + ".  Error: " + e;
+    }
+    finally {
+       document.getElementById("downloadButton").disabled = false;
+    }
+}</pre>
+
+<p>The nice thing is that an async function looks essentially the
+same as a regular JavaScript function.  The potential trap is
+that the flow of control in a program that uses async functions
+can be very different from the regular flow of control: Regular
+functions run from beginning to end with no interruption.</p>
+
+</subsection>
+
+
+<subsection title="Using Promises Directly" id="proglang.4.2">
+
+<p>The <code>await</code> operator makes promises fairly easy to use,
+but it is not always appropriate.  A JavaScript promise is an
+object belonging to a class named <classname>Promise</classname>.
+There are methods in that class that make it possible to respond when
+a promise resolves or rejects.  If <code>somePromise</code> is a
+promise, and <code>onResolve</code> is a function, then</p>
+
+<pre>somePromise.then( onResolve );</pre>
+
+<np>schedules <code>onResolve</code> to be called if and when
+the promise resolves.  The parameter that is passed to 
+<code>onResolve</code> will be the result of the promise.
+Note that we are essentially back to using callback functions:
+<code>somePromise.then()</code> returns immediately, and
+<code>onResolve</code> will be called, if at all, at some
+indeterminate future time. The parameter to <code>then()</code>
+is often an anonymous function.  For example, assuming
+<code>textPromise</code> is a promise that eventually
+produces a string:</np>
+
+<pre>textPromise.then(
+    str => alert("Hey, I just got " + str)
+);</pre>
+
+<p>Now, technically, the return value of the <code>onResolve</code>
+callback in <code>promise.then(onResolve)</code>
+must be another promise.  If not, the system will wrap
+the return value in a promise that immediately resolves to 
+the same value.  The promise that is returned by <code>onResolve</code>
+becomes the return value of the call to <code>promise.then()</code>.
+This means that you can chain another <code>then()</code>
+onto the return value from <code>promise.then()</code>.  For 
+example, let's rewrite our <code>loadTextFile()</code> example
+using <code>then()</code>.  The basic version is:</p>
+
+<pre>function loadTextFileWithThen( textFileURL ) {
+  fetch(textFileURL)
+    .then( response => response.text() )
+    .then( text => document.getElementById("textdisplay").innerHTML = text )
+}</pre>
+
+<np>Here, <code>fetch(textFileURL)</code> returns a promise, and we
+can attach <code>then()</code> to that promise.  When the
+anonymous function, <code>response => response.text()</code>, is
+called, the value of its parameter, <code>response</code>, is
+the result produced when <code>fetch(textFileURL)</code> resolves.
+The return value <code>response.text()</code> is a promise, and
+that promise becomes the return value from the first <code>then()</code>.
+The second <code>then()</code> is attached to that promise.  When the
+callback function in the second <code>then()</code> is called,
+its parameter is the result produced by the <code>result.text()</code>
+promise.</np>
+
+<p>Note that <code>loadTextFileWithThen()</code>is not an async
+function.  It does not use <code>await</code>.  When it is called,
+it returns immediately, without waiting for the text to arrive.</p>
+
+<p>Now, you might wonder what happens if the promise rejects.
+In fact, <code>then()</code> takes an optional second parameter, which
+is a callback function to be called if the promise rejects.
+However, you are more likely to use a second method from the
+<classname>Promise</classname> class:</p>
+
+<pre>somePromise.catch( onReject )</pre>
+
+<np>The parameter, <code>onReject</code>, is a function that will be called
+if the promise rejects (or, when <code>catch()</code> is attached to a 
+chain of calls to <code>then()</code>, when any of the promises in the
+chain rejects).  The parameter to <code>onReject</code> will be the
+error message produced by the promise that rejects.  And there is
+a <code>finally()</code> method in the <classname>Promise</classname>
+class that schedules a callback function to be called at the end of a
+then/catch chain. The callback function paramter in <code>finally()</code>
+takes no parameters.  So, we might improve our text-loading example
+as follows:</np>
+
+<pre>function loadTextFileWithThen(textFileURL) {
+  document.getElementById("downloadButton").disabled = true;
+  fetch(textFileURL)
+    .then( response => response.text() )
+    .then( text => document.getElementById("textdisplay").innerHTML = text )
+    .catch( e => document.getElementById("textdisplay").innerHTML =
+                       "Can't fetch " + textFileURL + ".  Error: " + e )
+    .finally( () => document.getElementById("downloadButton").disabled = false )
+}</pre>
+
+<break/>
+
+<p>Generally, you should try to use async functions and <code>await</code>
+when possible.  You should only occasionally have to use <code>then()</code> and 
+<code>catch()</code>.  And while you might find yourself using promise-based APIs,
+you will probably never need to create your own promise objects&mdash;a topic that
+is not covered in this textbook.</p>
+
+</subsection>
+
+
+</section>

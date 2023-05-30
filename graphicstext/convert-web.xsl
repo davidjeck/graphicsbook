@@ -23,12 +23,13 @@
         <table border="0">
         <tr valign="top"><td><p style="margin-right:20pt"><img height="235" width="180" src="resource/graphicstext-cover-180x235.png"/></p></td>
         <td style="margin-left:1cm">
+        <p><b>Version 1.4 will add a new <a href="c9/index.html">Chapter&#160;9</a>a> 
+        on WebGPU, with no other significant updates.</b></p>
         <p><big>W</big>ELCOME TO <i>Introduction to Computer Graphics</i>,
          a free, on-line textbook covering the fundamentals of computer graphics and
          computer graphics programming.  This book is meant for use as a textbook in
          a one-semester course that would typically be taken by undergraduate computer science majors
-         in their third or fourth year of college.  Version 1.4 will add a new
-         Chapter&#160;9 on WebGPU, with no other significant updates.
+         in their third or fourth year of college. 
          See the <a href="preface.html">preface</a> for more information.
         </p>
         <p>The web pages for this book include live, interactive demos that require a modern
@@ -126,7 +127,7 @@
         28 January 2016, Version 1.1 released<br/>
         6 January 2018, Version 1.2 released<br/>
         1 August 2021, Version 1.3 released<br/>
-        20 December 2021, Version 1.3.1 released
+        20 December 2021, Version 1.3.1 released<br/>
         Summer 2023, Version 1.4 under construction</i></small></div>
         </div>
         </div></body>

@@ -223,7 +223,7 @@ of a render pipeline:</p>
    alt="Data flow in a WebGPU render pipeline."/>
    
 <np>This diagram shows two types of input to the pipeline, <newword term="vertex buffer">vertex buffers</newword>
-and <newword term="bind group">bind groups</newword>.  Recall that when a primitive is drawn, the vertex shader is called once for
+and <newword term="bind group (in WebGPU)">bind groups</newword>.  Recall that when a primitive is drawn, the vertex shader is called once for
 each vertex in the primitive.  Each invocation of the vertex shader can get different values
 for the parameters in the vertex shader function.  Those values come from vertex buffers.
 The buffers must be loaded with values for the parameters&mdash;one set of parameter values
@@ -231,7 +231,7 @@ for each vertex.  A fixed function stage of the pipeline, shown as the dots betw
 vertex buffers and the vertex shader, calls the vertex shader once for each vertex, pulling
 the appropriate set of parameter values for that vertex from the buffers.  (Vertex buffers
 also hold data for <word>instanced drawing</word>, which will be covered in the
-<localref href="webgpu.1.2">next section</localref>; see also <localref href="webgl.1.8"/>).</np>
+<localref href="webgpu.2">next section</localref>; see also <localref href="webgl.1.8"/>).</np>
 
 <p>The vertex shader outputs some values, which must include the coordinates of the vertex
 but can also include other values such as color, <word>texture coordinates</word>,
