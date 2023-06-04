@@ -23,8 +23,9 @@
         <table border="0">
         <tr valign="top"><td><p style="margin-right:20pt"><img height="235" width="180" src="resource/graphicstext-cover-180x235.png"/></p></td>
         <td style="margin-left:1cm">
-        <p><b>Version 1.4 will add a new <a href="c9/index.html">Chapter&#160;9</a>a> 
-        on WebGPU, with no other significant updates.</b></p>
+        <p><b>Version 1.4 will add a new <a href="c9/index.html">Chapter&#160;9</a> 
+        on WebGPU and a <a href="a1/s4.html">short introduction</a> to JavaScript promises, 
+        with no other significant updates.</b></p>
         <p><big>W</big>ELCOME TO <i>Introduction to Computer Graphics</i>,
          a free, on-line textbook covering the fundamentals of computer graphics and
          computer graphics programming.  This book is meant for use as a textbook in

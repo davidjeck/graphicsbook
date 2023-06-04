@@ -32,4 +32,14 @@ the same time, however, it gives the programmer more control,
 access to more powerful capabilities of modern <word term="GPU">GPUs</word>, 
 and the possibility of more efficient code.</p>
 
+<p>The WebGPU specification is at
+<a href="https://www.w3.org/TR/webgpu/">https://www.w3.org/TR/webgpu/</a>,
+but it is not very useful for learning.  A simpler and more useful API reference can
+be found on the Mozilla Developer Network:</p>
+
+<p><a href="https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API">https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API</a></p>
+
+<np>Hopefully, though, this chapter has enough information to get you
+started with WebGPU.</np>
+
 </intro>

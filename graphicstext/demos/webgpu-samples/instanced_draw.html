@@ -38,10 +38,9 @@
 
 const shaderSource = `
 
-   // This shader program differs from the one in basic-webgpu-2.html
-   // only in the addition of the "offset" parameter in the vertex shader
-   // function.  The value of this parameter is added to the coords for
-   // the vertex.  The "offset" and "color" parameters are used as
+   // This shader program differs from the one in basic_webgpu_2.html only in
+   // the addition of the "offset" and "color" parameters in the vertex shader
+   // function.  The "offset" and "color" parameters are used as
    // instance properties; their values will be the same for every
    // vertex in the same instance, but different instances can have
    // different values.  Note that there is nothing in the shader code
@@ -103,10 +102,11 @@ let device;
 let shader;
 let pipeline;
 
-let vertexBuffer;  // holds the vertex coords for a disk of radius 0.1 centered at (0,0)
+let vertexBuffer;  // Holds the vertex coords for a disk of radius 0.1 centered at (0,0).
+                   // (The order of the vertices is for drawing the disk as a triangle-strip.)
 
-let instanceOffsetBuffer;  // holds per-instance data; the amounts by which instances are translated
-let instanceColorBuffer;   // holds per-instance data; the colors of the instances
+let instanceOffsetBuffer;  // Holds per-instance data; the amounts by which instances are translated.
+let instanceColorBuffer;   // Holds per-instance data; the colors of the instances.
 
 
 async function initWebGPU() {
@@ -164,7 +164,7 @@ function createPipelineConfig() {
       }
       // Note:  I chose to use two vertex buffers for the offset and color, but it
       // would also be possible to put them in one buffer with interleaved values,
-      // similarly to the vertex buffer used in basic-webgpu-3.html.
+      // similarly to the vertex buffer used in basic_webgpu_3.html.
    ];
       
    let pipelineDescriptor = {

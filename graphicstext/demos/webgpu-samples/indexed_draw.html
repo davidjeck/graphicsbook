@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<!--
+    This very boring program just draws a light blue disk on a white background.
+    However, it draws the disk using the drawInstanced() method of the pass
+    encoder, and to make things a bit more interesting it draws a black
+    outline around the disk using the "line-strip" primitive.
+    
+    Indexed drawing uses an index buffer containing a list of integers.
+    This is in addition to the vertex buffers that contain per-vertex data.
+    This representation is sometimes called an "indexed face set."
+    
+    Much of the program is similar to basic_webgpu_1.html.  All comments
+    on this program are for explaining the new features that it illustrates.
+-->
+<head>
+<title>Basic WebGPU Example: Colored Triangle</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+   // The trivial shaders for this application simply assign the same color to
+   // every pixel.  There are two fragment shader functions, one that make
+   // light blue pixels, for coloring the inside of the disk, and one that makes
+   // black pixels, for coloring the outline of the disk.
+
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {
+      return vec4f( coords, 0, 1 );
+   }
+   
+   @fragment
+   fn fragmentMainForDisk() -> @location(0) vec4f {
+      return vec4f( 0.8, 0.8, 1.0, 1.0 );  // light blue
+   }
+   
+   @fragment
+   fn fragmentMainForOutline() -> @location(0) vec4f {
+      return vec4f( 0, 0, 0, 1 );  // black
+   }
+`;
+
+const VERTEX_COUNT = 128;   // The disk is approximated by a polygon with this many sides.
+
+let vertexCoords = new Float32Array(2*(VERTEX_COUNT + 2));
+      // Holds the xy-coordinates of the vertices of the polygon.  Vertices are
+      // listed in counterclockwise order around the disk, and the first vertex is
+      // repeated at the end.  Then a (0,0) coordinate pair is added at the end,
+      // representing the center of the polygon.  The disk is drawn as a triangle-list;
+      // each triangle is generated using two consecutive vertices plus the center of the
+      // disk.  The list of vertices (but not the center point) is also used to
+      // draw the outline of the polygon as a line-strip.
+
+let diskIndices = new Uint16Array(3*VERTEX_COUNT);
+      // Holds the values for the index buffer.  There are VERTEX_COUNT triangles,
+      // each with 3 vertices, for a total of 3*VERTEX_COUNT vertices.  Each group
+      // of three elements of diskIndices generates a triangle by giving the
+      // vertex numbers of the vertices of that triangle in the vertexCoords array.
+
+let context;
+let device;
+
+let shader;
+
+let pipelineForDisk; // The render pipeline for drawing the disk as a triangle-list primitve.
+let pipelineForOutline; // The render pipeline for drawing the disk outline as a line-strip.
+
+let vertexBuffer;
+
+let indexBuffer;  // A buffer for holding the indices from the diskIndices array,
+                  // for use with drawIndexed().
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied" 
+   });
+   
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+function createPipelineConfig() {
+   
+   /* Create the pipeline for drawing the disk. */
+   
+   let vertexBufferLayout = [ 
+      { 
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8, 
+         stepMode: "vertex"
+      }
+   ];
+   
+   let pipelineDescriptor = {
+       vertex: { 
+          module: shader,
+          entryPoint: "vertexMain", 
+          buffers: vertexBufferLayout 
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMainForDisk",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: { 
+          topology: "triangle-list"
+       },
+       layout: "auto" // There are no bind groups in this program,
+                      // so we can just use "auto" as the value for layout.
+    };
+    
+   pipelineForDisk = device.createRenderPipeline(pipelineDescriptor);
+   
+   /* We need to create another pipeline for drawing the outline.  We need
+    * two pipelines because the fragment shader function and the primitive
+    * topology are different.  We can reuse the same pipelineDescriptor
+    * to make the second pipeline, just changing the appropriate properties.
+    */
+
+   pipelineDescriptor.fragment.entryPoint = "fragmentMainForOutline";
+   pipelineDescriptor.primitive.topology = "line-strip";
+   pipelineForOutline = device.createRenderPipeline(pipelineDescriptor);
+   
+   /* Create vertex buffer and copy data to it. (Same as previous program.) */
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);
+
+    /* We also need to create an index buffer and copy the diskIndices
+     * array into it.  Note the usage property includes GPUBufferUsage.INDEX.
+     */
+    
+   indexBuffer = device.createBuffer({ 
+       size: diskIndices.byteLength, 
+       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(indexBuffer, 0, diskIndices);
+}
+
+
+/*  This function is called in init() to fill the arrays
+ *  that hold the data for the application.  The arrays are used
+ *  in createPipelineConfig(), so this function has to be called
+ *  first.
+ */
+function initializeDataArrays() {
+
+   /* Fill vertexCoords with the xy-coordinates of the vertices of
+    * a disk of radius 0.9, centered at (0,0).  The first vertex
+    * is repeated at the end.  The coordinates of the center of
+    * the disk are added at the end of the array.  The center
+    * point is used for drawing the triangles that make up the
+    * disk, but not for drawing the outline.
+    */
+   
+   for (let i = 0; i <= VERTEX_COUNT; i++) {
+          // Coordinates for the i-th vertex.
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[2*i] = 0.9 * Math.cos(angle);
+      vertexCoords[2*i+1] = 0.9 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT+2] = 0;  // coordinate for the center point.
+   vertexCoords[2*VERTEX_COUNT+3] = 0;
+   
+   /* Fill diskIndices with the vertex indicies for the VERTEX_COUNT
+    * triangles that make up the disk.  Each triangle uses the center
+    * of the disk and two consecutive vertices on the outline.
+    */
+   
+   for (let i = 0; i < VERTEX_COUNT; i++) {
+      diskIndices[3*i] = VERTEX_COUNT+1;  // center of disk
+      diskIndices[3*i+1] = i;             // vertex number i
+      diskIndices[3*i+2] = i+1;           // vertex number i+1
+   }
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 1, g: 1, b: 1, a: 1 }, // white background
+          loadOp: "", // To be assigned later; we need different values for the two draws
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   
+   /* We do two rendering passes. The first one draws the disk, using the
+    * pipeline with the "triangle-list" topology.  The drawIndexed()
+    * function is used to draw the disk, so we need an index buffer
+    * in addition to the vertex buffer.
+    */
+
+   renderPassDescriptor.colorAttachments[0].loadOp = "clear"; // clear before drawing
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipelineForDisk);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setIndexBuffer(indexBuffer, "uint16");  // Specify the index buffer.
+      // The second parameter to setIndexBuffer() specifies the index format, which can be
+      // either "uint16" for 16-bit unsigned integers or "uint32" for 32-bit unsigned
+      // integers.  Here, the values in the indexBuffer are 16-bit integers, corresponding
+      // to the fact that diskIndices is a Uint16Array.
+   passEncoder.drawIndexed( 3*VERTEX_COUNT );
+      // The parameter to drawIndexed() is the number of vertices to be generated.
+      // In this case, there are VERTEX_COUNT triangles, with 3 vertices for each triangle.
+   passEncoder.end();
+   
+   /* The second render pass draws the outline of the disk using the pipeline
+    * with the "line-strip" topology.  We change the loadOp property in
+    * the renderPassDescriptor to "load" because we want to draw the outline
+    * over the existing contents of the image.  (The clearValue property of the
+    * renderPassDescriptor will be ignored in this case.)  The outline is
+    * drawn using the draw() function.  There are VERTEX_COUNT+1 vertices becasue
+    * the first vertex is repeated at the end to get the last line segment,
+    * which connects back to the first line segment.  This pass does not use
+    * the index buffer.
+    */
+   
+   renderPassDescriptor.colorAttachments[0].loadOp = "load"; // DON'T clear before drawing!
+   passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipelineForOutline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.draw(VERTEX_COUNT+1);
+   passEncoder.end();
+   
+   let commandBuffer = commandEncoder.finish(); 
+   device.queue.submit([commandBuffer]);
+}
+
+
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays();  // Fill the vertex coordinate and index arrays.
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+}
+
+window.onload = init; 
+
+</script>
+</head>
+
+<body>
+
+<h2>Basic WebGPU Example: Indexed Drawing</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

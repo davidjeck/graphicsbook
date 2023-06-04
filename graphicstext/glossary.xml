@@ -954,5 +954,21 @@ holds values to be used as input the vertex shader.</gitem>
 shaders for use in WebGPU are written.</gitem>
 <gitem term="bind group (in WebGPU)">A data structure that can hold resources
 such as buffers, textures, and samples, for input into a pipeline.</gitem>
+<gitem term="index buffer">In WebGPU, an index buffer is a GPU buffer that holds
+vertex indices for use with the drawIndexed().  A vertex index gives the position
+of a vertex in the list of vertices of a primitive.</gitem>
+<gitem term="indexed drawing">In WebGPU, drawing a primitive using the
+drawIndexed() function.  With that function, vertices are not generated
+in the order in which they are listed.  Instead, a list of vertex indices
+in an index buffer determines the order of the vertices.  Indexed drawing
+is used to render indexed face sets.</gitem>
+<gitem term="alignment (in WGSL)">Restrictions on the legal location of
+a value in memory, depending on the data type.  For example, the address
+of a vec3f variable in WGSL must be a multiple of 16.</gitem>
+<gitem term="storage buffer">In WebGPU, a general purpose buffer on the GPU,
+which can be used in compute shaders as well as in vertex and fragment shaders.</gitem>
+<gitem term="multisampling">A kind of antialiasing where the fragment shader is
+evaluated at several points in each pixel, and the results are averaged to get
+the color of the pixel.</gitem>
 
 </glossary>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<!--
+   This program shows moving colored disks.  But the main point
+   is to show how to use the vertex instance and instance index
+   in a shader.  Only the relevant parts of the program are
+   commented.
+       The disks are defined by their center point and size, and this
+   can be thought of as an imitation of how primitives of type POINTS
+   are handled in OpengGL and WebGL, where point primitive can have
+   a size, and the points are rendered as squares.  The squares
+   come with texture coordinates, (0,0) on the bottom left corner
+   of the square and (1,1) on the top right.  This program also
+   renders squares and generates similar texture coordinates for
+   them.  The texture coordinates are used only to discard pixels
+   that lie outside of a disk.
+-->
+<head>
+<title>Implementing Big Points in WebGPU</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+    struct VertexOutput {
+        @builtin(position) coords : vec4f,
+        @location(0) color : vec4f,
+        @location(1) texCoords : vec2f // To be used in fragment shader to discard some pixels.
+    }
+
+    // The shader is used for instanced drawing, where each instance
+    // is a square represented as a triangle-list with two triangles,
+    // and therefor six vertices.  However the vertex coordinates are
+    // not input data for the shader.  Instead, the xy coordinates of
+    // the centers of the squares are in a storage buffer.  The
+    // rgb color of the square is in another storage buffer.
+
+    @group(0) @binding(0) var<storage> coords: array<f32>;
+    @group(0) @binding(1) var<storage> colors: array<f32>;
+    
+    // Each square has a side of length POINT_SIZE, given here as a
+    // constant though it could easily be a uniform variable instead.
+    // The coordinates for the vertices of the square are computed
+    // in the vertex shader function from the coordinates of the center
+    // and the point size.  Note that the size is given in device
+    // normalized coordinates, in which x and y range from -1 to 1.
+    
+    const POINT_SIZE = 0.2;
+    
+    // The parameters to the vertex shader program are the vertex index
+    // and the instance index.  In JavaScript, the shader is invoked with
+    // draw( 6, POINT_COUNT ), which has the effect
+    //
+    //      for (instance_index = 0; instance_index < POINT_COUNT; instance_index++)
+    //          for (vertex_index = 0;  vertex_index < 6; vertex_index++)
+    //              vertMain( vertex_index, instance_index )
+    //
+    // If we think of this as rendering "big points" specified by the center coordinates
+    // of the points, then instance_index is the point number, and vertex_index is
+    // the vertex number in the list of 6 vertices that define the square as
+    // a primitive of type triangle_list.
+    
+    @vertex
+    fn vertMain(
+        @builtin(vertex_index) vertexNumInPoint: u32,
+        @builtin(instance_index) pointNum: u32
+    ) -> VertexOutput {
+       let pointRadius = POINT_SIZE / 2.0;
+       var x = coords[2*pointNum];      // xy coords of the center of instance nubmer i
+       var y = coords[2*pointNum + 1];  //             are at indices 2*i an 2*i+1 in the array.
+       var tx : f32;  // texture coordinates of this vertex of the square
+       var ty : f32;
+       switch( vertexNumInPoint ) {
+                // compute the xy coordinates and texture coordinates for the vertex,
+                // based on the center point of the square and which corner of the
+                // square we are at; vertexNumInPoint will range from 0 to 5
+          case 0, 3 { // points 0 and 3 are lower left corner
+             x -= pointRadius;
+             y -= pointRadius;
+             tx = 0;
+             ty = 0;
+          }
+          case 1 { // point 1 is lower right corner
+             x += pointRadius;
+             y -= pointRadius;
+             tx = 1;
+             ty = 0;
+          }
+          case 2, 4 { // points 2 and 4 are upper right corner
+             x += pointRadius;
+             y += pointRadius;
+             tx = 1;
+             ty = 1;
+          }
+          default { // point 5 is upper left corner
+             x -= pointRadius;
+             y += pointRadius;
+             tx = 0;
+             ty = 1;
+          }
+       }
+       let r = colors[3*pointNum];      // rgb color for the instance number i are at
+       let g = colors[3*pointNum + 1];  //            indices 3*i, 3*i+1, 3*i+2 in the array
+       let b = colors[3*pointNum + 2];
+       var output : VertexOutput;
+       output.coords = vec4f(x,y,0,1);
+       output.color = vec4f(r,g,b,1);
+       output.texCoords = vec2f(tx,ty);
+       return output;
+    }
+    
+    @fragment
+    fn fragMain(
+       @location(0) color : vec4f,
+       @location(1) texCoords : vec2f
+     ) -> @location(0) vec4f {
+        if ( distance( texCoords, vec2f(0.5,0.5) ) > 0.5 ) {
+              // Texture coordinates range from 0 to 1 in both directions.
+              // The texture coordinates at the center are (0.5, 0.5).
+              // We discard any pixel that lies outside the disk of radius
+              // 0.5 in texture coordinate space, so all that remains in the disk.
+           discard;
+        }
+        return color;
+    }
+`;
+
+const POINT_COUNT = 50;  // Number of disks.
+
+let pointCoords = new Float32Array(2*POINT_COUNT);  // xy-coodinates of the centers of the disks.
+let pointCoordsBuffer;  // A storage buffer for holding the coodinates on the GPU side.
+
+let pointColors = new Float32Array(3*POINT_COUNT);  // rgb colors of the disks.
+let pointColorBuffer;  // A storage buffer for holding the colors on the GPU side
+
+let velocities = new Float32Array(2*POINT_COUNT);
+
+let context; 
+let device;
+
+let shader; 
+let pipeline;
+let bindGroup;  // A bind group for the two storage buffers.
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+function createPipelineConfig() {
+    
+   let bindGroupLayout = device.createBindGroupLayout({
+         // We will need a bind group to attach the two
+         // storage buffers to the pipeline, so that they
+         // can be accessed in the vertex shader function.
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.VERTEX, 
+             buffer: {
+                type: "read-only-storage" // A storage buffer without write permission.
+             }
+          },
+          {
+             binding: 1,
+             visibility: GPUShaderStage.VERTEX,
+             buffer: {
+                type: "read-only-storage" 
+             }
+          }
+       ]
+    });
+   
+    let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertMain"
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [bindGroupLayout]
+       })
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);
+
+   /*  Create the actual storage buffers and write the data from the
+    *  pointCoords and pointColors arrays to the buffers.  Note that
+    *  the usage property of the buffer includes GPUBufferUsage.STORAGE. */
+    
+   pointCoordsBuffer = device.createBuffer({ 
+       size: pointCoords.byteLength, 
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(pointCoordsBuffer, 0, pointCoords);
+    
+   pointColorBuffer = device.createBuffer({ 
+       size: pointColors.byteLength, 
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(pointColorBuffer, 0, pointColors);
+   
+   /*  Create the bind group for the buffers, corresponding to the
+    *  structures of the bind group layout that was specified above. */
+
+   bindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        {
+           binding: 0, 
+           resource: {buffer: pointCoordsBuffer, offset: 0, size: pointCoords.byteLength} 
+        },
+        {
+           binding: 1, 
+           resource: {buffer: pointColorBuffer, offset: 0, size: pointColors.byteLength} 
+        }
+      ]
+   });
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.9, g: 0.9, b: 0.9, a: 1 }, 
+          loadOp: "clear", 
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setBindGroup(0,bindGroup);
+   passEncoder.draw( 6, POINT_COUNT ); 
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+}
+
+
+/*  This function is called in init() to fill the 
+ *  that hold the data for the buffers.  (Note that
+ *  it must be called before initPipelineConfig.)
+ */
+function initializeDataArrays() {
+   
+   for (let i = 0; i < POINT_COUNT; i++) {
+       pointCoords[2*i] = 1.8*Math.random() - 0.9;
+       pointCoords[2*i+1] = 1.8*Math.random() - 0.9;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       velocities[2*i] = speed*Math.cos(theta);
+       velocities[2*i+1] = speed*Math.sin(theta);
+       pointColors[3*i] = Math.random();
+       pointColors[3*i+1] = Math.random();
+       pointColors[3*i+2] = Math.random();
+   }   
+}
+
+
+//------------------------------------- Animation support -------------------------
+
+let running = false;
+let previousTime;
+
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000;
+   previousTime = now;
+   
+   // Update the pointCoords array to give new locations
+   // to the disks, and write the new locations to the
+   // storage buffer that is used in the shader.
+   
+   for (let i = 0; i < POINT_COUNT; i++) {
+       let x = 2*i;
+       let y = 2*i+1;
+       pointCoords[x] += velocities[x] * dt;
+       pointCoords[y] += velocities[y] * dt;
+       if (pointCoords[x] > 0.9) {
+           velocities[x] = -velocities[x];
+           pointCoords[x] = 1.8 - pointCoords[x];
+       }
+       else if (pointCoords[x] < -0.9) {
+           velocities[x] = -velocities[x];
+           pointCoords[x] = -1.8 - pointCoords[x];
+       }
+       if (pointCoords[y] > 0.9) {
+           velocities[y] = -velocities[y];
+           pointCoords[y] = 1.8 - pointCoords[y];
+       }
+       else if (pointCoords[y] < -0.9) {
+           velocities[y] = -velocities[y];
+           pointCoords[y] = -1.8 - pointCoords[y];
+       }
+   }
+   device.queue.writeBuffer(pointCoordsBuffer,0,pointCoords);
+   
+   draw();
+   requestAnimationFrame(doFrame); 
+}
+
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) {
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+}
+
+//---------------------------------------------------------------------------
+
+
+
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+   draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+<body>
+
+<h2>WebGPU Example: "Big Points"</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>

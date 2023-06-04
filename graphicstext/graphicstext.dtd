@@ -239,3 +239,4 @@
 
 <!ENTITY webgpu_intro SYSTEM "c09-webgpu/intro.xml">
 <!ENTITY webgpu_s1 SYSTEM "c09-webgpu/s1.xml">
+<!ENTITY webgpu_s2 SYSTEM "c09-webgpu/s2.xml">

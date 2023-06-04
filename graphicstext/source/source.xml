@@ -419,6 +419,26 @@ Variations on the previous example that draw a triangle with different colored v
 adding a second parameter to the vertex shader program. The first program does this by using two
 vertex buffers; the second, by using a single vertex buffer with interleaved values for the two
 input parameters.  From <localref href="webgpu.1.6"/>.</li>
+<li><sourceref href="webgpu/instanced_draw.html"/>  &mdash;  Uses <word>instanced drawing</word> to draw multiple colored 
+disks using a single call to draw.  Shows how to use instance attributes in 
+<word term="vertex buffer">vertex buffers</word>.  From <localref href="webgpu.2.1"/>.</li>
+<li><sourceref href="webgpu/indexed_draw.html"/>  &mdash;  Uses the <code>drawIndexed()</code> method to 
+draw a single disk as an <word>indexed face set</word> using a triangle-list primitive.  Also
+draws the disk outline using a triangle-strip primitive and shows how to use two render passes
+in one command buffer.  From <localref href="webgpu.2.2"/>.</li>
+<li><sourceref href="draw_multiple.html"/>  &mdash; Draws multiple outlined disks using different rendering
+passes for each disk.  Also illustrates using <code>copyBufferToBuffer()</code> to set
+the value of a uniform variable between rendering passes.  Also, <sourceref href="draw_multiple_2.html"/>
+is a variation on the program that does the same thing using <code>writeBuffer()</code>,
+which requires a separate command encoder for drawing each disk.  From <localref href="webgpu.2.3"/>.</li>
+<li><sourceref href="indices_in_shader.html"/> &mdash; An example of using the vertex index and the
+instance index in the vertex shader function.  The application in this case is to imitate what
+can be done in WebGL with a POINTS primitive by setting a point size.  WebGPU does not implment
+point size, so a points-list primitive can only be rendered as individual pixels.
+From <localref href="webgpu.2.4"/>.</li>
+<li><sourceref href="multisampling.html"/> &mdash; Demonstrates how to add <word>multisampling</word> to a
+WebGPU program, by adding it to <sourceref href="webgpu/instanced_draw.html"/>.  Multisampling
+is a kind of <word>antialiasing</word>.  From <localref href="webgpu.2.5"/>.</li>
 </ul>
 </subsection>
 
@@ -605,6 +625,10 @@ Uses a dynamic cubemap texture that is redrawn for every frame.</li>
 <li><demoref href="c9/first-webgpu-demo.html"/> &mdash; from <localref href="webgpu.1"/>.
 A WebGPU demo that just draws a colored triangle.  It is also meant as a test to check
 whether a browser supports WebGPU.</li>
+<li><demoref href="c9/multisampling-demo.html"/>&mdash; from <localref href="webgpu.2"/>.
+Shows an animation of moving randomly colored disks.  The disks are drawn using instanced
+drawing.  The demo uses multisampling for antialiasing, and lets the user turn multisampling 
+on and off to see the effect.</li>
 </ul>
 
 

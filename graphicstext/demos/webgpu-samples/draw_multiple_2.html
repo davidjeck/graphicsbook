@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<head>
+<!--
+   Shows an animation of colored disks moving around in the canvas and
+   bouncing off the edges.  Each disk has an outline, drawn in black.
+   The user can turn the animation on and off.
+
+   This program is a modification of draw_multiple.html.  That program stored
+   disk offsets and colors in storage buffers and uses copyBufferToBuffer to
+   install the new offset and color for each disk.  This program uses
+   writeBuffer() to change the values, which requires using multiple
+   command encoders.
+
+   The only comments in this program are for explaining the changes from
+   draw_multiple.html.
+-->   
+<title>WebGPU; multiple draws using multiple command buffers.</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+   // (Same shader program as for draw_multiple.html.)   
+   
+   struct DiskInfo {
+       color : vec3f,  // interior color for the disk
+       offset : vec2f  // translation applied to the disk
+   }
+   
+   @group(0) @binding(0) var<uniform> diskInfo : DiskInfo;
+   
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {
+      return vec4f( coords + diskInfo.offset, 0, 1 );
+   }
+   
+   @fragment
+   fn fragmentMainFordisk() -> @location(0) vec4f{ // for drawing disk interior
+      return vec4f( diskInfo.color, 1 );
+   }
+   
+   @fragment
+   fn fragmentMainForOutline() -> @location(0) vec4f{ // for drawing disk outline
+      return vec4f(0,0,0,1);
+   }
+`;
+
+const VERTEX_COUNT = 32;
+const DISK_COUNT = 50;
+
+let vertexCoords = new Float32Array(2*VERTEX_COUNT + 4);
+let diskIndices = new Uint16Array(3*VERTEX_COUNT);
+let diskInfo = new Float32Array(6);
+
+let diskOffsets = new Float32Array(2*DISK_COUNT);
+let diskColors = new Float32Array(3*DISK_COUNT);
+let velocities = new Float32Array(2*DISK_COUNT);
+
+let context;
+let device; 
+
+let shader;
+let pipelineForDisk;
+let pipelineForOutline;
+
+let vertexBuffer;
+
+let indexBuffer;
+
+let uniformBuffer;
+let bindGroup;
+
+// let diskOffsetBuffer;  // These storage buffers from draw_multiple.html are no longer used.
+// let diskColorBuffer; 
+
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+   }   
+}
+
+
+
+function createPipelineConfig() {
+
+   let vertexBufferLayout = [ 
+      { 
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "vertex" 
+      }
+   ];
+   
+   let uniformBindGroupLayout = device.createBindGroupLayout({
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
+             buffer: {
+                type: "uniform" 
+             }
+          }
+       ]
+    });
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMainFordisk",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [uniformBindGroupLayout]
+       })
+   };
+    
+   pipelineForDisk = device.createRenderPipeline(pipelineDescriptor);  
+      
+   pipelineDescriptor.fragment.entryPoint = "fragmentMainForOutline";
+   pipelineDescriptor.primitive.topology = "line-strip";
+   pipelineForOutline = device.createRenderPipeline(pipelineDescriptor);  
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords); 
+   
+   indexBuffer = device.createBuffer({ 
+       size: diskIndices.byteLength, 
+       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(indexBuffer, 0, diskIndices);
+   
+   // code for creating storage buffers was removed
+      
+   uniformBuffer = device.createBuffer({ 
+      size: 32, 
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+   });
+   
+   bindGroup = device.createBindGroup({
+      layout: uniformBindGroupLayout,
+      entries: [
+        {
+           binding: 0,
+           resource: {buffer: uniformBuffer, offset: 0, size: 32} 
+        }
+      ]
+   });
+}
+
+
+function initializeDataArrays() { 
+   
+   for (let i = 0; i <= VERTEX_COUNT; i++) {  
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[2*i] = 0.1 * Math.cos(angle);
+      vertexCoords[2*i+1] = 0.1 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT+2] = 0;
+   vertexCoords[2*VERTEX_COUNT+3] = 0;
+   
+   for (let i = 0; i < VERTEX_COUNT; i++) {
+      diskIndices[3*i] = VERTEX_COUNT+1;
+      diskIndices[3*i+1] = i;
+      diskIndices[3*i+2] = i+1;
+   }
+   
+   for (let i = 0; i < DISK_COUNT; i++) {  
+       diskOffsets[2*i] = 1.8*Math.random() - 0.9;
+       diskOffsets[2*i+1] = 1.8*Math.random() - 0.9;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       velocities[2*i] = speed*Math.cos(theta);
+       velocities[2*i+1] = speed*Math.sin(theta);
+       diskColors[3*i] = Math.random();
+       diskColors[3*i+1] = Math.random();
+       diskColors[3*i+2] = Math.random();
+   }   
+}
+
+
+function draw() {
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.9, g: 0.9, b: 0.9, a: 1 }, 
+          loadOp: "clear", 
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   
+   for (let i = 0; i < DISK_COUNT; i++) {    // Draw disk number i.
+
+      /*  Copy the color and offset for this disk to the uniform buffer
+       *  that holds those values in the shader program.  The function
+       *  device.queue.writeBuffer() actually just adds the copy operation
+       *  to the queue of commands to be executed on the GPU, so buffer
+       *  writes will be executed between disk draws.  Note that these
+       *  two commands could be given anywhere in this loop before the
+       *  final call to device.queue.submit().  Because writeBuffer()
+       *  requires the use of an intermediate storage buffer, I expect
+       *  this program to be less efficient than draw_multiple.html.
+       *     Note, by the way that the last two parameters to
+       *  writeBuffer() give the start index in the array and the
+       *  number of elements to be copied -- NOT the start byte
+       *  number and number of bytes.  The second parameter, giving
+       *  the starting point in the buffer, is still measured in bytes.
+       */
+      
+      device.queue.writeBuffer(uniformBuffer, 0, diskColors, 3*i, 3);
+      device.queue.writeBuffer(uniformBuffer,16, diskOffsets, 2*i, 2);
+      
+      let commandEncoder = device.createCommandEncoder(); // For rendering one disk.
+      
+      let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+      passEncoder.setPipeline(pipelineForDisk);
+      passEncoder.setVertexBuffer(0,vertexBuffer);
+      passEncoder.setBindGroup(0,bindGroup);
+      passEncoder.setIndexBuffer(indexBuffer,"uint16");
+      passEncoder.drawIndexed(3*VERTEX_COUNT); 
+      passEncoder.end();
+      
+      if (i == 0) {
+         renderPassDescriptor.colorAttachments[0].loadOp = "load";
+      }
+      
+      passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+      passEncoder.setPipeline(pipelineForOutline);
+      passEncoder.setBindGroup(0,bindGroup);
+      passEncoder.setVertexBuffer(0,vertexBuffer);
+      passEncoder.draw(VERTEX_COUNT+1);
+      passEncoder.end();
+      
+      let commandBufferForOneDisk = commandEncoder.finish();
+      device.queue.submit( [commandBufferForOneDisk] );
+   }
+   // By the way, my first thought was to submit all the command buffers at
+   // once at the very end, but that wouldn't work here -- we would end up
+   // with all the buffer writes getting done before all the disk draws, so
+   // every disk would use the values from the last buffer write.
+}
+
+//-------------------------- Animation support ----------------------------------
+
+let running = false;
+let previousTime;
+
+
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000;
+   previousTime = now;
+   for (let i = 0; i < DISK_COUNT; i++) {
+       let x = 2*i;
+       let y = 2*i+1;
+       diskOffsets[x] += velocities[x] * dt;
+       diskOffsets[y] += velocities[y] * dt;
+       if (diskOffsets[x] > 0.9) {
+           velocities[x] = -velocities[x];
+           diskOffsets[x] = 1.8 - diskOffsets[x];
+       }
+       else if (diskOffsets[x] < -0.9) {
+           velocities[x] = -velocities[x];
+           diskOffsets[x] = -1.8 - diskOffsets[x];
+       }
+       if (diskOffsets[y] > 0.9) {
+           velocities[y] = -velocities[y];
+           diskOffsets[y] = 1.8 - diskOffsets[y];
+       }
+       else if (diskOffsets[y] < -0.9) {
+           velocities[y] = -velocities[y];
+           diskOffsets[y] = -1.8 - diskOffsets[y];
+       }
+   }
+   // device.queue.writeBuffer(diskOffsetBuffer,0,diskOffsets); //diskOffsetBuffer is no longer used
+   draw();
+   requestAnimationFrame(doFrame);
+}
+
+
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) { // Animation is being started.
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+}
+
+//-----------------------------------------------------------------------
+   
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU: Drawing multiple primitives.</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+
