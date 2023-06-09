@@ -748,7 +748,7 @@ from the vertices of the primitive.  (In newer versions of GLSL, which support a
 shader stages, the term "varying variable" is replaced by the more general terms "in variable" 
 and "out variable," which refer to variables that are used for input to or output from a shader.)</gitem>
 
-<gitem term="swizzler">In GLSL, a notation such as v.yzx, where v is a vector and
+<gitem term="swizzler">In GLSL and WGSL, a notation such as v.yzx, where v is a vector and
 v.yzx represents the three-component vector made up of the y, z, and x components of v.  Technically,
 any use of the dot notation with vectors is considered to be a swizzler.</gitem>
 <gitem term="column-major order">Column-by-column ordering of the elements of a two-dimensional
@@ -970,5 +970,9 @@ which can be used in compute shaders as well as in vertex and fragment shaders.<
 <gitem term="multisampling">A kind of antialiasing where the fragment shader is
 evaluated at several points in each pixel, and the results are averaged to get
 the color of the pixel.</gitem>
+<gitem term="address space (in WGSL)">WGSL memory is divided into address spaces.  
+From the WGSL specification: "Each address space has unique properties 
+determining mutability, visibility, the values it may contain, and 
+how to use variables with it."</gitem>
 
 </glossary>

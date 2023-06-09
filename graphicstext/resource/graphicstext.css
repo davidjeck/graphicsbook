@@ -45,6 +45,10 @@ iframe {
    margin-bottom:17px;
 }
 
+li {
+   margin-top: 5px;
+}
+
 pre.exercisecode {
    margin-left: 25px;
 }

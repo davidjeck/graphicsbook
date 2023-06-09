@@ -71,6 +71,7 @@
    &webgpu_intro;
    &webgpu_s1;
    &webgpu_s2;
+   &webgpu_s3;
 </chapter>
 
 <appendix title="Programming Languages" id="proglang">
