@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<head>
+<!--
+   Shows an animation of colored disks moving around in the canvas and
+   bouncing off the edges.  Each disk has an outline, drawn in black.
+   The user can turn the animation on and off.
+
+   This program is first example of using the depth test in WebGPU.
+   It uses a mix of code from indexed_draw.html and instanced_draw.html,
+   and it does multisampling, but the ONLY comments on the code are on
+   the small number of things that are needed to use the depth test.
+
+   This program  draws 50 disks using instanced drawing.
+   It draws all the disk interiors with one render pass using instanced
+   drawing.  Then it draws all the disk outlines using indexed
+   instanced drawing.  It uses the depth test to make sure that the
+   outline of a disk can be hidden by interiors of disks that lie
+   in front of it.  This is done by drawing each disk and each outline
+   at a different depth.  The depth is computed using the instance number.
+   See the shader source code to see how this is done.
+-->   
+<title>WebGPU: first example of using the depth test.</title>
+<style>
+   body { 
+      background-color: #EEEEEE;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSourceForDisk = `
+
+   // This shader program draws the colored interiors of the disks.  The
+   // disks are drawn using instanced drawing, and the instance number is
+   // an input to the vertex shader.  Each disk is drawn at a differnt depth,
+   // depending on the instance number for that disk.  As the instance
+   // number increases from 0 to 99, the depth decreases from 1 to 0.01.
+   // Note that things with lower depth are "closer to the viewer".
+   // (The maximum number of disks is 100, since disks with instance number
+   // greater than one would be outside the range of z in clip coordinates.)
+      
+   struct VertexOutput {
+       @builtin(position) position : vec4f,
+       @location(0) color : vec4f
+   }
+   
+   @vertex
+   fn vertexMain( 
+          @location(0) coords : vec2f,
+          @location(1) offset : vec2f,
+          @location(2) color : vec3f,
+          @builtin(instance_index) instance : u32
+        ) -> VertexOutput {
+      let depth = 1 - f32(instance)/100;  // depth (z-value) computed from insance number
+      var output : VertexOutput;
+      output.position = vec4f( coords + offset, depth , 1 );
+      output.color = vec4f(color,1);
+      return output;
+   }
+   
+   @fragment
+   fn fragmentMain( @location(0) color : vec4f ) -> @location(0) vec4f{
+      return color;
+   }
+`;
+
+
+const shaderSourceForOutline = `
+
+   // This shader program is for the outlines of disks.  The outline of
+   // a disk has a depth that is 0.005 less than the depth of the disk.
+   // This puts it in front of that disk but behind the disk with the
+   // next higher instance number.
+
+   @vertex
+   fn vertexMain(
+          @location(0) coords : vec2f,
+          @location(1) offset : vec2f,
+          @builtin(instance_index) instance : u32
+        ) -> @builtin(position) vec4f {
+      let depth = (1 - f32(instance)/100) - 0.005;
+      return vec4f( coords + offset, 1 - f32(instance)/100 - 0.005, 1 );
+   }
+      
+   @fragment
+   fn fragmentMain() -> @location(0) vec4f {
+      return vec4f( 0, 0, 0, 1 );
+   }
+`;
+
+const VERTEX_COUNT = 32; 
+const INSTANCE_COUNT = 50;
+
+let diskIndices = new Uint16Array(3*VERTEX_COUNT);
+
+let context;
+let device;
+
+let shaderForDisks;
+let shaderForOutlines;
+
+let pipelineForDisk; 
+let pipelineForOutline; 
+
+let vertexCoords = new Float32Array(2*(VERTEX_COUNT + 2));
+let vertexBuffer;
+let indexBuffer; 
+
+let instanceOffsets = new Float32Array(2*INSTANCE_COUNT);
+let instanceColors = new Float32Array(3*INSTANCE_COUNT);
+let velocities = new Float32Array(2*INSTANCE_COUNT);
+let instanceOffsetBuffer;
+let instanceColorBuffer; 
+
+let textureForMultisampling;
+let textureViewForMultisampling;
+
+// The depth test requires a texture, which serves as the depth buffer.
+// It becomes part of the color attachement for the pipeline.
+let depthTexture;
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied" 
+   });
+   
+   shaderForDisks = device.createShaderModule({ 
+      code: shaderSourceForDisk
+   });
+   shaderForOutlines = device.createShaderModule({ 
+      code: shaderSourceForOutline
+   });
+}
+
+
+function createPipelineConfig() {
+   
+   
+   let vertexBufferLayout = [ 
+      {
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8, 
+         stepMode: "vertex"
+      },
+      {
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "instance" 
+      },
+      {
+         attributes: [ { shaderLocation:2, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "instance" 
+      }
+   ];
+   
+   let pipelineDescriptor = {
+       vertex: { 
+          module: shaderForDisks,
+          entryPoint: "vertexMain", 
+          buffers: vertexBufferLayout 
+       },
+       fragment: {
+          module: shaderForDisks,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       multisample: {
+         count: 4, 
+       },
+           // The depth test must be enabled for this pipeline by adding
+           // a depthStencil property to the pipelineDescriptor.  (This
+           // property also controls the stencil test, which is not used
+           // in this program.)
+       depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: { 
+          topology: "triangle-list"
+       },
+       layout: "auto" 
+    };
+    
+   pipelineForDisk = device.createRenderPipeline(pipelineDescriptor);
+   
+
+   let vertexBufferLayoutForOutlines = [ 
+      { 
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8, 
+         stepMode: "vertex"
+      },
+      { 
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "instance" 
+      }
+   ];
+   
+   let pipelineDescriptorForOutlines = {
+       vertex: { 
+          module: shaderForOutlines,
+          entryPoint: "vertexMain", 
+          buffers: vertexBufferLayoutForOutlines
+       },
+       fragment: {
+          module: shaderForOutlines,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       multisample: {
+         count: 4, 
+       },
+       depthStencil: {  // enable the depth test for this pipeline
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: { 
+          topology: "line-strip"
+       },
+       layout: "auto" 
+    };
+
+   pipelineForOutline = device.createRenderPipeline(pipelineDescriptorForOutlines);
+   
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);
+    
+   indexBuffer = device.createBuffer({ 
+       size: diskIndices.byteLength, 
+       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(indexBuffer, 0, diskIndices);
+      
+   instanceOffsetBuffer =  device.createBuffer({ 
+       size: instanceOffsets.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(instanceOffsetBuffer, 0, instanceOffsets); 
+   
+   instanceColorBuffer =  device.createBuffer({ 
+       size: instanceColors.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(instanceColorBuffer, 0, instanceColors); 
+
+   textureForMultisampling = device.createTexture({
+      size: [context.canvas.width, context.canvas.height],
+      sampleCount: 4,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    textureViewForMultisampling = textureForMultisampling.createView();
+
+   /* Create the depth texture, with a size matching the size of the canvas.
+    * (Note: If multisampling is used, then a sampleCount property must
+    * be added to the parameter, with the same value as the sample count
+    * for multisampling.) */
+   
+   depthTexture = device.createTexture({
+       size: [context.canvas.width, context.canvas.height],
+       format: 'depth24plus',
+       sampleCount: 4, // Only required when multisampling is used!
+       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+   });
+}
+
+
+function initializeDataArrays() {
+   
+   for (let i = 0; i <= VERTEX_COUNT; i++) {
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[2*i] = 0.1 * Math.cos(angle);
+      vertexCoords[2*i+1] = 0.1 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT+2] = 0; 
+   vertexCoords[2*VERTEX_COUNT+3] = 0;
+   
+   for (let i = 0; i < VERTEX_COUNT; i++) {
+      diskIndices[3*i] = VERTEX_COUNT+1; 
+      diskIndices[3*i+1] = i; 
+      diskIndices[3*i+2] = i+1; 
+   }
+      
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       instanceOffsets[2*i] = 1.8*Math.random() - 0.9;
+       instanceOffsets[2*i+1] = 1.8*Math.random() - 0.9;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       velocities[2*i] = speed*Math.cos(theta);
+       velocities[2*i+1] = speed*Math.sin(theta);
+       instanceColors[3*i] = Math.random();
+       instanceColors[3*i+1] = Math.random();
+       instanceColors[3*i+2] = Math.random();
+   }   
+   
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 1, g: 1, b: 1, a: 1 },
+          loadOp: "clear", 
+          storeOp: "store",
+          view: textureViewForMultisampling,
+          resolveTarget: context.getCurrentTexture().createView()
+      }],
+      depthStencilAttachment: {  // The depth texture must be added to the color attachment.
+        view: depthTexture.createView(),
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      }
+   };
+   
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipelineForDisk);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setVertexBuffer(1,instanceOffsetBuffer);
+   passEncoder.setVertexBuffer(2,instanceColorBuffer);
+   passEncoder.setIndexBuffer(indexBuffer, "uint16"); 
+   passEncoder.drawIndexed( 3*VERTEX_COUNT, INSTANCE_COUNT );
+   passEncoder.end();
+      
+   // The second render pass draws the disk outlines.  We do not want to
+   // clear the depth buffer, so change its depthLoadOp to "load".
+   renderPassDescriptor.depthStencilAttachment.depthLoadOp = "load";
+   renderPassDescriptor.colorAttachments[0].loadOp = "load"; 
+   passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipelineForOutline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setVertexBuffer(1,instanceOffsetBuffer);
+   passEncoder.draw(VERTEX_COUNT+1, INSTANCE_COUNT);
+   passEncoder.end();
+   
+   let commandBuffer = commandEncoder.finish(); 
+   device.queue.submit([commandBuffer]);
+}
+
+
+let running = false; 
+let previousTime; 
+
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000;
+   previousTime = now;
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       let x = 2*i;
+       let y = 2*i+1;
+       instanceOffsets[x] += velocities[x] * dt;
+       instanceOffsets[y] += velocities[y] * dt;
+       if (instanceOffsets[x] > 0.9) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = 1.8 - instanceOffsets[x];
+       }
+       else if (instanceOffsets[x] < -0.9) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = -1.8 - instanceOffsets[x];
+       }
+       if (instanceOffsets[y] > 0.9) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = 1.8 - instanceOffsets[y];
+       }
+       else if (instanceOffsets[y] < -0.9) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = -1.8 - instanceOffsets[y];
+       }
+   }
+   device.queue.writeBuffer(instanceOffsetBuffer,0,instanceOffsets);
+   draw();
+   requestAnimationFrame(doFrame);
+}
+
+
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) { 
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+}
+
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays(); 
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+}
+
+window.onload = init; 
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU: Depth Test Example</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>

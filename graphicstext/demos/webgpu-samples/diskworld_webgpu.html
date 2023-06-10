@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<!--
+   A demo of lighting and hierarchical modeling using WebGPU.  The basic
+   example has been adapted many times, starting from a Java original,
+   and has a few odd features beacause of that (like use  of the
+   currentColor global variable).  This latest version is a
+   translation of a WebGL version.
+   
+   There is a sun, with a directional light from the direction of the
+   sun that rotates around the diskworld.  It is turned off at "night"
+   when the sun is below the horizon.
+   
+   There is a lamp at the center that comes on at night.  There is
+   a point light at the location of the lamp that uses attenuation.
+   
+   The car has two headlights, with spotlights that come on at light.
+   
+   Emissive color is used to make the lights seem to glow yellow when
+   they are turned on.
+   
+   There is also a very dim viewpoint light, so nothing is ever absolutely
+   dark.
+-->
+<head>
+<title>DiskWorld: WebGPU Lighting and Hierarchical Modeling</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    label {
+        white-space: pre;
+        margin-left: 25px;
+    }
+</style>
+
+<script src="wgpu-matrix.min.js"></script>  <!-- matrix and vector algebra from Gregg Tavares -->
+<script src="trackball-rotator.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+
+<script>
+
+"use strict";
+
+
+const shaderSource = `
+    
+    // The shader peograms implement most of the basic OpenGL lighting model
+    // (without ambient light).  The bodies of fragMain() and lightingEquations()
+    // are almost identical to the ones in the WebGL version of this program.
+    // Objects are drawing as indexed face sets.
+    
+    struct VertexOutput {
+        @builtin(position) coords : vec4f,
+        @location(0) v_normal : vec3f,
+        @location(1) v_eyeCoords : vec3f
+    }
+    
+    @group(0) @binding(0) var<uniform> modelview : mat4x4f;
+    @group(0) @binding(1) var<uniform> projection : mat4x4f;
+        
+    @vertex
+    fn vertMain( @location(0) a_coords : vec3f, @location(1) a_normal : vec3f ) -> VertexOutput{
+        var coords = vec4f(a_coords,1.0);
+        var eyeCoords = modelview * coords;
+        var output : VertexOutput;
+        output.coords = projection * eyeCoords;
+        output.v_normal = normalize(a_normal);
+        output.v_eyeCoords = eyeCoords.xyz/eyeCoords.w; // (in fact, eyeCoords.w is 1 in this program)
+        return output;
+    }
+
+    struct MaterialProperties {
+        diffuseColor : vec4f, 
+        specularColor : vec3f,
+        emissiveColor : vec3f,
+        specularExponent : f32
+    }
+    
+    struct LightProperties {
+        position : vec4f,
+        color : vec3f,
+        spotDirection: vec3f,  // Note: only a point light can be a spotlight
+        spotCosineCutoff: f32, // if <= 0, this is not a spotlight, if >= 1, the light cone shrinks to nothing
+        spotExponent: f32,
+        attenuation: f32,      // Linear attenuation factor, >= 0. Only point lights attenuate.
+        enabled : f32  // 0.0 or 1.0 for false/true
+    }
+    
+    @group(1) @binding(0) var<uniform> material : MaterialProperties;
+    @group(1) @binding(1) var<uniform> lights : array<LightProperties,4>;
+    @group(1) @binding(2) var<uniform> normalMatrix : mat3x3f;
+
+    fn lightingEquation( light : LightProperties, material : MaterialProperties, 
+                                eyeCoords : vec3f, N : vec3f, V : vec3f )-> vec3f {
+           // N is normal vector, V is direction to viewer.
+        var L : vec3f;  // Light direction
+        var R : vec3f;  // reflected light direction.
+        var spotFactor = 1.0;  // multiplier to account for spotlight
+        var attenuationFactor = 1.0; // multiplier to account for light attenuation with distance
+        if ( light.position.w == 0.0 ) {
+            L = normalize( light.position.xyz );
+        }
+        else {
+            L = normalize( light.position.xyz/light.position.w - eyeCoords );
+            if (light.spotCosineCutoff > 0.0) { // the light is a spotlight
+                var D = -normalize(light.spotDirection);
+                var spotCosine = dot(D,L);
+                if (spotCosine >= light.spotCosineCutoff) { 
+                    spotFactor = pow(spotCosine,light.spotExponent);
+                }
+                else { // The point is outside the cone of light from the spotlight.
+                    spotFactor = 0.0; // The light will add no color to the point.
+                }
+            }
+            if (light.attenuation > 0.0) {
+                var dist = distance(eyeCoords,light.position.xyz/light.position.w);
+                attenuationFactor = 1.0 / (1.0 + dist*light.attenuation);
+            }
+        }
+        if (dot(L,N) <= 0.0) {
+            return vec3f(0.0);
+        }
+        var reflection = dot(L,N) * light.color * material.diffuseColor.rgb;
+        R = -reflect(L,N);
+        if (dot(R,V) > 0.0) {
+            let factor = pow(dot(R,V),material.specularExponent);
+            reflection += factor * material.specularColor * light.color;
+        }
+        return spotFactor*attenuationFactor*reflection;
+    }
+    
+    @fragment
+    fn fragMain(
+             @builtin(front_facing) front_facing : bool,
+             @location(0) v_normal : vec3f, 
+             @location(1) v_eyeCoords : vec3f
+     ) -> @location(0) vec4f {
+        let normal = normalize( normalMatrix*v_normal );
+        let viewDirection = normalize( -v_eyeCoords);  // (Assumes a perspective projection.)
+        var color = material.emissiveColor;
+        for (var i = 0; i < 4; i++) {
+            if (lights[i].enabled > 0) {
+                if (front_facing) {
+                      // (but note that in this program, back-facing polygons are culled!)
+                    color += lightingEquation( lights[i], material, v_eyeCoords,
+                                                    normal, viewDirection);
+                }
+                else {
+                    color += lightingEquation( lights[i], material, v_eyeCoords,
+                                                    -normal, viewDirection);
+                }
+            }
+        }
+        return vec4f(color,material.diffuseColor.a);
+    }`;
+
+const mat4 = wgpuMatrix.mat4;  // for easier access to the functins from wgpu-matrix.js
+const mat3 = wgpuMatrix.mat3;
+    
+let context;   // The WebGPU context.
+let device;    // The WebGPU device.
+let pipeline;  // The render pipeline.
+let depthTexture;  // Texture for the depth test.
+
+let renderPassDescriptor; // Created in draw() and used as global variable during drawing.
+
+let bindBuffer0;  // GPU buffer for values in @group(0) -- hold uniform variables for vertex shader
+let modelview;   // modelview matrix (for @binding(1) of group 0); value comes from rotator
+
+let bindBuffer1;  // GPU buffer for values in @group(1) -- hold uniform variables for fragment shader
+const normalMatrix = mat3.create();  // derived from modelview matrix
+    // Note:  material is at byte offset 0 in bindBuffer1
+    //        lights is at byte offset 256
+    //        normalMatrix is at byte offset 512
+    
+let bindGroup0, bindGroup1; // The actual bind groups for @group(0) nd @group(1)
+
+let lightData;  // An array holding the data for lightProperties array in the shader program.
+
+let textureForMultisampling;      // A texture, required for multisampling.
+let textureViewForMultisampling;  // A view of the texture, to be used in draw().
+
+let rotator;  // A TrackballRotator to implement rotation by mouse.
+
+let frameNumber = 0;  // Originally a frame number, but modified to represent elapsed time in units of 1/60 second.
+
+let torus, sphere, cone, cylinder, disk, ringM, cubeM;  // basic objects, created using function createModel()
+
+const matrixStack = [];   // A stack of matrices for implementing hierarchical graphics.
+
+let currentColor = [1,1,1,1];   // The current diffuseColor; render() functions in the basic objects set
+                                // the diffuse color to currentColor when it is called before drawing the object.
+                                // Other color properties, which don't change often are handled elsewhere.
+
+let sunAngle = Math.PI/2; // rotation of the sun about the z-axis.
+let daytime = true;
+
+
+//------------------- Initialization functions ----------------------------------
+
+/**
+ * Called by init() to do all one-time initialization, except for creating the object models.
+ * Initializes WebGPU and its shaders, pipeline, and buffers.  Also creates the default
+ * data for the uniform variables in the shader and copies them into the buffers.
+ */
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+
+   let shader = device.createShaderModule({
+      code: shaderSource
+   });
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   let vertexBufferLayout = [
+      { // first vertex buffer, for coords
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      },
+      { // second vertex buffer, for normals
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      }
+    ];
+
+   let bindLayout0 = device.createBindGroupLayout({ // for vertex shader uniforms.
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.VERTEX,
+             buffer: {
+                type: "uniform"
+             }
+          },
+          {
+             binding: 1,
+             visibility: GPUShaderStage.VERTEX,
+             buffer: {
+                type: "uniform"
+             }
+          }
+       ]
+    });
+
+   let bindLayout1 = device.createBindGroupLayout({  // for fragment shader uniforms
+       entries: [
+          {
+             binding: 0,
+             visibility: GPUShaderStage.FRAGMENT,
+             buffer: {
+                type: "uniform"
+             }
+          },
+          {
+             binding: 1,
+             visibility: GPUShaderStage.FRAGMENT,
+             buffer: {
+                type: "uniform"
+             }
+          },
+          {
+             binding: 2,
+             visibility: GPUShaderStage.FRAGMENT,
+             buffer: {
+                type: "uniform"
+             }
+          }
+       ]
+    });
+
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       depthStencil: {  // enable depth test
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: {
+          topology: "triangle-list",
+          cullMode: "back"  // cull back faces
+       },
+       multisample: { // enable multisampling in pipeline
+         count: 4, 
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [bindLayout0,bindLayout1]
+       })
+    };
+    
+    pipeline = device.createRenderPipeline(pipelineDescriptor);
+    
+    bindBuffer0 = device.createBuffer({ // for vertex shader uniforms
+       size: 256 + 64, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    }); 
+
+    bindBuffer1 = device.createBuffer({ // for fragment shader uniforms
+       size: 256 + 256 + 48, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    }); 
+
+    bindGroup0 = device.createBindGroup({ // vertex shader uniforms
+       layout: bindLayout0,
+       entries: [
+         { // projection matrix
+            binding: 0,
+            resource: {buffer: bindBuffer0, offset: 0, size: 64}
+         },
+         { // modelview matrix
+            binding: 1,
+            resource: {buffer: bindBuffer0, offset: 256, size: 64}
+         }
+       ]
+    });
+
+    bindGroup1 = device.createBindGroup({  // fragmetn shader uniforms
+       layout: bindLayout1,
+       entries: [
+         {  // material
+            binding: 0,
+            resource: {buffer: bindBuffer1, offset: 0, size: 64}
+         },
+         {  // four lights 
+            binding: 1,
+            resource: {buffer: bindBuffer1, offset: 256, size: 256}
+         },
+         {  // normal matrix
+            binding: 2,
+            resource: {buffer: bindBuffer1, offset: 512, size: 48}
+         }
+       ]
+    });
+
+    depthTexture = device.createTexture({  // texture required for depth test
+       size: [canvas.width, canvas.height],
+       format: 'depth24plus',
+       sampleCount: 4, // must match sampleCount in the multisampling texture 
+       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+   textureForMultisampling = device.createTexture({  // required for multisampling
+      size: [context.canvas.width, context.canvas.height],
+      sampleCount: 4,  // (4 is actually the only value.)
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    textureViewForMultisampling = textureForMultisampling.createView();
+    
+    /* The rest of the code in this function initializes the JavaScript arrays
+     * that hold values for uniform variables in the shader progra, and copies
+     * the data to the two uniform buffers. */
+    
+    let projectionMatrix = mat4.perspective( Math.PI/4, 1, 1, 50 );  // does not change in this program
+    device.queue.writeBuffer(bindBuffer0, 256, projectionMatrix);
+    
+    // Note: modelview matrix will be set for each object
+    
+    let materialData = new Float32Array([
+         1, 1, 1, 1,        // difuse color, to be set before drawing each object
+         0.1, 0.1, 0.1, 1,  // specular color, will not change
+         0, 0, 0, 1,        // emissive color, to be changed occasionally, for some objects
+         16                 // specular exponent, will not change
+    ]);
+    device.queue.writeBuffer(bindBuffer1, 0, materialData);
+    
+    lightData = new Float32Array(64);
+
+    for (let i = 0; i < 4; i++) { // set defaults for lights
+        lightData.set([0,0,1,0], 16*i + 0);   // position    
+        lightData.set([1,1,1], 16*i + 4);     // color    
+        lightData.set([0,0,-1], 16*i + 8);    // spotDirection
+        lightData[16*i + 11] =  0.0;   // spotCosineCutoff (not a spotlight) 
+        lightData[16*i + 12] =  5.0;   // spotExponent
+        lightData[16*i + 13] =  0.0;   // attenuation (no attenuation)
+        lightData[16*i + 14] =  0.0;   // disabled
+    }
+    
+    lightData.set([0,0,0,1], 0); // light 0 is positional, at viewpoint
+    lightData.set([0.2,0.2,0.2], 4);  // light 0 color is dim white.
+    lightData[14] = 1.0;  // light 0 is always enabled
+    
+    lightData[16 + 14] = 1.0;   // light 1 is always enabled (for the sun during the day, the lamp at night)
+    
+    lightData[16*2 + 11] = Math.cos(Math.PI/8);    // lights 2 and 3 are headlights,  which are spotlights;
+    lightData[16*3 + 11] = Math.cos(Math.PI/8);    //      set their spotCosineCutoffs
+    lightData.set([0.5, 0.5, 0.4], 16*2 + 4);      //          and their colors
+    lightData.set([0.5, 0.5, 0.4], 16*3 + 4);
+      
+    device.queue.writeBuffer(bindBuffer1, 256, lightData);
+    
+} // end initWebGPU()
+
+
+
+/**
+ *  Create one of the basic objects.  The modelData parameter holds the data
+ *  for an IFS using the structure from basic-objects-IFS.js.  This function
+ *  creates buffers to hold the coordinates, normal vectors, and indices
+ *  from the IFS, and it loads the data into those buffers.  The function
+ *  creates a new object whose properties are the identities of the
+ *  buffers.  The new object also has a function, render(), that can be called to
+ *  render the object, using all the data from the buffers.  The model object
+ *  is returned as the value of the function.  (The second parameter,
+ *  xtraTranslate, is there because this program was ported from a Java
+ *  version where cylinders were created in a different position, with
+ *  the base on the xy-plane instead of with their center at the origin.
+ *  The xtraTranslate parameter is a 3-vector that is applied as a
+ *  translation to the rendered object.  It is used to move the cylinders
+ *  into the position expected by the code that was ported from Java.)
+ */
+function createModel(modelData, xtraTranslate) {
+    let model = [];
+    model.xtraTranslate = xtraTranslate || null;
+    model.count = modelData.indices.length;
+    model.coordsBuffer = device.createBuffer({ 
+       size: modelData.vertexPositions.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    model.normalBuffer = device.createBuffer({ 
+       size: modelData.vertexNormals.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    model.indexBuffer = device.createBuffer({ 
+       size: modelData.indices.byteLength, 
+       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(model.coordsBuffer,0,modelData.vertexPositions);
+    device.queue.writeBuffer(model.normalBuffer,0,modelData.vertexNormals);
+    device.queue.writeBuffer(model.indexBuffer,0,modelData.indices);
+    model.render = function() {  // This function will render the object,
+                                 //    using several global variables.
+                                 // Rewrites values of diffuse color, modelview matris, normal matrix.
+                                 // Submits to device.queue the commands required to draw this model.
+        if (this.xtraTranslate) {
+            pushMatrix();
+            mat4.translate(modelview,this.xtraTranslate,modelview);
+        }
+        device.queue.writeBuffer(bindBuffer0,0,modelview);
+        mat3.fromMat4(modelview,normalMatrix); // get normal matrix from modelview matrix
+        mat3.inverse(normalMatrix,normalMatrix);
+        mat3.transpose(normalMatrix,normalMatrix);
+        device.queue.writeBuffer(bindBuffer1,512,normalMatrix);
+        device.queue.writeBuffer(bindBuffer1,0,new Float32Array(currentColor));
+        let commandEncoder = device.createCommandEncoder();
+        let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+        passEncoder.setPipeline(pipeline);
+        passEncoder.setBindGroup(0,bindGroup0);
+        passEncoder.setBindGroup(1,bindGroup1);
+        passEncoder.setVertexBuffer(0,model.coordsBuffer);
+        passEncoder.setVertexBuffer(1,model.normalBuffer);
+        passEncoder.setIndexBuffer(model.indexBuffer,"uint16");
+        passEncoder.drawIndexed(model.count);
+        passEncoder.end();
+        device.queue.submit([commandEncoder.finish()]);
+        if (this.xtraTranslate) {
+           popMatrix();
+        }
+    };
+    return model;
+} // end createModel()
+
+
+//------------ Drawing -------------------------------------------------------
+
+
+/**
+ * Draws the diskworld!
+ */
+function draw() {
+
+    renderPassDescriptor = {
+       colorAttachments: [{
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: "clear",
+          storeOp: "store",
+          view: textureViewForMultisampling,
+          resolveTarget: context.getCurrentTexture().createView()
+       }],
+       depthStencilAttachment: {
+          view: depthTexture.createView(),
+          depthClearValue: 1.0,
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+       }
+    };
+
+    let commandEncoder = device.createCommandEncoder(); // for clearing only
+    let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor)
+    passEncoder.end();
+    device.queue.submit( [commandEncoder.finish()] );
+    
+    renderPassDescriptor.colorAttachments[0].loadOp = "load";
+    renderPassDescriptor.depthStencilAttachment.depthLoadOp = "load";
+    
+    modelview = new Float32Array(rotator.getViewMatrix());
+    
+    lights();
+    
+    world();
+}
+
+
+/**
+ * Convenience function for writing a new emission color to the appropriate buffer.
+ */
+function setEmissiveColor(r,g,b) {
+    device.queue.writeBuffer(bindBuffer1,32,new Float32Array([r,g,b]),0,3);
+}
+
+
+/**
+ *  Push a copy of the current modelview matrix onto the matrix stack.
+ */
+function pushMatrix() {
+    matrixStack.push( mat4.clone(modelview) );
+}
+
+
+/**
+ *  Restore the modelview matrix to a value popped from the matrix stack.
+ */
+function popMatrix() {
+    modelview = matrixStack.pop();
+}
+
+
+/**
+ * Sets properties of lights for one frame of the animation.  Also draws spheres
+ * for the sun and the lamp.
+ */
+function lights() {
+
+    if (daytime) {  // light 1 is the sun
+        lightData.set([0.6,0.6,0.5], 16+4);  // light 1 is the sun during the day
+        lightData[16+13] = 0;  // sunlight doesn't attenuate
+    }
+    else {
+        lightData.set([1,1,0.8], 16+4);  // light 1 is the lamp at night
+        lightData[16+13] = 2;  // set lamp attenuation to 2
+    }
+    
+    currentColor = [ 0.3, 0.3, 0.3, 1 ];
+    
+    pushMatrix();  // draw the sun, with yellow emissive color during the day, dim white at night; NB: sun won't be illuminated by other lights
+    mat4.rotateZ(modelview,sunAngle,modelview);
+    mat4.translate(modelview,[6.5,0,0],modelview);
+    mat4.scale(modelview,[0.4,0.4,0.4],modelview);
+    if (daytime) { 
+        setEmissiveColor(0.7, 0.7, 0 );
+        setLightPosition(1, modelview, [1,0,0,0]);
+    }
+    else {
+        setEmissiveColor(0.1, 0.1, 0.1 );
+    }
+    device.queue.writeBuffer(bindBuffer1, 256+64, lightData, 16, 16);  // write data for light 1 to buffer
+    sphere.render();
+    popMatrix();
+    
+    pushMatrix();  // draw the lamp, with emissive color at night
+    mat4.translate(modelview,[0,1.5,0],modelview);
+    mat4.scale(modelview,[0.15,0.15,0.15],modelview);
+    if (daytime) {
+        setEmissiveColor(0, 0, 0 );
+    }
+    else { 
+        setLightPosition(1, modelview, [0,0,0,1]);
+        device.queue.writeBuffer(bindBuffer1,256+64,lightData,16,4);
+        setEmissiveColor(0.5, 0.5, 0 );
+    }
+    sphere.render();
+    setEmissiveColor(0, 0, 0 );
+    popMatrix();
+    
+    if (daytime) { // turn off headlights in the day
+        lightData[16*2 + 14] = 0;
+        lightData[16*3 + 14] = 0;
+    }
+    else { // turn on the headlights at night -- we need the same transforms as are applied to the car!
+        lightData[16*2 + 14] = 1;
+        lightData[16*3 + 14] = 1;
+        pushMatrix();
+        mat4.rotate(modelview,[ 0, 1, 0],(-frameNumber)/180*Math.PI,modelview);;
+        mat4.translate(modelview,[0,0.3,4],modelview);
+        mat4.scale(modelview,[0.3,0.3,.3],modelview);
+        pushMatrix();
+        mat4.translate(modelview,[-3,0.6,-1],modelview);
+        mat4.rotateY(modelview,-Math.PI/12,modelview);  // (bogus extra rotation to point headlights more along road)
+        setLightPosition(2, modelview, [0,0,0,1]);
+        setSpotlightDirection(2, modelview, [-1,0,0]);
+        popMatrix();
+        pushMatrix();
+        mat4.translate(modelview,[-3,0.6,1],modelview);
+        mat4.rotateY(modelview,-Math.PI/12,modelview);
+        setLightPosition(3, modelview, [0,0,0,1]);
+        setSpotlightDirection(3, modelview, [-1,0,0]);
+        popMatrix();        
+        popMatrix();
+    }
+    
+    device.queue.writeBuffer(bindBuffer1, 256+128, lightData, 32, 32); // write data for lights 2 and 3 to buffer
+
+    /* Set the direction vector of a light, in eye coordinates.  This only changes the
+     * value in the lightData array, not in the associated buffer.
+     * (Note: This function sets the value of the global variable normalMatrix.)
+     * @lightNum the index of the light in the lightData array
+     * @param modelview the matrix that does object-to-eye coordinate transforms
+     * @param lightDirection a vector that points in the direction that the spotlight is pointing (a vec3)
+     */
+    function setSpotlightDirection( lightNum, modelview, lightDirection ) {
+        mat3.fromMat4(modelview,normalMatrix);
+        mat3.inverse(normalMatrix,normalMatrix);
+        mat3.transpose(normalMatrix,normalMatrix);
+        let transformedDirection = wgpuMatrix.vec3.transformMat3(lightDirection, normalMatrix);
+        lightData.set(transformedDirection, 16*lightNum + 8);
+    }
+
+    /* Set the position of a light, in eye coordinates.
+     * @lightNum the index of the light in the lightData array
+     * @param modelview the matrix that does object-to-eye coordinate transforms
+     * @param lightPosition the location of the light, in object coordinates (a vec4)
+     */
+    function setLightPosition( lightNum, modelview, lightPosition ) {
+        let transformedPosition = wgpuMatrix.vec4.transformMat4(lightPosition, modelview);
+        lightData.set(transformedPosition, 16*lightNum);
+    }
+    
+} // end lights()
+
+
+/**
+ * Draws a "world" consisting of a disk holding some trees and a road, and a car that
+ * drives along the road.
+ */
+function world() {
+	pushMatrix();
+	mat4.translate(modelview,[0,-0.05,0],modelview);
+	mat4.rotate(modelview,[1,0,0],(90)/180*Math.PI,modelview);;
+	currentColor = [0.1,0.4,0.1,1];
+	disk.render();
+	popMatrix();
+   pushMatrix();
+	mat4.rotate(modelview,[-1,0,0],(90)/180*Math.PI,modelview);;
+   mat4.scale(modelview,[0.15,0.15,1.5],modelview);
+   currentColor = [0.8,0.8,1,1];
+   cylinder.render();
+   popMatrix();
+	pushMatrix();
+	currentColor = [0.7,0.7,0.8,1];
+	mat4.rotate(modelview,[-1,0,0],(90)/180*Math.PI,modelview);;
+	ringM.render();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,[ 0, 1, 0],(-frameNumber)/180*Math.PI,modelview);;
+	mat4.translate(modelview,[0,0.3,4],modelview);
+	mat4.scale(modelview,[0.3,0.3,.3],modelview);
+	car();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[1,0,0],modelview);
+	mat4.scale(modelview,[0.7,0.7,0.7],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[-0.5,0,-1],modelview);
+	mat4.scale(modelview,[0.5,0.5,0.5],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[-1.5,0,2],modelview);
+	mat4.scale(modelview,[0.7,0.7,0.7],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[-1,0,5.2],modelview);
+	mat4.scale(modelview,[0.25,0.25,0.25],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[5.1,0,0.5],modelview);
+	mat4.scale(modelview,[0.3,0.3,0.3],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[5.1,0,-0.5],modelview);
+	mat4.scale(modelview,[0.35,0.35,0.35],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[5.3,0,0],modelview);
+	mat4.scale(modelview,[0.5,0.5,0.5],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,[0,1,0],(70)/180*Math.PI,modelview);;
+	pushMatrix();
+	mat4.translate(modelview,[5.1,0,0.5],modelview);
+	mat4.scale(modelview,[0.3,0.3,0.3],modelview);
+	tree();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[5.1,0,-0.5],modelview);
+	mat4.scale(modelview,[0.35,0.35,0.35],modelview);
+	tree();
+	popMatrix();
+	mat4.rotate(modelview,[0,1,0],(53)/180*Math.PI,modelview);;
+	pushMatrix();
+	mat4.translate(modelview,[5.3,0,0],modelview);
+	mat4.scale(modelview,[0.5,0.5,0.5],modelview);
+	tree();
+	popMatrix();
+	popMatrix();
+}
+
+
+/**
+ * Draws a tree consisting of a green cone with a brown cylinder for a trunk.
+ */
+function tree() {
+	pushMatrix();
+	mat4.rotate(modelview,[-1,0,0],(90)/180*Math.PI,modelview);;
+	pushMatrix();
+	currentColor = [0.5,0.3,0.1,1];
+	mat4.scale(modelview,[0.5,0.5,1],modelview);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	currentColor = [0,0.8,0,1];
+	mat4.translate(modelview,[0,0,0.8],modelview);
+	mat4.scale(modelview,[1.5,1.5,2],modelview);
+	cone.render();
+	popMatrix();
+	popMatrix();
+}
+
+
+/**
+ * Draws a car consisting of two scaled red cubes with headlights
+ * and four wheels on two axels.
+ */
+function car() {
+	pushMatrix();
+	mat4.translate(modelview,[2.5,0,0],modelview);
+	axel();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[-2.5,0,0],modelview);
+	axel();
+	popMatrix();
+	currentColor = [1,0,0,1];
+	pushMatrix();
+	mat4.translate(modelview,[0,0.6,0],modelview);
+	mat4.scale(modelview,[6,1.2,3],modelview);
+	cubeM.render();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[0.5,1.4,0],modelview);
+	mat4.scale(modelview,[3,1,2.8],modelview);
+	cubeM.render();
+	popMatrix();
+	currentColor = [1,1,0.3,1];
+    if (!daytime) {
+       setEmissiveColor(0.4,0.4,0);
+    }
+	pushMatrix();
+	mat4.translate(modelview,[-3,0.6,-1],modelview);
+	mat4.scale(modelview,[0.1,0.25,0.25],modelview);
+	sphere.render();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[-3,0.6,1],modelview);
+	mat4.scale(modelview,[0.1,0.25,0.25],modelview);
+	sphere.render();
+	popMatrix();
+    if (!daytime) {
+        setEmissiveColor(0,0,0);
+    }
+} // end world()
+
+
+/**
+ *  Draw an axel that consists of a long yellow cylinder with
+ *  a wheel on each end.
+ */
+function axel() {
+	currentColor = [0.8,0.7,0,1];
+	pushMatrix();
+	mat4.scale(modelview,[0.2,0.2,4.3],modelview);
+	mat4.translate(modelview,[0,0,-0.5],modelview);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[0,0,2],modelview);
+	wheel();
+	popMatrix();
+	pushMatrix();
+	mat4.translate(modelview,[0,0,-2],modelview);
+	wheel();
+	popMatrix();
+}
+
+
+/**
+ * Draw a rotating wheel that consists of a torus with three
+ * cylinders to make the spokes of the wheel.
+ */
+function wheel() {
+	pushMatrix();
+	mat4.rotate(modelview,[0,0,1],(frameNumber*10)/180*Math.PI,modelview);;
+	currentColor = [0,0,0.7,1];
+	torus.render();
+	currentColor = [0.9,0.9,0.6,1];
+	pushMatrix();
+	mat4.rotate(modelview,[-1,0,0],(90)/180*Math.PI,modelview);;
+	mat4.scale(modelview,[0.1,0.1,1.8],modelview);
+	mat4.translate(modelview,[0,0,-0.5],modelview);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,[0,0,1],(60)/180*Math.PI,modelview);;
+	mat4.rotate(modelview,[-1,0,0],(90)/180*Math.PI,modelview);;
+	mat4.scale(modelview,[0.1,0.1,1.8],modelview);
+	mat4.translate(modelview,[0,0,-0.5],modelview);
+	cylinder.render();
+	popMatrix();
+	pushMatrix();
+	mat4.rotate(modelview,[0,0,1],(-60)/180*Math.PI,modelview);;
+	mat4.rotate(modelview,[-1,0,0],(90)/180*Math.PI,modelview);;
+	mat4.scale(modelview,[0.1,0.1,1.8],modelview);
+	mat4.translate(modelview,[0,0,-0.5],modelview);
+	cylinder.render();
+	popMatrix();
+	popMatrix();
+}
+
+
+//--------------------------------- animation framework ------------------------------
+
+let animating = false;
+let prevTime;  // time since previous call to frame()
+
+function frame(time) {
+    if (!animating) {
+        return;  // stops the animation
+    }
+    if (prevTime == null) { // Just save the start time.
+        prevTime = time;
+    }
+    else {
+        let elapsedTimeInSecs = (time - prevTime)/1000;
+        prevTime = time;
+        let delta = elapsedTimeInSecs * 60;  // time change in units of 1/60 second.
+        frameNumber += delta;
+        sunAngle += delta * Math.PI/360;
+        if (sunAngle > 2*Math.PI) {
+            sunAngle -= 2*Math.PI;
+        }
+        daytime = sunAngle < Math.PI;
+        draw();
+    }
+    requestAnimationFrame(frame);
+}
+
+function setAnimating(run) {
+    if (run != animating) {
+        animating = run;
+        if (animating) {
+            prevTime = null;
+            requestAnimationFrame(frame);
+        }
+    }
+}
+
+//-------------------------------------------------------------------------
+
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+async function init() {
+    try {
+        await initWebGPU();  // initialize WebGPU. the render pipeline, and some buffers
+    }
+    catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+               throw e;
+        return;
+    }
+    document.getElementById("animCheck").checked = false;
+    document.getElementById("reset").onclick = function() {
+       rotator.setView(17,[0,1,2]);
+       frameNumber = 0;
+       sunAngle = Math.PI/2;
+       daytime = true;
+       animating = false;
+       document.getElementById("animCheck").checked = false;
+       draw();
+    };
+    
+    torus = createModel(uvTorus(0.5,1,16,8));   // Create all the basic objects, with their buffers.
+    sphere = createModel(uvSphere(1));
+    cone = createModel(uvCone(),[0,0,.5]);
+    cylinder = createModel(uvCylinder(),[0,0,.5]);
+    disk = createModel(uvCylinder(5.5,0.5,64),[0,0,.25]);
+    ringM = createModel(ring(3.3,4.8,40));
+    cubeM = createModel(cube());
+ 
+    rotator = new TrackballRotator(context.canvas,function() {
+        if (!animating)
+           draw();
+    },17,[0,1,2]);
+    
+    draw();
+}
+
+window.onload = init;
+
+</script>
+
+</head>
+<body>
+
+<h2>DiskWorld using WebGPU</h2>
+
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGPU</h3><hr></noscript>
+
+<p id="message" style="font-weight:bold">Drag your mouse (or finger on a touchscreen) on the model to rotate it.<br>
+Make sure to try the animation, and let it run long enough to see the nighttime view!</p>
+
+<p>
+   <label><input type="checkbox" id="animCheck" onchange="setAnimating(this.checked)">Animate</label>
+   <button id="reset" style="margin-left:40px">Reset</button>
+</p>
+
+
+<div>
+
+    <canvas width=600 height=600 id="webgpuCanvas" style="background-color:black"></canvas>
+
+</div>
+</body>
+</html>
+

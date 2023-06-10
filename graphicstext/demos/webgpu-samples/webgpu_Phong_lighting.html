@@ -13,18 +13,15 @@
 </style>
 
 <!--
+    Shows individual objects using simple lighting, with diffuse
+    and specular color and a single white light.  The lighting
+    uses Phong shading; that is, the lighting calculations are
+    done in the fragment shader using interpolated normal vetors.
     
-    
-
-    Shows objects using simple lighting, with diffuse and
-    specular color and a single white light.  The lighting
-    uses Phong shading; that is, the lighting calculations
-    are done in the fragment shader using interpolated
-    normal vetors.  
+    This is a translation from a version that uses WebGL.
 -->
 
-
-<script src="wgpu-matrix.js"></script>
+<script src="wgpu-matrix.js"></script>  <!-- matrix and vector algebra from Gregg Tavares -->
 <script src="trackball-rotator.js"></script>
 <script src="basic-object-models-IFS.js"></script>
 <script>
@@ -33,8 +30,8 @@
 
 const shaderSource = `
     struct UniformData {
-        modelview : mat4x4f,   // size 16, offset 0  (floats)
-        projection : mat4x4f,  // size 16, offset 16
+        modelview : mat4x4f,   // size 16, offset 0  
+        projection : mat4x4f,  // size 16, offset 16 (measured in 4-byte floats)
         normalMatrix : mat3x3f,// size 12, offset 32
         lightPosition : vec4f, // size  4, offset 44
         diffuseColor : vec3f,  // size  3, offset 48
@@ -51,9 +48,9 @@ const shaderSource = `
     }
     
     @vertex
-    fn vmain(@location(0) coords: vec3f,
-              @location(1) normal: vec3f) -> VertexOut {
-        var eyeCoords = uniformData.modelview * vec4f(coords,1.0);
+    fn vmain( @location(0) coords: vec3f,
+              @location(1) normal: vec3f ) -> VertexOut {
+        var eyeCoords = uniformData.modelview * vec4f(coords,1);
         var output : VertexOut;
         output.position = uniformData.projection * eyeCoords;
         output.normal = normalize(normal);
@@ -62,47 +59,46 @@ const shaderSource = `
     }
     
     @fragment
-    fn fmain(@location(0) normal : vec3f, @location(1) eyeCoords : vec3f) -> @location(0) vec4f{
-        var N : vec3f;     // vectors for lighting equation
-        var L : vec3f;
-        var R : vec3f;
-        var V : vec3f;
+    fn fmain( @location(0) normal : vec3f,
+              @location(1) eyeCoords : vec3f ) -> @location(0) vec4f {
+        var N : vec3f;  // normalized normal vector
+        var L : vec3f;  // unit vector pointing towards the light source
+        var R : vec3f;  // reflected vector of L
+        var V : vec3f;  // unit vector pointing towards the viewer
         N = normalize( uniformData.normalMatrix * normal );
-        if ( uniformData.lightPosition.w == 0.0 ) {
+        if ( uniformData.lightPosition.w == 0.0 ) { // directional ligh
             L = normalize( uniformData.lightPosition.xyz );
         }
-        else {
+        else { // positional light
             L = normalize( uniformData.lightPosition.xyz/uniformData.lightPosition.w - eyeCoords );
         }
-        R = -reflect(L,N);
-        V = normalize(-eyeCoords);  // (Assumes a perspective projection.)
-        if ( dot(L,N) <= 0.0 ) {
+        if ( dot(L,N) <= 0.0 ) { // light does not illuminate this point
             return vec4f(0,0,0,1);
         }
         else {
-            var color = 0.8*dot(L,N) * uniformData.diffuseColor;
-            if (dot(R,V) > 0.0) {
+            R = -reflect(L,N);
+            V = normalize(-eyeCoords);  // (Assumes a perspective projection.)
+            var color = 0.8*dot(L,N) * uniformData.diffuseColor;  // diffuse reflection
+                  // constant multiples on colors are to avoid over-saturating the total color
+            if (dot(R,V) > 0.0) {  // add in specular reflection
                 color += 0.4*pow(dot(R,V),uniformData.specularExponent) * uniformData.specularColor;
             }
             return vec4f(color,1.0);
         }
     }`;
 
-let canvas;  // The canvas where the image is drawn.
 let context; // The WebGPU context for the canvas.
 let device;  // The WebGPU device.
+let renderPipeline;  // The render pipeline for use in draw().
+let uniformBuffer;   // The uniform buffer, for transfering uniform data to the GPU.
+let uniformBindGroup;// The bind group containing the buffer, for attaching to the pipeline.
+let depthTexture;    // Depth buffer, for the color attachment to the pipeline.
 
-let shader;    // The shader module containing the shaders.
-let pipelineDescriptor;
-let renderPipeline;
-let uniformBufferLayout;
-let uniformBuffer;
-let depthTexture;
+let uniformData = new Float32Array(56); // Holds values for transfer to the uniform buffer.
 
-let uniformData = new Float32Array(56); // holds values for transfer to the uniform buffer
-
-const uniforms = { // size and offset of uniform data in the uniform buffer and in uniformData array
-    modelview:        { size: 16, offset: 0  },
+const uniforms = { // Size and offset (in floats) of uniform data withiin
+                   // the uniform buffer and in uniformData array.
+    modelview:        { size: 16, offset: 0  }, 
     projection:       { size: 16, offset: 16 },
     normalMatrix:     { size: 12, offset: 32 },
     lightPosition:    { size:  4, offset: 44 },
@@ -116,16 +112,22 @@ let currentObject;   // an element of objects array, the data for the currently 
 
 let rotator;  // A TrackballRotator to implement rotation by mouse.
 
-const colors = [  // RGB color arrays for diffuse and specular color values, selected by popup menu
+const colors = [  // RGB color arrays for diffuse and specular color values, selected by popup menu.
     [1,1,1], [1,0,0], [0,1,0], [0,0,1], [0,1,1], [1,0,1], [1,1,0], [0,0,0], [0.5,0.5,0.5]
 ];
 
-const lightPositions = [  // values for light position, selected by popup menu
+const lightPositions = [  // Values for light position, selected by popup menu.
     [0,0,0,1], [0,0,1,0], [0,1,0,0], [0,0,-10,1], [2,3,5,0]
 ];
 
-
-async function initGPU() {
+/**
+ * This function does all the initialization that only needs to be done
+ * just once, except for creating the buffers used by the object models,
+ * which are created by the next function when they are needed.
+ * Initializes the global variables context, device, renderPipeline, uniformBuffer,
+ * uniformBindGroup, depthTexture.
+ */
+async function initWebGPU() {
 
    if (!navigator.gpu) {
       throw Error("WebGPU not supported in this browser.");
@@ -137,20 +139,11 @@ async function initGPU() {
 
    device = await adapter.requestDevice();
    
-}
-
-async function createConfig() {
-
-   device.pushErrorScope("validation");
-   shader = device.createShaderModule({
+   let shader = device.createShaderModule({
       code: shaderSource
    });
-   let error = await device.popErrorScope();
-   if (error) {
-      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
-   }
    
-   canvas = document.getElementById("webgpuCanvas");
+   let canvas = document.getElementById("webgpuCanvas");
    context = canvas.getContext("webgpu");
    context.configure({
       device: device,
@@ -171,7 +164,7 @@ async function createConfig() {
       }
     ];
 
-   uniformBufferLayout = device.createBindGroupLayout({
+   let uniformBufferLayout = device.createBindGroupLayout({
        entries: [
           {
              binding: 0,
@@ -183,7 +176,7 @@ async function createConfig() {
        ]
     });
 
-   pipelineDescriptor = {
+   let pipelineDescriptor = {
        vertex: {
           module: shader,
           entryPoint: "vmain",
@@ -202,7 +195,8 @@ async function createConfig() {
           format: "depth24plus",
        },       
        primitive: {
-          topology: "triangle-list"
+          topology: "triangle-list",
+          cullMode: "back"  // no need to draw back faces, since all objects are closed solids.
        },
        layout: device.createPipelineLayout({
           bindGroupLayouts: [uniformBufferLayout]
@@ -212,28 +206,45 @@ async function createConfig() {
     renderPipeline = await device.createRenderPipelineAsync(pipelineDescriptor);
     
     uniformBuffer = device.createBuffer({ 
-       size: 56*4, 
+       size: 56*4,
        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     }); 
 
+   uniformBindGroup = device.createBindGroup({
+       layout: uniformBufferLayout,
+       entries: [
+         {
+            binding: 0,
+            resource: {buffer: uniformBuffer, offset: 0, size: 56*4}
+         }
+       ]
+    });
+
     depthTexture = device.createTexture({
-       size: [canvas.width, canvas.height],
+       size: [context.canvas.width, context.canvas.height],
        format: 'depth24plus',
        usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
 }
 
-
+/**
+ *  Redraws the canvas to show the object that is selected by the
+ *  user using the "Object" popup menu.  If the object has not been
+ *  previously viewed, the vertex and index buffers for the object
+ *  need to be created.  The buffers are saved and are reused if
+ *  the object is selected again in the future.  The data for the
+ *  buffers come from basic-object-models-IFS.js.  
+ */
 function installModel() {
    let modelNum = Number(document.getElementById("object").value);
-   if ( ! objects[modelNum] ) {
+   if ( ! objects[modelNum] ) { // Create the model.
         let model;
-        switch (modelNum) {
+        switch (modelNum) { // Calling functions from basic-object-models-IFS.js.
             case 0:  model = cube(5); break;
             case 1:  model = uvTorus(3,1,64,32); break;
             case 2:  model = uvCylinder(1.5,5.5); break;
             case 3:  model = uvCone(2.5,5.5); break;
-            case 4:  model = uvSphere(3); break;
+            case 4:  model = uvSphere(3, 64, 32); break;
             default: model = uvSphere(3,12,6); break;
         }
         model.count = model.indices.length;
@@ -252,12 +263,17 @@ function installModel() {
         device.queue.writeBuffer(model.coordsBuffer,0,model.vertexPositions);
         device.queue.writeBuffer(model.normalBuffer,0,model.vertexNormals);
         device.queue.writeBuffer(model.indexBuffer,0,model.indices);
-        objects[modelNum] = model;
+        objects[modelNum] = model; // Cache the model for future use.
    }
    currentObject = objects[modelNum];
    draw();
 }
 
+
+/**
+ *  Fills the uniformData array with the initial values of the uniform shader variables
+ *  and writes that data to uniformBuffer.
+ */
 function initializeUniformData() {
    let viewMatrix = rotator.getViewMatrix();
    let projectionMatrix = wgpuMatrix.mat4.perspective(Math.PI/5,1,10,20);
@@ -276,6 +292,14 @@ function initializeUniformData() {
    device.queue.writeBuffer(uniformBuffer,0,uniformData);
 }
 
+
+/**
+ *  Changes the value for the specified uniform data item in the uniformData array
+ *  and writes the new value to uniformBuffer.  The itemName is the name of the
+ *  field in the unifomData struct in the shader source code.  The offset and
+ *  size of the item in the uniformData array is stored in global variable named
+ *  uniforms for convenience.
+ */
 function updateUniform(itemName, value, redrawNow = true) {
    let data = uniforms[itemName];
    if (data.size === 1)
@@ -283,21 +307,16 @@ function updateUniform(itemName, value, redrawNow = true) {
    else
       uniformData.set(value, data.offset);
    device.queue.writeBuffer(uniformBuffer, 4*data.offset, uniformData, data.offset, data.size);
-   if (redrawNow)
+   if (redrawNow) {
        draw();
+   }
 }
 
 
+/**
+ *  Renders the current model.
+ */
 function draw() {
-   let uniformBindGroup = device.createBindGroup({
-      layout: uniformBufferLayout,
-      entries: [
-        {
-           binding: 0,
-           resource: {buffer: uniformBuffer, offset: 0, size: 56*4}
-        }
-      ]
-   });
    let commandEncoder = device.createCommandEncoder();
    let renderPassDescriptor = {
       colorAttachments: [{
@@ -324,10 +343,12 @@ function draw() {
    device.queue.submit([commandEncoder.finish()]);   
 }
 
+/**
+ * Called after document load to initialize the application and draw the first object.
+ */
 async function init() {
    try {
-      await initGPU();
-      await createConfig();
+      await initWebGPU();
    }
    catch (e) {
        document.getElementById("message").innerHTML =
@@ -349,8 +370,9 @@ async function init() {
           () => updateUniform("specularColor", colors[ Number(document.getElementById("specular").value) ]);
    document.getElementById("exponent").onchange = 
           () => updateUniform("specularExponent", Number(document.getElementById("exponent").value));
-   rotator = new TrackballRotator(canvas, () => {
-           let viewMatrix = rotator.getViewMatrix()
+   rotator = new TrackballRotator(context.canvas, () => {
+                // Callback function, to be called when user rotates the view.
+           let viewMatrix = rotator.getViewMatrix();
            updateUniform("modelview", viewMatrix, false);
            updateUniform("normalMatrix", wgpuMatrix.mat3.fromMat4(viewMatrix));
        }, 15);
