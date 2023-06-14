@@ -974,5 +974,11 @@ the color of the pixel.</gitem>
 From the WGSL specification: "Each address space has unique properties 
 determining mutability, visibility, the values it may contain, and 
 how to use variables with it."</gitem>
+<gitem term="NDC">Normalized Device Coordinates.  In WebGPU, refers to the default 
+xyz coordinate system in which x and y range from -1 to&nbsp;1 and z ranges
+from 0 to&nbsp;1.  The x and y in NDC map linearly to device, or pixel, coordinates
+on the viewport.</gitem>
+<gitem term="compute shader">A stage in a GPU pipeline that does purely computational
+work, rather than participating directly in graphical rendering.</gitem>
 
 </glossary>

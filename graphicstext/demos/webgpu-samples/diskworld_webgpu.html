@@ -119,7 +119,7 @@ const shaderSource = `
                 attenuationFactor = 1.0 / (1.0 + dist*light.attenuation);
             }
         }
-        if (dot(L,N) <= 0.0) {
+        if (dot(L,N) <= 0.0) { // light does not illuminate this side
             return vec3f(0.0);
         }
         var reflection = dot(L,N) * light.color * material.diffuseColor.rgb;
@@ -467,8 +467,8 @@ function createModel(modelData, xtraTranslate) {
         }
         device.queue.writeBuffer(bindBuffer0,0,modelview);
         mat3.fromMat4(modelview,normalMatrix); // get normal matrix from modelview matrix
-        mat3.inverse(normalMatrix,normalMatrix);
         mat3.transpose(normalMatrix,normalMatrix);
+        mat3.inverse(normalMatrix,normalMatrix);
         device.queue.writeBuffer(bindBuffer1,512,normalMatrix);
         device.queue.writeBuffer(bindBuffer1,0,new Float32Array(currentColor));
         let commandEncoder = device.createCommandEncoder();

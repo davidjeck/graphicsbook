@@ -50,7 +50,7 @@ const shaderSource = `
     @vertex
     fn vmain( @location(0) coords: vec3f,
               @location(1) normal: vec3f ) -> VertexOut {
-        var eyeCoords = uniformData.modelview * vec4f(coords,1);
+        let eyeCoords = uniformData.modelview * vec4f(coords,1);
         var output : VertexOut;
         output.position = uniformData.projection * eyeCoords;
         output.normal = normalize(normal);

@@ -46,7 +46,7 @@ some shared memory.</p>
 
 <p>In this section we will mostly be looking at one sample program:
 <sourceref href="webgpu/basic_webgpu_1.html">basic_webgpu_1.html</sourceref>,
-which simply draws a color triangle.
+which simply draws a colored triangle.
 The source code for this example is extensively commented, and you are
 encouraged to read it.  You can run it to test whether your browser supports WebGPU.
 <tex>A demo version is also available.

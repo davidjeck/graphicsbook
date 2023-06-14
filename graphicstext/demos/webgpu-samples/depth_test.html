@@ -124,7 +124,7 @@ let textureForMultisampling;
 let textureViewForMultisampling;
 
 // The depth test requires a texture, which serves as the depth buffer.
-// It becomes part of the color attachement for the pipeline.
+// It becomes part of the color attachment for the pipeline.
 let depthTexture;
 
 
@@ -296,7 +296,7 @@ function createPipelineConfig() {
    
    depthTexture = device.createTexture({
        size: [context.canvas.width, context.canvas.height],
-       format: 'depth24plus',
+       format: "depth24plus",
        sampleCount: 4, // Only required when multisampling is used!
        usage: GPUTextureUsage.RENDER_ATTACHMENT,
    });
@@ -347,8 +347,8 @@ function draw() {
       depthStencilAttachment: {  // The depth texture must be added to the color attachment.
         view: depthTexture.createView(),
         depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
       }
    };
    
