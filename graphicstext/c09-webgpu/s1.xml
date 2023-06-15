@@ -16,13 +16,13 @@ basic 2D graphics, with no <word term="geometric transform">transformations</wor
 or <word>lighting</word>.  Although I will make some references to WebGL,
 I will try to make the discussion accessible even
 for someone who has not already studied WebGL or OpenGL; however, if you are not
-familiar with computer graphics, you might need to refer to earlier sections
+familiar with those older APIs, you might need to refer to earlier sections
 of this book for background information.</p>
 
 <p>Our WebGPU examples will be programmed in <word>JavaScript</word>.
 A short introduction to JavaScript can be found in <localref href="proglang.3">Section&nbsp;3</localref>
 of Appendix&nbsp;A.  WebGPU makes extensive use of <word term="typed array">typed arrays</word>
-such as <i>Float32Array</i> and of the notations for creating objects (using <code>{&dots;}</code>)
+such as <classname>Float32Array</classname> and of the notations for creating objects (using <code>{&dots;}</code>)
 and arrays (using <code>[&dots;]</code>).
 And it uses <word term="async function">async</word> functions and 
 <word term="promise (in JavaScript)">promises</word>, advanced JavaScript
@@ -90,7 +90,7 @@ The code for obtaining the device and context can be the same in any application
     
 <np>Here, <code>device</code> and <code>context</code> are global variables,
 <code>navigator</code> is a predefined variable representing the web browser, and
-The other variables, <code>adapter</code> and <code>canvas</code>, are probably
+the other variables, <code>adapter</code> and <code>canvas</code>, are probably
 not needed outside the initialization function.  (If a reference to the
 canvas is needed, it is available as <code>context.canvas</code>.)
 The functions <code>navigator.gpu.requestAdapter()</code> and
@@ -121,13 +121,16 @@ the console open when testing your work.</p>
 
 
 <subsection title="Shader Module" id="webgpu.1.2">
+
 <p>Like WebGL and OpenGL, WebGPU draws <word term="geometric primitive">primitives</word>
 (points, lines, and triangles) that are defined by <word term="vertex">vertices</word>.
 The rendering process involves some computation for each vertex of a primitive, and
 some computation for each pixel (or "fragment") that is part of the primitive.  A
 WebGPU programmer must define functions to specify those computations.  Those functions
 are <word term="shader">shaders</word>.  To render an image, a WebGPU program must
-provide a vertex shader function and a fragment shader function.  Shader functions and
+provide a vertex shader main function and a fragment shader main function.  In the documentation,
+those function are referred to as the vertex shader entry point and the fragment shader entry point.
+Shader functions and
 supporting code for WebGPU are written in <newword>WGSL</newword>, the WebGPU Shader Language.
 Shader source code is given as an ordinary JavaScript string. The
 <code>device.createShaderModule()</code> method, in the WebGPU device object,
@@ -176,7 +179,7 @@ multiple lines:</p>
 <pre>fn <bnf>function_name</bnf> ( <bnf>parameter_list</bnf> ) -&gt; <bnf>return_type</bnf></pre>
 
 <np>The types used in this example&mdash;<code>vec2f</code>, <code>vec3f</code>, and
-<code>vec4f</code> &mdash;represent vectors of two, three, and four 32-bit floating point numbers.
+<code>vec4f</code>&mdash;represent vectors of two, three, and four 32-bit floating point numbers.
 Variable declarations can have several forms.  The one example in this code has the
 form</np>
 
@@ -187,8 +190,8 @@ A variable in the uniform address space gets its value from the JavaScript side.
 
 <p>The words beginning with "@" are annotations or modifiers.  For example, 
 <code>@vertex</code> means that the following function can be used as a vertex shader
-function, and <code>@fragment</code> means that the following function can be used as a fragment shader
-function.  <code>@builtin(position)</code> says that the return value from
+entry point, and <code>@fragment</code> means that the following function can be used as a fragment shader
+entry point.  The <code>@builtin(position)</code> annotation says that the return value from
 <code>vertexMain()</code> gives the coordinates of the
 vertex in the standard WebGPU coordinate system.  And <code>@location(0)</code>,
 <code>@group(0)</code>, and <code>@binding(0)</code> in this example are used to specify
@@ -197,14 +200,14 @@ discussed below.</p>
 
 <p>The vertex and fragment shader functions that are used here are very simple.  
 The vertex shader simply takes the (x,y) coordinates from its parameter, which
-come from the JavaScript side, and adds z- and w-coordinates to get the
+comes from the JavaScript side, and adds z- and w-coordinates to get the
 final <word>homogeneous coordinates</word> for the vertex.
 The expression <code>vec4f(coords,0,1)</code> for the return value constructs
 a <code>vec4f</code> (a vector of four floats) from the four floating-point
 values in its parameter list.  The fragment shader, which outputs an
 <word term="RGBA color">RGBA</word> color for the pixel that it is processing, simple uses
 the three RGB components from the uniform <code>color</code> variable, which
-comes from the JavaScript side, and adds a 1 for the alpha value of the color.</p>
+comes from the JavaScript side, and adds a 1 for the alpha component of the color.</p>
 
 </subsection>
 
@@ -225,13 +228,13 @@ of a render pipeline:</p>
 <np>This diagram shows two types of input to the pipeline, <newword term="vertex buffer">vertex buffers</newword>
 and <newword term="bind group (in WebGPU)">bind groups</newword>.  Recall that when a primitive is drawn, the vertex shader is called once for
 each vertex in the primitive.  Each invocation of the vertex shader can get different values
-for the parameters in the vertex shader function.  Those values come from vertex buffers.
-The buffers must be loaded with values for the parameters&mdash;one set of parameter values
-for each vertex.  A fixed function stage of the pipeline, shown as the dots between the 
+for the parameters in the vertex shader entry point function.  Those values come from vertex buffers.
+The buffers must be loaded with values for the parameters for every vertex.
+A fixed function stage of the pipeline, shown as the dots between the 
 vertex buffers and the vertex shader, calls the vertex shader once for each vertex, pulling
 the appropriate set of parameter values for that vertex from the buffers.  (Vertex buffers
 also hold data for <word>instanced drawing</word>, which will be covered in the
-<localref href="webgpu.2">next section</localref>; see also <localref href="webgl.1.8"/>).</np>
+<localref href="webgpu.2">next section</localref>).</np>
 
 <p>The vertex shader outputs some values, which must include the coordinates of the vertex
 but can also include other values such as color, <word>texture coordinates</word>,
@@ -262,7 +265,7 @@ can be used for advanced applications such as <word>deferred shading</word>
 many details of their configuration.  (Fortunately, a lot of the detail
 can be handled by the tried-and-true method of cut-and-paste.)
 Let's look at the relatively simple example from our first sample program.
-The goal is to create a render pipeline in the final line of this code
+The goal is to create a render pipeline as the final step in the following code
 excerpt.  Before that, the program creates some objects to
 specify the pipeline configuration:</p>
 
@@ -317,7 +320,7 @@ The <code>vertex</code> and <code>fragment</code> properties of
 the pipeline descriptor describe the shaders that are used in the
 pipeline.  The <code>module</code> property is the compiled shader
 module that contains the shader function.  The <i>entryPoint</i>
-property gives the name used for the shader function in the shader
+property gives the name used for the shader entry point function in the shader
 source code.  The <code>buffers</code> and <code>targets</code>
 properties are concerned with inputs for the vertex shader function
 and outputs from the fragment shader function.</p>
@@ -344,7 +347,7 @@ The index is also used in the shader program. For example, if you look
 back at the shader source code above, you'll see that the uniform
 variable declaration is annotated with <code>@group(0)</code>.  This 
 means that the value for that variable will be found in the bind
-group with index&nbsp;0.</p>
+group at index&nbsp;0 in the <code>bindGroupLayouts</code> array.</p>
 
 <p>Furthermore, each bind group can hold a 
 list of resources, which are specified by the <code>entries</code> 
@@ -358,9 +361,9 @@ on the uniform variable declaration says that the value for the variable
 comes specifically from the entry with binding number 0 in the
 bind group at index&nbsp;0.</p>
 
-<p>The pipeline also has outputs, which come from the fragment shader function,
+<p>The pipeline also has outputs, which come from the fragment shader entry point function,
 and the pipeline needs attachment points for the destinations of those outputs.
-The <code>targets</code> property inside the <code>pipelineDescriptor</code>
+The <code>targets</code> property in the <code>pipelineDescriptor</code>
 is an array with one entry for each attachment point.   When the shader
 source code defines the fragment shader with
 <code>fn&nbsp;fragmentMain() -&gt; @location(0)&nbsp;vec4f</code>,
@@ -419,9 +422,9 @@ For example, the sample program creates a vertex buffer with</p>
 
 <np>The purpose of a vertex buffer is to hold inputs for a vertex shader on the
 GPU side of the program.  The data will come from a <word>typed array</word>, such as
-a <code>Float32Array</code>, or from a related JavaScript data type such as
-<code>ArrayBuffer</code>. In this case,
-<code>vertexCoords</code> is a <code>Float32Array</code> that holds the xy-coordinates
+a <classname>Float32Array</classname>, or from a related JavaScript data type such as
+<classname>ArrayBuffer</classname>. In this case,
+<code>vertexCoords</code> is a <classname>Float32Array</classname> that holds the xy-coordinates
 of the vertices of a triangle, and <code>vertexCoords.byteLength</code> gives the
 number of bytes in that array.  (Alternatively, the size could be specified as
 <code>4*vertexCoords.length</code> or as the constant&nbsp;24.)</np>
@@ -460,7 +463,7 @@ that specify resources; a corresponding bind group has <code>entries</code>
 the provide the actual resources. The resource in this case is a 
 <code>buffer</code>.  The <code>offset</code> and <code>size</code>
 properties of the <code>resource</code> make it possible to use just
-a segment of a buffer; <code>offset</code> is the starting bye number of
+a segment of a buffer; <code>offset</code> is the starting byte number of
 the segment, and <code>size</code> is the number of bytes in the segment.</np>
 
 <p>To be useful, a buffer must loaded with data.  The buffer exists on
@@ -483,10 +486,10 @@ array; for other data sources, the starting position in the source and the size
 of the data to be copied are measured in bytes.)</np>
 
 <p>In the sample program, the buffers and bind group are created just once, during initialization. And
-<code>vertexBuffer</code> and <code>uniformBuffer</code> are global variables&mdash;
-<code>vertexBuffer</code> because it must be attached to the pipeline each time
+<code>vertexBuffer</code> and <code>uniformBuffer</code> are global 
+variables&mdash;<code>vertexBuffer</code> because it must be attached to the pipeline each time
 the pipeline is used to draw a triangle, and <code>uniformBuffer</code> 
-so that its value can be changed.  A new value is written to <code>uniformBuffer</code>
+so that the data stored in it can be changed.  A new value is written to <code>uniformBuffer</code>
 every time the color of the triangle is to be changed.
 Similarly, <code>uniformBindGroup</code> is a global variable because it
 must be attached to the pipeline each time a triangle is drawn.</p>
@@ -509,7 +512,7 @@ copies the data into an intermediate "staging" buffer that exists in memory
 that is shared by the JavaScript and GPU sides.  This means that you are
 free to reuse the array immediately; you don't have to wait for the data
 to be copied to its final destination.  Instead of calling <code>writeBuffer()</code>,
-its possible to do the work yourself&mdash;create a staging buffer, copy
+it's possible to do the work yourself&mdash;create a staging buffer, copy
 the data into the staging buffer, enqueue a command to copy the data from
 the staging buffer to the destination buffer&mdash;but
 <code>writeBuffer()</code> makes the process much easier.</p>
@@ -577,7 +580,7 @@ topology, those vertices form a triangle.  The vertex shader function,
 which was specified as part of the pipeline, will be called three times,
 with inputs that are pulled from the vertex buffer.  The outputs from the
 three invocations of the vertex shader specify the positions of the three
-vertices.  The fragment shader function is then called for each pixel
+vertices of a triangle.  The fragment shader function is then called for each pixel
 in the triangle. The fragment shader gets the color for the pixel from the uniform
 buffer that is part of the bind group.  All the set up that was done
 earlier in the program will finally be used to produce an image!
@@ -621,7 +624,8 @@ each vertex has a different color.  The colors for the interior pixels are inter
 from the vertex colors.  This is the standard "RGB triangle" example.</p>
 
 <p>Since each vertex has a different color, the color is a vertex attribute that
-has to be passed as a parameter the vertex shader function.  That function now has two
+has to be passed as a parameter to the vertex shader entry point.  In the new examples, 
+that function has two
 parameters, the 2D vertex coordinates and the vertex RGB color.  Interpolated
 versions of these two values are used by the fragment shader, so the 
 the vertex shader also needs two outputs.  Since a function can have only one

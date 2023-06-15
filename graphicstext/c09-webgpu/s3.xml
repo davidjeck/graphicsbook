@@ -75,7 +75,7 @@ compute shaders and will be covered later.</li>
 <p>Values for uniform and storage variables come from bind groups.  The JavaScript side
 of the program provides their values using buffers, bind groups, and bind group
 layouts (<localref href="webgpu.1.3"/>).  There are certain requirements: For a uniform variable, the <code>usage</code>
-property of the buffer in <code>device.createBuffer() </code>
+property of the buffer in <code>device.createBuffer()</code>
 must include <code>GPUBufferUsage.UNIFORM</code>, and the buffer
 in the bind group layout must have its <code>type</code> property set to "uniform" (which
 is the default).  In the bind group itself, the <code>offset</code> property for each
@@ -127,7 +127,7 @@ alignment is essential, since you have to take it into account on the JavaScript
 side when writing data to buffers.</p>
 
 <p>The basic (scalar) data types in WGSL are 4-byte integers and floats, which have
-alignment&nbsp;4.  WGSL has vectors of 2, 3, an 4 scalar values, which have size
+alignment&nbsp;4.  WGSL has vectors of 2, 3, and 4 scalar values, which have size
 8, 12, and 16.  The alignments for 2-vectors and 4-vectors are 8 and 16, as you
 might expect.  But the size of a 3-vector is 12, which is not a legal alignment,
 so the alignment for 3-vectors is 16.  That is, the address in memory of the
@@ -167,7 +167,7 @@ follow it:</p>
 <np>The first <code>vec3f</code> in the struct, <code>color</code>, ends with byte
 number 27, but the next <code>vec3f</code>, <code>spotDirection</code>,
 can't start at byte 28 because the alignment rule says that it must start
-at a multiple of 32. So, four bytes of padding are added.  Then, <code>spotDirection</code>
+at a multiple of 16. So, four bytes of padding are added.  Then, <code>spotDirection</code>
 starts at byte number 32 and ends with byte number 43.  The next element is the 32-bit float
 <code>spotCosineCutoff</code>, with alignment 4, and it can start at the next
 byte number,&nbsp;44.  Note that there is no padding after <code>spotDirection</code>.
@@ -182,8 +182,8 @@ structs of type <code>LightProperties</code>.  The alignment for a
 of its elements).  The size, which must be a multiple of the alignment,
 is 64, with 8 bytes of padding at the end.  The size of the array
 is therefore 256 bytes, or 64 32-bit floats.  On the JavaScript side,
-data for the WGSL array could come from a <code>Float32Array</code>
-of length 64.  When storing values into that <code>Float32Array</code>,
+data for the WGSL array could come from a <classname>Float32Array</classname>
+of length 64.  When storing values into that <classname>Float32Array</classname>,
 you would have to be very careful to take the data alignments into
 account.</p>
 
@@ -204,7 +204,7 @@ with normal transformation metrics in 3D graphics.</p>
 with values <code>true</code> and <code>false</code>; the 32-bit unsigned integer type,
 <code>u32</code>; the 32-bit signed integer type, <code>i32</code>; and the
 32-bit floating point type, <code>f32</code>.  Note in particular that there are no
-8-bit, 16-bit, or 64-bit numeric types (although a 16-bit floating point type,
+8-bit, 16-bit, or 64-bit numeric types (although the 16-bit floating point type,
 <code>f16</code>, is available as a language extension).</p>
 
 <p>The <code>bool</code> type is not "host sharable," which means that a variable of
@@ -291,8 +291,8 @@ individual members of a struct can have annotations.  For example,</p>
 
 <p>WGSL has pointer types, but as far as I can tell, they can only be used for
 the types of formal parameters in function definitions.  A pointer type name 
-takes the form <code>ptr&lt;A,T&gt;</code>, where <code>A</code> is an a
-address space and <code>T</code> is a type; for example:  
+takes the form <code>ptr&lt;A,T&gt;</code>, where <code>A</code> is an
+address space name and <code>T</code> is a type; for example:  
 <code>ptr&lt;function,i32&gt;</code> or <code>ptr&lt;private,array&lt;f32,5&gt;&gt;</code>.
 A pointer of type <code>ptr&lt;A,T&gt;</code> can only point to a value of type
 <code>T</code> in address space&nbsp;<code>A</code>.</p>
@@ -360,9 +360,10 @@ and no type is specified, the type is taken to be <code>i32.</code></np>
 
 <p>In a function body, an identifier can be declared using <code>let</code>
 instead of <code>var</code>.  The result is a named value rather than
-a variable.  A&nbsp;<code>let</code> declaration must in include an initial
+a variable.  A&nbsp;<code>let</code> declaration must include an initial
 value.  The value cannot be changed after initialization.  The declaration
-can optionally include a type.  An address space cannot be specified.
+can optionally include a type, but it is usually not necessary.  
+An address space cannot be specified.
 Using <code>let</code> makes it clear that you do not expect the
 value to change and makes it impossible to change the value accidently.</p>
 
@@ -384,7 +385,8 @@ used on variable declarations, function definitions, function formal parameters,
 and the return type of a function.  (The WGSL documentation calls them "attributes", but I prefer
 to save the term "attribute" for vertex attributes.) This textbook only covers the
 most common annotations.  We encountered some of them in previous
-sections, and a few more will come up later when we discuss compute shaders.</p>
+sections, and a few more will come up later when we discuss compute shaders.
+Common annotations include:</p>
 
 <ul>
 <li><code>group(N)</code> and <code>@binding(M)</code>, where N and M are integers,
@@ -399,9 +401,9 @@ See <localref href="webgpu.1.2"/>.</li>
 of vertex shader and fragment shader entry point functions.  It can be applied to
 their formal parameters and return types and to members of structs that
 are used to specify the type of their formal parameters and return types.
-The meaning depends on context.  On an input to a vertex shader entry point function, it
+The meaning depends on context.  On an input to a vertex shader entry point, it
 specifies the source of the input in a vertex buffer (<localref href="webgpu.1.6"/>).
-On a fragment shader entry point function, it specifies the color attachment that is the
+On a fragment shader entry point, it specifies the color attachment that is the
 destination of that output (<localref href="webgpu.1.3"/>.)
 And when used on a vertex shader output or a fragment shader input,
 it associates a particular output of the vertex shader with the corresponding
@@ -441,8 +443,8 @@ This can be useful, for example, when doing two-sided lighting in
 <subsection title="Expressions and Built-in Functions" id="webgpu.3.4">
 
 <p>WGSL has all the familiar arithmetic, logical, bitwise, and comparison operators:
-<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, ~, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
-It does not have the conditional <code>?:</code> operator, but it has an equivalent built-in
+<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilda;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
+It does not have the conditional <code>?:</code>&nbsp;operator, but it has an equivalent built-in
 function, <code>select(false_case,true_case,boolean)</code>.  Note that assignment (<code>=</code>,
 <code>+=</code>, etc.) is not an operator; that is, <code>A&nbsp;=&nbsp;B</code> is a statement,
 not an expression, and it does not have a value like it would in C or JavaScript.</p>
@@ -522,7 +524,7 @@ compound assignment (using <code>+=</code>, <code>*=</code>, etc.);
 increment (using&nbsp;<code>++</code> as in <code>x++</code>); decrement (using&nbsp;<code>--</code>);
 function call statements; <code>return</code> statements; <code>break</code>;
 <code>continue</code>; and <code>discard</code>.  Increment and decrement are postfix only; that is,
-<code>x++</code> is allowed, but not <code>++x</code>). And&mdash;like assignment statements&mdash;increment
+<code>x++</code> is allowed, but not <code>++x</code>. And&mdash;like assignment statements&mdash;increment
 and decrement statements are not expressions; that is, they don't have a value and cannot be used as
 part of a larger expression. The <code>discard</code> statement can only be used in a fragment
 shader entry point function.  It stops the output of the fragment shader from being written to its destination.</p>
@@ -612,7 +614,7 @@ fn simpleLighting(N : vec3f, L : vec3f, V : vec3f, diffuse : vec3f) -> vec3f {
        // L is the unit vector pointing towards the light.
        // V is the unit vector pointing towards viewer
     if ( dot(N,L) &lt;= 0 ) { // wrong side of surface to be illuminated
-        return vec3f(0);   // return the zero vector
+        return vec3f(0);   // return the zero vector (black)
     }
     var color = diffuse * dot(N,L);
     let R = -reflect(L,N);  // reflected ray;

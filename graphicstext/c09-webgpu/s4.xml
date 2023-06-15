@@ -10,8 +10,8 @@ That means using 3D <word term="coordinate system">coordinate systems</word>,
 in this section.  But note that we will use only the basic OpenGL lighting
 model, not the more realistic <word term="PBR">physically based rendering</word>
 that has become more common.  The last example in the section will be
-a port of my simple WebGL <sourceref href="webgl/diskworld-2.html">"diskworld"</sourceref>
-hierarchical modeling example<web> Here is a demo of the WebGPU version:</web></p1>
+a port of my simple WebGL <sourceref href="webgl/diskworld-2.html">&leftquote;diskworld"</sourceref>
+hierarchical modeling example.<web> Here is a demo of the WebGPU version:</web></p1>
 
 <demo height="575" width="475" src="c9/diskworld-webgpu-demo.html"></demo>
 
@@ -38,7 +38,7 @@ It can be created using the <code>device.createTexture()</code> function:</p>
 
 <pre>depthTexture = device.createTexture({
     size: [context.canvas.width, context.canvas.height],  // size of canvas
-    format: "depth24plus"", 
+    format: "depth24plus", 
     usage: GPUTextureUsage.RENDER_ATTACHMENT
 });</pre>
 
@@ -71,7 +71,7 @@ considered closer to the user.  In some cases, "less-equal" might be a better va
 for this property.  Setting the <code>depthWriteEnabled</code> property
 to <code>true</code> means that when a new fragment passes the depth test, its
 depth value is written to the depth buffer.  In some applications, it's necessary
-to apply the depth test, without saving the new depth value. This is sometimes
+to apply the depth test without saving the new depth value. This is sometimes
 done, for example, when drawing translucent objects (see <localref href="webgl3d.4.1"/>).</np>
 
 <p>Finally, when drawing the image, the depth buffer must be attached to the
@@ -119,15 +119,15 @@ renderPassDescriptor.colorAttachments[0].loadOp = "load";</pre>
 <subsection title="Coordinate Systems" id="webgpu.4.2">
 
 <p>We have been using the default WebGPU coordinate system, in which x 
-ranges between -1.0 and 1.0 from left to right, y&nbsp;ranges
-between -1.0 and 1.0 from bottom to top,
-and the depth, or z-value, ranges  between 0.0 and 1.0 from front to back.
+ranges from -1.0 to 1.0 from left to right, y&nbsp;ranges
+from -1.0 to 1.0 from bottom to top,
+and the depth, or z-value, ranges  from 0.0 to 1.0 from front to back.
 Points with coordinates outside these ranges are not part of the image.
 This coordinate system is referred to as 
 <newword term="NDC">normalized device coordinates</newword> (NDC).
 (OpenGL uses the term "clip coordinates" for its default coordinate system;
 WebGPU uses that term to refer to <word>homogeneous coordinates</word>,
-(x,y,z,w), for its equivalent coordinate system; that is, the transformation
+(x,y,z,w), for its default system; that is, the transformation
 from clip coordinates to NDC is given by mapping (x,y,z,w) to (x/w,y/w,z/w).)</p>
 
 <p>Normalized device coordinates are mapped to <word>viewport</word> 
@@ -143,7 +143,8 @@ with half-integer coordinates such as (0.5,0.5) for the pixel in
 the upper left corner of the viewport.</p>
 
 <p>But we want to be able to use the coordinate system of our choice when drawing.
-That brings in <word>object coordinates</word>, the coordinate system in which
+That brings in several new coordinate systems: <word>object coordinates</word>, 
+the coordinate system in which
 vertices are originally specified; <word>world coordinates</word>, the arbitrary
 coordinate system on the scene as a whole; and <word>eye coordinates</word>, which
 represent the world from the point of view of the user, with the viewer at (0,0,0),
@@ -163,7 +164,7 @@ transformations are implemented in code either on the JavaScript side or in the 
 program.</p>
 
 <p>The <word term="modeling transformation">modeling transform</word> and
-<word term="viewing transformation">viewing transform</word> are usually combined a
+<word term="viewing transformation">viewing transform</word> are usually combined into a
 <word term="modelview transformation">modelview transform</word>, as shown, for
 reasons explained in <localref href="gl1geom.3.4"/>.  So a program generally only
 needs to work with the modelview and <word term="projection transformation">projection</word> 
@@ -176,7 +177,7 @@ transformed by the modelview transformation, its normal vectors must also be
 transformed.  The transformation for normal vectors is not the same as the
 modelview transformation but can be derived from it.</p>
 
-<p>All of these transformations can be implemented as <word term="matrix">matrices</word>.
+<p>All of these transformations are implemented as <word term="matrix">matrices</word>.
 The modelview and projection transformations are 4-by-4 matrices. The transformation
 matrix for normal vectors is a 3-by-3 matrix.</p>
 
@@ -186,13 +187,13 @@ matrix for normal vectors is a 3-by-3 matrix.</p>
 <subsection title="Into 3D" id="webgpu.4.3">
 
 <p>The sample program <sourceref href="webgpu/Phong_lighting.html"/> is
-our first example of 3D graphics in WebGPU.  This program has identical functionality
-to the WebGL version, <sourceref href="webgl/basic-specular-lighting-Phong.html"/>.
+our first example of 3D graphics in WebGPU.  This program has functionality
+identical to the WebGL version, <sourceref href="webgl/basic-specular-lighting-Phong.html"/>.
 It displays one object at a time, illuminated by a single white light source.
 The user has some control over what object is shown and the material properties
 of the object, and the user can rotate the object by dragging on the image.
 The objects are defined as <word term="indexed face set">indexed face sets</word>
-and are rendered using <word>indexed drawing</word>.)</p>
+and are rendered using <word>indexed drawing</word>.</p>
 
 <p>Various properties are provided by the JavaScript side of the program and used in
 the shader program.  I have collected them all into a single struct in the shader program:</p>
@@ -209,7 +210,7 @@ the shader program.  I have collected them all into a single struct in the shade
 
 @group(0) @binding(0) var&lt;uniform> uniformData : UniformData;</pre>
 
-<np>This is backed on the JavaScript side by a <code>Float32Array</code>,
+<np>This is backed on the JavaScript side by a <classname>Float32Array</classname>,
 <code>userData</code>, of length 56, and values are written from that array
 into the uniform buffer that holds the struct on the GPU side. The offsets
 listed above for members of the struct correspond to indices in the array.
@@ -233,7 +234,7 @@ used in the vertex shader, and the other members of the struct are used
 in the fragment shader.  (It is probably not best practice to combine data
 for the vertex shader and fragment shader in the same struct, as I have done here.)  The inputs
 to the vertex shader are the 3D coordinates and the normal vector for the
-vertex.  The position of the vector is given in the object coordinate system.
+vertex.  The vector coordinates are given in the object coordinate system.
 The vertex shader outputs are the position of the vertex in clip coordinates
 (which is a required output), the normal vector, and the position of
 the vertex in the eye coordinate system:</p>
@@ -260,7 +261,7 @@ and the support in WGSL for matrix and vector math.
 The eye coordinates of the vertex are obtained by multiplying the 
 homogeneous object coordinate vector by the modelview matrix.  This gives the
 homogeneous (x,y,z,w) eye coordinates, which are converted to ordinary
-(x,y,z) coordinates by dividing the <code>vec3f</code>m <code>eyeCoords.xyz</code>,
+(x,y,z) coordinates by dividing the <code>vec3f</code> <code>eyeCoords.xyz</code>,
 by the w-coordinate, <code>eyeCoords.w</code>.  The output position, which must
 be given in clip coordinates, is obtained by multiplying the eye coordinate
 vector by the projection matrix.</np>
@@ -271,7 +272,8 @@ become inputs to the fragment shader, where they are used in the lighting calcul
 that contains the fragment.)  <word term="Phong shading">Phong lighting</word> refers to
 doing lighting calculations in the fragment shader using interpolated normal vectors
 and the basic OpenGL lighting model
-(see <localref href="gl1light.1.4"/> and <localref href="webgl3d.2.2"/>).</p>
+(see <localref href="gl1light.1.4"/> and <localref href="webgl3d.2.2"/>).
+There is more about lighting in the last example in this section.</p>
 
 </subsection>
 
@@ -295,7 +297,8 @@ while in GLSL, a 3-by-3 matrix contains 9 floats.</p>
 under the MIT open source license.  Download and documentation links can be found
 on its web page, <a href="https://wgpu-matrix.org/">https://wgpu-matrix.org/</a>.
 (Some of my examples use the smaller, "minified," version of the library,
-<sourceref href="webgpu/wgpu-matrix.min.js"/>, which is not human-readable)</p>
+<sourceref href="webgpu/wgpu-matrix.min.js"/>, which is not human-readable.)
+I found the JavaScript files in the "dist" folder in the wgpu-matrix download.</p>
 
 <p>The modelview transformation matrix can be computed on the JavaScript side
 by starting with the identity matrix and then multiplying by viewing and modeling
@@ -310,11 +313,11 @@ is easily implemented using wgpu-matrix.</p>
 objects such as <code>wgpuMatrix.mat4</code>, <code>wgpuMatrix.mat3</code>, and
 <code>wgpuMatrix.vec4</code>.  Matrices and vectors are represented as
 <code>Float32Arrays</code> with the appropriate lengths.  They can be
-created as <code>Float32Arrays</code> directly or by calling functions
-from the library:</p>
+created as <classname>Float32Arrays</classname> directly or by calling functions
+from the library; for example:</p>
 
-<pre>matrix4 = wgpuMatrix.mat4.create();
-vector3 = wgpuMatrix.vec3.create();</pre>
+<pre>matrix4 = wgpuMatrix.mat4.create();  // a 4-by-4 matrix
+vector3 = wgpuMatrix.vec3.create();  // a 3-vector</pre>
 
 <np>These functions create arrays filled with zeros.
 Most matrix and vector operations produce a matrix or vector as output. In wgpu-matrix,
@@ -356,7 +359,7 @@ For that, the equivalent of <code>gluLookAt()</code> is convenient:</p>
 <np>The parameters are 3-vectors, which can be specified as regular JavaScript arrays.
 This constructs a view matrix for a viewer positioned at <code>eye</code>, looking
 in the direction of <code>viewRef</code>, with the vector <code>viewUp</code> pointing
-upwards in the view.  Of course, a view matrix might be created by starting with the
+upwards in the view.  Of course, a view matrix might also be created by starting with the
 identity matrix and applying a translation and some rotations. For example,</np>
 
 <pre>modelview = gpuMatrix.mat4.identity();
@@ -366,7 +369,7 @@ gpuMatrix.mat4.rotateY(modelview, Math.PI/15, modelview);</pre>
 
 <np>(I will note, however, that in my sample programs for this section, the
 view matrix actually comes the same "trackball rotator" that I used
-with WebGL.  See <localref href="webgl3d.1.5"/>)</np>
+with WebGL.  See <localref href="webgl3d.1.5"/>.)</np>
 
 <p>For applying modeling transformations to the modelview matrix, wgpu-matrix
 has the following functions, where I am including the optional final parameter
@@ -407,7 +410,7 @@ matrix, <code>M</code>.  For a 4-vector and a 4-by-4 matrix:</p>
 
 <pre>transformedV = wgpuMatrix.vec4.transformMat4( V, M );</pre>
 
-<np>And similarly for a 3-vector and a 3-by-3 matrix.</np>
+<np>and similarly for a 3-vector and a 3-by-3 matrix.</np>
 
 </subsection>
 
@@ -417,7 +420,7 @@ matrix, <code>M</code>.  For a 4-vector and a 4-by-4 matrix:</p>
 <p><localref href="webgl3d.2"/> covered the implementation of OpenGL-style 
 lighting and materials in WebGL, including <word term="diffuse color">diffuse</word>, 
 <word term="specular color">specular</word>, and <word term="emission color">emissive</word>
-material properties, <word term="directional light">direction</word> and
+material properties, <word term="directional light">directional</word> and
 <word term="point light">point</word> lights, <word term="spotlight">spotlights</word>,
 and light <word>attenuation</word>.
 The "Diskworld&nbsp;2" example at the end of that section illustrated all of these
@@ -442,7 +445,7 @@ how the fragment shader implements the lighting equation.  The light and materia
 and the normal matrix are uniform variables in the fragment shader:</p>
 
 <pre>struct MaterialProperties {
-    diffuseColor : vec4f, 
+    diffuseColor : vec4f, // alpha component becomes the alpha for the fragment
     specularColor : vec3f,
     emissiveColor : vec3f,
     specularExponent : f32
@@ -487,7 +490,7 @@ is called by the fragment shader entry point function for each enabled light:</p
             var D = -normalize(light.spotDirection);
             var spotCosine = dot(D,L);
             if (spotCosine >= light.spotCosineCutoff) { 
-                spotFactor = pow(spotCosine,light.spotExponent);
+                spotFactor = pow(spotCosine, light.spotExponent);
             }
             else { // The point is outside the cone of light from the spotlight.
                 spotFactor = 0.0; // The light will add no color to the point.
@@ -498,13 +501,13 @@ is called by the fragment shader entry point function for each enabled light:</p
             attenuationFactor = 1.0 / (1.0 + dist*light.attenuation);
         }
     }
-    if (dot(L,N) &lt;= 0.0) { // light does not illuminate this side
+    if (dot(L,N) &lt;= 0.0) { // Light does not illuminate this side.
         return vec3f(0.0);
     }
     var reflection = dot(L,N) * light.color * material.diffuseColor.rgb;
     R = -reflect(L,N);
     if (dot(R,V) > 0.0) { // Add in specular reflection.
-        let factor = pow(dot(R,V),material.specularExponent);
+        let factor = pow(dot(R,V), material.specularExponent);
         reflection += factor * material.specularColor * light.color;
     }
     return spotFactor*attenuationFactor*reflection;

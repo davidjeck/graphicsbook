@@ -14,7 +14,8 @@
    <xsl:variable name="s"><xsl:value-of select="str:replaceAll($kk,'@Omega@','\\5')"/></xsl:variable>
    <xsl:variable name="ss"><xsl:value-of select="str:replaceAll($s,'@minus@','\\6')"/></xsl:variable>
    <xsl:variable name="sss"><xsl:value-of select="str:replaceAll($ss,'@middot@','\\7')"/></xsl:variable>
-   <xsl:variable name="kkk"><xsl:value-of select="str:replaceAll($sss,'@times@','\\8')"/></xsl:variable>
+   <xsl:variable name="lll"><xsl:value-of select="str:replaceAll($sss,'@tilda@','\\tilda')"/></xsl:variable>
+   <xsl:variable name="kkk"><xsl:value-of select="str:replaceAll($lll,'@times@','\\8')"/></xsl:variable>
    <xsl:variable name="bbb"><xsl:value-of select="str:replaceAll($kkk,'@pi@','\\2')"/></xsl:variable>
    <xsl:choose>
        <xsl:when test="ancestor::pre or ancestor::code or ancestor::codedef">

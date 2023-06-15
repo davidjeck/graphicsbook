@@ -8,7 +8,7 @@ some new options for drawing them: <word>instanced drawing</word>
 and <word>indexed drawing</word>.</p1>
 
 <demo height="450" width="390" src="c9/multisampling-demo.html"><p>For most of
-this section, we will be looking at variations on the same example: an app
+this section, we will be looking at variations on one example: an app
 that shows randomly colored disks moving around in a canvas.  The last 
 variation will add antialiasing to the example using a technique called
 multisampling.  <web>Here is a demo that lets you switch between the
@@ -36,10 +36,10 @@ rendered image, provided that they have different values for some
 attributes.  For example, the instances can have different colors.  
 The color would be an "instance attribute."</p>
 
-<p>We have used the pass encoder method <code>draw(N)</code> to draw
+<p>We have used the render pass encoder method <code>draw(N)</code> to draw
 a primitive that has N vertices.  For each vertex, the system will
 pull attribute values from vertex buffers for that vertex and will
-pass them as parameters to the vertex shader function.  Instance
+pass them as parameters to the vertex shader entry point.  Instance
 properties work the same way, except that the value for an
 instance attribute is the same for every vertex in a given instance.</p>
 
@@ -180,7 +180,7 @@ interior of disk, we will also need to have the center of the disk, (0,0),
 in the list.  The center is added as vertex number <code>VERTEX_COUNT+1</code>.
 To render the interior, we need to draw <code>3*VERTEX_COUNT</code>
 vertices&mdash;three vertices for each triangle. The data for the index
-buffer is loaded into a JavaScript <code>Uint16Array</code> of
+buffer is loaded into a JavaScript <classname>Uint16Array</classname> of
 length <code>3*VERTEX_COUNT</code>:</p>
 
 <pre>/* Fill diskIndices with the vertex indicies for the VERTEX_COUNT
@@ -269,8 +269,8 @@ top of the existing image, so the <code>loadOp</code> must be "load".  The same
 <p>I would like to draw the outlines of the colored disks in my moving disk example.  However
 I can't simply use instanced drawing to draw all the disks, then use it again to draw the outlines,
 since that would show the complete outline of every disk, even parts of the outline that
-should be hidden by other disks.  (Actually, I can do that if I add a <word>depth test</word>
-to the program (see <localref href="webgpu.4.1"/>).  A&nbsp;solution is to abandon
+should be hidden by other disks.  (Actually, I could do that if I add a <word>depth test</word>
+to the program (see <localref href="webgpu.4.1"/>).)  A&nbsp;solution is to abandon
 instanced drawing and draw each disk separately.  That's what I do in the sample program
 <sourceref href="webgpu/draw_multiple.html"/>.  That program also introduces a few new
 WebGPU features.</p>
@@ -388,8 +388,8 @@ rather than the 12 that you might have expected:</p>
 <pre>commandEncoder.copyBufferToBuffer( diskOffsetBuffer, 8*i,
                                              uniformBuffer, <b>16</b>, 8 );</pre>
  
-<p>I will have more to say about alignment later in this chapter.
-You should be able to understand the rest of the <sourceref href="webgpu/draw_multiple.html"/>.
+<p>I will have more to say about alignment in <localref href="webgpu.3.1"/>.
+You should be able to understand the rest of the <sourceref href="webgpu/draw_multiple.html">program source</sourceref>.
 As always, read the comments.</p>
 
 </subsection>
@@ -397,7 +397,7 @@ As always, read the comments.</p>
 
 <subsection title="Using Indices in Shaders" id="webgpu.2.4">
 
-<p>IN WebGL, each point in a primitive of type POINTS can have a size.  The point
+<p>In WebGL, each point in a primitive of type POINTS can have a size.  The point
 is rendered as a square with the given size, and the square comes with <word>texture coordinates</word>.
 (See <localref href="webgl.2.5"/>.)  In WebGPU, there is no similar idea of point size for
 primitives with the point-list topology; the points are just individual pixels, which limits
@@ -426,7 +426,7 @@ fn vertMain(
 a render pass encoder, the effect is similar to this pseudocode:</np>
 
 <pre>for (instance_index = 0; instance_index &lt; instanceCt; instance_index++)
-    for (verex_index = 0; vertex_index &lt; vertexCt; vertex_index++)
+    for (vertex_index = 0; vertex_index &lt; vertexCt; vertex_index++)
         vertMain( instance_index, vertex_index )</pre>
 
 <np>Note that in this example there are no parameter inputs from vertex buffers.
@@ -434,7 +434,7 @@ But the job of the function is still to output coordinates and possibly other
 data for vertex number <code>vertex_index</code> in instance number
 <code>instance_index</code>.  It needs to create that output somehow!</np>
 
-<p>The shader still has access to data from other sources, such as a buffers
+<p>The shader still has access to data from other sources, such as buffers
 that are part of bind groups.  In this example, I provide the necessary data in two
 storage buffers.  One storage buffer contains a color for each square,
 and one contains the coordinates of the center point for each square.
@@ -470,7 +470,7 @@ WebGL for the <demoref href="c6/textured-points.html">demo</demoref> in <localre
 
 <p>The final example for this section is <sourceref href="webgpu/multisampling.html"/>,
 which adds multisampling to the basic basic moving disks example.  Ordinarily, the
-fragment shader function is evaluated once per pixel, at the center point of the pixel.
+fragment shader entry point function is evaluated once per pixel, at the center point of the pixel.
 With multisampling, it is evaluated at several points within each pixel, and the
 color for that pixel is obtained by averaging the colors from each of those samples.
 This is a kind of antialiasing. For example, when the geometric edge of a primitive 
@@ -487,7 +487,7 @@ needed.) The code for that is a preview of creating textures and texture views:<
 
 <pre>textureForMultisampling = device.createTexture({
     size: [context.canvas.width, context.canvas.height],
-    sampleCount: 4,  // (4 is currently the only possible value.)
+    sampleCount: 4,  // (1 and 4 are currently the only possible values.)
     format: navigator.gpu.getPreferredCanvasFormat(),
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
 });
@@ -515,7 +515,7 @@ multisampled rendering:</np>
 <pre>pipelineDescriptor = {
          . . .
     <newcode>multisample: {  // Sets number of samples for multisampling.
-       count: 4,     //  (4 and 1 are currently the only possible values).
+       count: 4,     //  (1 and 4 are currently the only possible values).
     },</newcode>
        . . .</pre>
 

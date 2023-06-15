@@ -904,9 +904,9 @@ async function init() {
         await initWebGPU();  // initialize WebGPU. the render pipeline, and some buffers
     }
     catch (e) {
-       document.getElementById("message").innerHTML =
-          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
-                    e.message + "</span>";
+       document.getElementById("canvas-holder").innerHTML =
+          "<p style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</p>";
                throw e;
         return;
     }

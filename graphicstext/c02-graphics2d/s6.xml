@@ -588,7 +588,7 @@ mouse with this tool, I use <i>OSG.getImageData</i> to get the color data from a
 9-by-9 square of pixels surrounding the mouse location.  <i>OSG</i> is the graphics
 context for the canvas that contains the image.  Since I want to do real-number
 arithmetic with color values, I copy the color components into another typed array,
-one of type <i>Float32Array</i>, which can hold 32-bit floating point numbers.
+one of type <classname>Float32Array</classname>, which can hold 32-bit floating point numbers.
 Here is the function that I call to do this:</p>
 
 <pre>function grabSmudgeData(x, y) {  // (x,y) gives mouse location

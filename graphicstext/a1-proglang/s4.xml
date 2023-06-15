@@ -13,7 +13,7 @@ However, note that they are not used in any other part of this textbook.</p1>
 <p>A JavaScript promise represents a result that might be available at some time.
 If and when the result becomes available, the promise is fulfilled; it is said to
 "resolve."  When that happens, the result can be returned, although in some cases
-the result is simply the knowledge what whatever the promise was waiting for has occurred.
+the result is simply the knowledge that whatever the promise was waiting for has occurred.
 If something happens that means the promise cannot be fulfilled, then the
 promise is said to "reject."  A programmer can provide functions to be called
 when the promise resolves or rejects.</p>
@@ -88,7 +88,8 @@ potential problems:  You have to remember that other, unrelated things
 can happen in the middle of an async function.</p>
 
 <p>Let's look at a specific example.  The fetch API is an API for retrieving
-files from the Internet.  If <code>url</code> is the <word>URL</word> for 
+files from the Internet.  (But without extra work, it can only fetch files from the same
+source as the web page on which it is used.) If <code>url</code> is the <word>URL</word> for 
 some file, the function <code>fetch(url)</code> returns a promise that
 resolves when the file has been located or rejects when the file cannot
 be found.  The expression <code>await&nbsp;fetch(url)</code> waits for
@@ -107,8 +108,8 @@ an element on the web page could be written like this:</p>
    document.getElementById("textdisplay").innerHTML = text;
 }</pre>
 
-<np>This will work, but might throw an exception, for example if
-no such file exists.  We might want to catch that exception.
+<np>This will work, but might throw an exception, for example if access to the
+file is not allowed or if no such file exists.  We might want to catch that exception.
 Furthermore, it can take some time to get the file, and other
 things can happen in the program while the function is waiting.  In particular,
 the user might generate more events, maybe even an event that
@@ -175,7 +176,7 @@ Note that we are essentially back to using callback functions:
 indeterminate future time. The parameter to <code>then()</code>
 is often an anonymous function.  For example, assuming
 <code>textPromise</code> is a promise that eventually
-produces a string:</np>
+produces a string,</np>
 
 <pre>textPromise.then(
     str => alert("Hey, I just got " + str)

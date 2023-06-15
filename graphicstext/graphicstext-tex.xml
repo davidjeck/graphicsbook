@@ -10,6 +10,7 @@
    <!ENTITY middot "@middot@">
    <!ENTITY minus "@minus@">
    <!ENTITY times "@times@">
+   <!ENTITY tilda "@tilda@">
    <!ENTITY leftquote "``">  <!-- for forcing `` in place of " where it is not done automatically-->
    <!ENTITY textitlebreak "\\">
    <!ENTITY newcodestyle "italic">

@@ -11,6 +11,7 @@
 <!ENTITY minus "&#8722;">
 <!ENTITY times "&#215;">
 <!ENTITY leftquote '"'>
+<!ENTITY tilda '~'>
 <!ENTITY textitlebreak "">
 <!ENTITY newcodestyle "red">
 
@@ -242,3 +243,6 @@
 <!ENTITY webgpu_s2 SYSTEM "c09-webgpu/s2.xml">
 <!ENTITY webgpu_s3 SYSTEM "c09-webgpu/s3.xml">
 <!ENTITY webgpu_s4 SYSTEM "c09-webgpu/s4.xml">
+<!ENTITY webgpu_s5 SYSTEM "c09-webgpu/s5.xml">
+<!ENTITY webgpu_s6 SYSTEM "c09-webgpu/s6.xml">
+<!ENTITY webgpu_s7 SYSTEM "c09-webgpu/s7.xml">

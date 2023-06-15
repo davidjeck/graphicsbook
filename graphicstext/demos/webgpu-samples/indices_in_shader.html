@@ -181,7 +181,7 @@ async function initWebGPU() {
    });
    let error = await device.popErrorScope();
    if (error) {
-      throw Error("Compilation error in shader: <pre>\n" + error.message + "</pre>");
+      throw Error("Compilation error in shader; see Console for details.");
    }   
 }
 

@@ -17,13 +17,16 @@ You should at least be able to work with the sample programs that accompany this
 
 <p>Java is obligatory only for <localref href="graphics2d.5"/>.  For the material on
 <word>OpenGL</word>&nbsp;1.1 in <localref href="gl1geom"/> and <localref href="gl1light"/>, 
-either Java or C can be used, but you will need to be at least somewhat familiar with
+either Java or C can be used.  Or, if you prefer JavaScript, you can use my glsim.js
+(<localref href="gl1geom.6.3"/>), a JavaScript library that simulates a large part of OpenGL&nbsp;1.1.
+But in any case, you will need to be at least somewhat familiar with
 C to follow the discussion.  The <word>shader</word> programming language that is used
 with <word>WebGL</word> is based on C, so some knowledge of C will also be useful
 there.  (However, for writing WebGL shaders, you will not need to know one of the most
 confusing aspects of C, namely the details of how it uses pointers).
 JavaScript is essential for <word>WebGL</word> programming (<localref href="webgl"/> and <localref href="webgl3d"/>), 
-and for programming with <word>three.js</word> (<localref href="threejs"/>).  It is also used for
+for programming with <word>three.js</word> (<localref href="threejs"/>), and
+for WebGPU (<localref href="webgpu"/>).  It is also used for
 <word>HTML canvas</word> graphics in <localref href="graphics2d.6"/>.</p>
 
 </intro>

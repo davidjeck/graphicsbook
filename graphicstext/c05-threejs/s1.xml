@@ -378,7 +378,7 @@ is the name of the attribute that specifies the coordinates, or position, of the
 vertices.</np>
 
 <p>Similarly, to specify a color for each vertex, you can put the <word term="RGB color">RGB</word>
-components of the colors into a <i>Float32Array</i>, and use that to specify
+components of the colors into a <classname>Float32Array</classname>, and use that to specify
 a value for the <classname>BufferGeometry</classname> attribute named "color".</p>
 
 <p>For a specific example, suppose that we want to represent a primitive of type
