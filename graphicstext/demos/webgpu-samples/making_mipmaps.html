@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<!--
+This program defines and tests a function that creates a WebGPU image texture
+along with a full set of mipmaps.  The input for the function is an ImageBitmap
+and the WebGPU device.
+
+(The test requires the Mona Lisa image at URL "textures/mona-lisa.jpg", and the
+canvas on the web page is exactly sized to show that example and its mipmaps.
+The URL can be changed in the last line of the init() function.)
+-->
+<head>
+<title>Making Mipmaps in WebGPU</title>
+<style>
+   body { 
+      background-color: #E8E8E8;
+   }
+   #canvasholder {
+       display: inline-block;
+   }
+   canvas {
+      display: block;
+      background-color: white;
+   }
+</style>
+<script>
+
+"use strict";
+
+/**
+ *  A self-contained function for createding an image texture on a
+ *  WebGPU device, including a full set of mipmaps.  The image data is
+ *  from an ImageBitmap object (typically created with createImageBitmap()).
+ *  The parameters are the ImageBitmap and the WebGPU device.
+ *  The return value is the texture.
+ */
+function createImageTextureWithMipmaps( imageBitmap, webgpuDevice ) {
+    const shaderSource = `
+       struct VertexOutput {
+          @builtin(position) position: vec4f,
+          @location(0) texcoords : vec2f  
+       }
+       @vertex fn vertexMain( @location(0) coords : vec2f,
+                              @location(1) texcoords : vec2f ) -> VertexOutput {  
+          return VertexOutput( vec4f(coords,0,1), texcoords );
+       }
+       @group(0) @binding(0) var samp : sampler;
+       @group(0) @binding(1) var tex : texture_2d<f32>;
+       @fragment fn fragmentMain(@location(0) texcoords : vec2f) -> @location(0) vec4f {
+          return textureSample( tex, samp, texcoords );
+       }
+    `;
+    let mipmapCount = 1;
+    let size = Math.max(imageBitmap.width,imageBitmap.height);
+    while (size > 1) {
+        mipmapCount++;
+        size = size >> 1;
+    }
+    let texture = webgpuDevice.createTexture({
+        size: [imageBitmap.width, imageBitmap.height],
+        mipLevelCount: mipmapCount,
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
+                    GPUTextureUsage.RENDER_ATTACHMENT
+    });
+    webgpuDevice.queue.copyExternalImageToTexture(
+       { source: imageBitmap },
+       { texture: texture, mipLevel: 0 },
+       [imageBitmap.width, imageBitmap.height]
+    );
+    let vertexBufferLayout = [{ 
+       attributes: [ { shaderLocation:0, offset:0, format: "float32x2" },
+                     { shaderLocation:1, offset:8, format: "float32x2" }  ],
+       arrayStride: 16, 
+       stepMode: "vertex" 
+    } ];
+    let vertexData = new Float32Array([ -1,-1, 0,1,   1,-1, 1,1,  -1,1, 0,0,  1,1, 1,0 ]);
+    let vertexBuffer = webgpuDevice.createBuffer({ size: vertexData.byteLength, 
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST  });
+    webgpuDevice.queue.writeBuffer(vertexBuffer, 0, vertexData);
+    let shader = webgpuDevice.createShaderModule({code: shaderSource });
+    let pipelineDescriptor = {
+       vertex: { module: shader, entryPoint: "vertexMain", buffers: vertexBufferLayout },
+       fragment: { module: shader, entryPoint: "fragmentMain",
+                    targets: [{ format: texture.format }] },
+       primitive: { topology: "triangle-strip" },
+       layout: "auto"
+    };
+    let pipeline = webgpuDevice.createRenderPipeline(pipelineDescriptor);
+    let sampler = webgpuDevice.createSampler( { minFilter: "linear", magFilter: "linear" } );
+    let commandEncoder = webgpuDevice.createCommandEncoder();
+    for (let mipmap = 1; mipmap < mipmapCount; mipmap++) {
+        let inputView = texture.createView({ baseMipLevel: mipmap - 1, mipLevelCount: 1 });
+        let outputView = texture.createView({ baseMipLevel: mipmap, mipLevelCount: 1 });
+        let renderPassDescriptor = {
+           colorAttachments: [{
+               clearValue: { r: 0, g: 1, b: 1, a: 1 }, 
+               loadOp: "clear",
+               storeOp: "store", 
+               view: outputView
+           }]
+        };
+        let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+        passEncoder.setPipeline(pipeline);
+        passEncoder.setVertexBuffer(0,vertexBuffer);
+        let bindGroup = webgpuDevice.createBindGroup({
+           layout: pipeline.getBindGroupLayout(0),
+           entries: [ { binding: 0,resource: sampler }, { binding: 1,resource: inputView } ]
+        });
+        passEncoder.setBindGroup(0,bindGroup);
+        passEncoder.draw(4);
+        passEncoder.end();
+    }
+    let commandBuffer = commandEncoder.finish();
+    webgpuDevice.queue.submit([commandBuffer]);
+    return texture;
+}
+
+
+/**
+ *  This function is used in this program to load an image and create
+ *  an image texture from it.It is called at the end of the init() funciton.
+ *  After creating the texture, it calls drawMipmaps() to render all the mipmaps.
+ */
+function loadImageTexture(URL) {
+    fetch(URL)
+       .then( response => response.blob() )
+       .then( blob => createImageBitmap(blob) )
+       .then( bitmap => textureLoaded(bitmap) )
+       .catch( e => { document.getElementById("message").innerHTML =
+                         "<span style='color:red'>Could not load the texture image!</span>";
+                      console.log("Error loading image: ", e);
+                     } )
+    function textureLoaded(bitmap) {
+        let texture = createImageTextureWithMipmaps(bitmap,device);
+        bitmap.close();
+        drawMipmaps(texture);
+    }
+}
+
+
+//----------- WebGPU initialization, called from init() ----------
+
+let device; 
+let context;
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+}
+
+
+//------------- Test the function by drawing all the mipmaps -------------
+
+/**
+ *  This function shows the Mona Lisa image and its mipmaps. A lot of the
+ *  code is the same as in createImageTextureWithMipmaps(), but it is repeated
+ *  to make sure that function is self-contained.
+ */
+function drawMipmaps(texture) {
+   const shaderSource = `
+       struct VertexOutput {
+          @builtin(position) position: vec4f,
+          @location(0) texcoords : vec2f  
+       }
+       @vertex fn vertexMain( @location(0) coords : vec2f,
+                              @location(1) texcoords : vec2f ) -> VertexOutput {  
+          return VertexOutput( vec4f(coords,0,1), texcoords );
+       }
+       @group(0) @binding(0) var samp : sampler;
+       @group(0) @binding(1) var tex : texture_2d<f32>;
+       @fragment fn fragmentMain(@location(0) texcoords : vec2f) -> @location(0) vec4f {
+          return textureSample( tex, samp, texcoords );
+       }
+   `;
+   let vertexBufferLayout = [{ 
+      attributes: [ { shaderLocation:0, offset:0, format: "float32x2" },
+                    { shaderLocation:1, offset:8, format: "float32x2" }  ],
+      arrayStride: 16, 
+      stepMode: "vertex" 
+   } ];
+   let vertexData = new Float32Array([ -1,-1, 0,1,   1,-1, 1,1,  -1,1, 0,0,  1,1, 1,0 ]);
+   let vertexBuffer = device.createBuffer({ size: vertexData.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST  });
+   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+   let shader = device.createShaderModule({code: shaderSource });
+   let pipelineDescriptor = {
+      vertex: { module: shader, entryPoint: "vertexMain", buffers: vertexBufferLayout },
+      fragment: { module: shader, entryPoint: "fragmentMain",
+                   targets: [{ format: navigator.gpu.getPreferredCanvasFormat() }] },
+      primitive: { topology: "triangle-strip" },
+      layout: "auto"
+   };
+   let pipeline = device.createRenderPipeline(pipelineDescriptor);
+   let sampler = device.createSampler( { } ); // default sampler is OK here
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 1, g: 1, b: 1, a: 1 }, 
+          loadOp: "clear",
+          storeOp: "store", 
+          view: context.getCurrentTexture().createView() // for drawing to the canvas
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   let x = 0;
+   let width = texture.width;
+   let height = texture.height;
+   for (let level = 0; level < texture.mipLevelCount; level++) {
+      console.log(x, width, height)
+      let textureView = texture.createView({ baseMipLevel: level, mipLevelCount: 1 });
+      let bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+           { 
+              binding: 0,
+              resource: sampler
+           },
+           { 
+              binding: 1,
+              resource: textureView
+           }
+        ]
+      });
+      passEncoder.setBindGroup(0,bindGroup);
+      passEncoder.setViewport(x,0,width,height,0,1);
+      passEncoder.draw(4);
+      x += width;
+      width = Math.max(1, width >> 1);
+      height = Math.max(1, height >> 1);
+   }
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+}
+
+
+//---------------------------------------------------------------------------
+
+async function init() {
+   try {
+      await initWebGPU();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   loadImageTexture("textures/mona-lisa.jpg"); // Start loading the image.
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU Mipmaps</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message">Showing a Mona Lisa image and its full set of mipmaps, computed on the GPU.</p>
+
+<div id="canvasholder">
+<canvas width=638 height=399 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+
+

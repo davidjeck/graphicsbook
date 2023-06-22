@@ -2,6 +2,294 @@
 
 <section id="webgpu.5" title="Textures">
 
-<p1>To Be Written!</p1>
+<p1>A <word>texture</word> is simply some property that varies from point to point
+on a <word term="geometric primitive">primitive</word>.  The most common&mdash;or at
+least the most visible&mdash;kind of texture is a variation in color from point
+to point, and the most common type of color texture is an <word>image texture</word>.
+Other kinds of texture, such as variations in reflectivity or normal vector,
+are also possible.</p1>
+
+<p>Image textures were covered in <localref href="gl1light.3"/> for OpenGL
+and in <localref href="webgl.4"/> for WebGL.  Many of the basic ideas 
+carry over to WebGPU, even though the coding details are different.</p>
+
+<p>WebGPU has one-, two-, and three-dimensional image textures plus
+<word term="cubemap texture">cubemap textures</word> (<localref href="threejs.3.4"/>).  
+I will concentrate on two-dimensional image textures for most of this section.</p>
+
+
+<subsection title="Texture Coordinates" id="webgpu.5.1">
+
+<p>When an image texture is applied to a surface, the texture color for a point
+is obtained by <newword>sampling</newword> the texture, based on <word>texture coordinates</word>
+for that point.  Sampling is done on the GPU side of a WebGPU program, using
+a WGSL variable of type <code>sampler</code>.</p>
+
+<p>A 2D image texture comes with a standard (u,v) coordinate system.  The coordinates
+range from 0 to 1 on the image.   What happens
+for texture coordinates outside the range 0 to 1 depends on the sampler
+that is used to sample the texture. For a 1D texture, only the u coordinate 
+is used, and for a 3D texture, the coordinate system is referred to as (u,v,w).</p>
+
+<p>When applying a 2D texture image to a surface, the two texture coordinates for a point 
+on the surface map that surface point to a point in the (u,v) coordinate system.  
+The sampling process uses the (u,v) coordinates to look up a color from the image.  
+The look up process can be non-trivial.
+It is referred to as "filtering" and can involve looking at the colors of multiple 
+pixels in the image and its <word term="mipmap">mipmaps</word>.
+(See <localref href="gl1light.3.2"/>.)</p>
+
+<p>By convention, we can take texture coordinates (0,0) to refer to the top-left
+corner of the image, with u increasing from right to left and v increasing
+from top to bottom.  This is really just a convention, but it corresponds
+to the way that data for images on the web is usually stored: The data for the top-left
+pixel is stored first, and the data is stored row-by-row, from the top of
+the image to the bottom.</p>
+
+<p>Note that the texture coordinate system in OpenGL uses r, s, and t as the coordinate names
+instead of u, v, and&nbsp;w. The convention in OpenGL is that the t-axis points upward,
+with texture coordinates (0,0) referring to the bottom-left corner of the image.
+With that in mind, see <localref href="gl1light.3.1"/> for a more in-depth discussion 
+of texture coordinates and how they are used.</p>
+
+<p>The sample program <sourceref href="webgpu/first_texture.html"/> is our first 
+example of using textures in WebGPU. This simple program just draws a square
+with three different textures:</p>
+
+<img src="webgpu-textures.png" width="623" height="208" tex="webgpu-textures.eps" texscale="0.7"/>
+
+<np>Texture coordinates for the square range from (0,0) at the top left corner of the 
+square to (1,1) at the bottom right corner.  For the square on the left in the picture, the texture
+coordinates for a point on the square are used as the red and green components of the
+color for that point.  (There is no texture image.  This is a trivial example
+of a <word>procedural texture</word> (<localref href="webgl3d.3.3"/>).)
+The square on the right uses an image texture, where the "Mona Lisa" image comes from a file.
+The middle square also uses an image texture, but in this case the colors for the image
+comes from an array of pixel colors that is part of the program.  The image is a tiny
+four-pixel image, with two rows of pixels and two columns.  The original texture coordinates
+on the square are multiplied by 5 before sampling the texture, so that we see 5 copies of
+the texture across and down the square.  (This is a very simple example of a 
+<word>texture transformation</word> (<localref href="gl1light.3.4"/>).)</np>
+
+<p>Although we will spend much of this section on this basic example, you can also
+look at <sourceref href="webgpu/textured_shapes.html"/>, which applies textures
+to three-dimensional shapes, and <sourceref href="webgpu/texture-from-canvas.html"/>,
+which takes the image for a texture from a <word term="HTML canvas">canvas</word>
+on the same page.</p>
+
+<break/>
+
+<p>Sampling is done in the fragment shader.  The texture coordinates that are used for
+sampling could come from anywhere.  But most often, texture coordinates are input to
+the shader program as a vertex attribute.  Then, interpolated texture coordinates are 
+passed to the fragment shader, where they are used to sample the texture.</p>
+
+<p>In the example, the square is drawn as a triangle-strip with four vertices.  There are
+two vertex attributes, giving the coordinates and the texture coordinates for each vertex.
+The two attributes are stored interleaved in a single vertex buffer 
+(see <localref href="webgpu.1.6"/>).  The data comes from this array:</p>
+
+<pre>const vertexData = new Float32Array([
+   /* coords */     /* texcoords */
+    -0.8, -0.8,       0, 1,      // data for bottom left corner
+     0.8, -0.8,       1, 1,      // data for bottom right corner
+    -0.8,  0.8,       0, 0,      // data for top left corner
+     0.8,  0.8,       1, 0,      // data for top right corner
+]);</pre>
+
+<np>Note that the texture coordinates for the top left corner are (0,0) and for the bottom right
+corner are (1,1).  You should check out how this correspond to the colors on the first square
+in the illustration.  When used (with no texture transformation), the square will show one full 
+copy of the image, in its usual orientation.  If the OpenGL convention for texture coordinates
+were used on the square, texture coordinates (0,0) would be assigned to the bottom left
+corner of the square, and the image would appear upside-down.  To account for this, images in
+OpenGL are often flipped vertically before loading the image data into a texture.
+See the end of <localref href="webgl.4.2"/>.  If you use geometric models that come with
+texture coordinates, they might well be texture coordinates designed for OpenGL, and you might 
+find that you need to flip your images to get them to apply correctly to the model.
+This is true, for example, in the 
+<sourceref href="webgpu/textured_shapes.html">textured shapes</sourceref> example.</np>
+
+</subsection>
+
+
+
+<subsection title="Textures and Samplers" id="webgpu.5.2">
+
+<p>Textures and samplers are created on the JavaScript side of a WebGPU program and are
+used on the GPU side, where they are used in the fragment shader.  This means
+that they are shader resources.  Like other resources, they are declared as global
+variables in the shader program.  Their values are passed to the
+shader in <word term="bind group (in WebGPU)">bind groups</word>,
+so a sampler or texture variable must be declared with
+<code>@group</code> and <code>@binding</code> annotations.
+As an example, the declaration of a variable. <code>tex</code> that represents a 
+2D image texture resource could look like this:</p>
+
+<pre>@group(0) @binding(0) var tex : texture_2d&lt;f32>;</pre>
+
+<np>The type name <code>texture_2d&lt;f32</code> refers to a 2D texture with samples of type
+f32; that is, the color returned by sampling the texture will be of type vec4f.  
+A 1D textures with floating point samples would use type name <code>texture_1d&lt;f32</code>,
+and there are similar names for 3D and cube textures. (There are 
+also integer textures with type names like <code>texture_2d&lt;u32</code> and <code>texture_1d&lt;i32</code>,
+they are not used with samplers.  They are discussed later in this section.)</np>
+
+<p>Note that a texture variable is declared using <code>var</code> with no address space.
+(Not like <code>var&lt;uniform</code> for uniform variables.)
+The same is true for sampler variables.  Textures and samplers are considered to be in a
+special "handle" address space, but that name is not used in shader programs.</p>
+
+<p>Sampler variables are declared using type name <code>sampler</code>.  (Unfortunately,
+this means that you use "sampler" as the name of a variable.)  For example:</p>
+
+<pre>@group(0) @binding(1) var samp : sampler;</pre>
+
+<np>A sampler is a simple data structure that specifies certain aspects of the
+sampling process, such as the <word>minification filter</word> and
+whether to use <word>anisotropic filtering</word>.</np>
+
+<p>Values for texture and sampler variables are constructed on the JavaScript side.
+A shader program has no direct access to the internal structure of a texture or sampler.
+In fact, the only thing you can do with them is pass them as parameters to functions.
+There are several builtin functions for working with textures (most of them too obscure
+to be covered here).  The main function for sampling textures is <code>textureSample()</code>.
+Its parameters are a floating-point texture, a sampler, and texture coordinates.  For example,</p>
+
+<pre>let textureColor = textureSample ( tex, samp, texcoords );</pre>
+
+<np>This function can be used for sampling 1D, 2D, 3D, and cube textures.
+For a 1D texture, the <code>texcoords</code> parameter is an f32; for a 2D texture,
+it is a vec2f; and for a 3D or cube texture, it's a vec3f.  The return value is a vec4f
+representing an <word>RGBA color</word>.  The return value is always a vec4f, even
+when the texture does not actually store four color components.  For example, 
+a <word>grayscale</word> texture might store just one color component; when it is
+sampled using <code>textuerSample()</code>, the gray value from the texture will be
+used as the red component of the color, the green and blue color components will
+be set to 0.0, and the alpha component will be&nbsp;1.0.</np>
+
+<p>You should now be able to understand the fragment shader source code from the
+sample program.  The code is quite simple.  Most of the work is on the JavaScript
+side.</p>
+
+<pre>@group(0) @binding(0) var samp : sampler;  // Sampler resource from JavaScript.
+@group(0) @binding(1) var tex : texture_2d&lt;f32>;  // Image texture resource.
+
+@group(0) @binding(2) var&lt;uniform> textureSelect: u32;
+    // Value is 1, 2, or 3 to tell the fragment shader which texture to use.
+
+@fragment
+fn fragmentMain(@location(0) texcoords : vec2f) -> @location(0) vec4f{
+   if (textureSelect == 1) { // Trivial procedural texture.
+           // Use texcoords as red/green color components.
+      return vec4f( texcoords, 0, 1);
+   }
+   else if (textureSelect == 2) { // For the checkboard texture.
+          // Apply texture transform: multiply texcoords by 5.
+      return textureSample( tex, samp, 5 * texcoords );
+   }
+   else { // For the Mona Lisa texture; no texture transform.
+      return textureSample( tex, samp, texcoords );
+   }
+}</pre>
+
+<p>Because of the limited options, textures and samplers are fairly simple to use in
+the shader program.  Most of the work is on the JavaScript side.</p>
+
+<break/>
+
+<p>A sampler in WebGPU is a simple data structure whose purpose is to set options 
+for the sampling process.  Samplers are created using the <code>device.createSampler()</code>
+The following code creates a typical sampler for high-quality sampling of a 2D texture:</p>
+
+<pre>let sampler = device.createSampler({
+   addressModeU: "repeat",  // Default is "clamp-to-edge".
+   addressModeV: "repeat",  //    (The other possible value is "mirror-repeat".)
+   minFilter: "linear", 
+   magFilter: "linear",     // Default for filters is "nearest".
+   mipmapFilter: "linear",
+   maxAnisotropy: 16        // 1 is the default; 16 is the maximum.
+});</pre>
+
+<np>The <code>addressModeU</code> property specifies how to treat values of the u texture
+coordinate that are outside the range 0&nbsp;]to&nbsp;1, <code>addressModeV</code> does
+the same for the v coordinates, and for 3D textures there is also <code>addressModeW</code>.
+(In OpenGL and WebGL, this was called "wrapping"; see <localref href="gl1light.3.3"/>.  The meanings
+are the same here.)</np>
+
+<p>Filtering accounts for the fact that an image usually has to be stretched or shrunk
+when it is applied to a surface.  The <code>magFilter</code>, or <word>magnification filter</word>,
+is used when stretching an image. The <code>minFilter</code>, or <word>minification filter</word>,
+is used when shrinking it.  Mipmaps are reduced-size copies of the image that can make filtering
+more efficient.  Textures don't automatically come with mipmaps; the <code>mipmapFilter</code>
+is ignored if no mipmaps are available.  This is all similar to OpenGL; see
+<localref href="gl1light.3.2"/>.</p>
+
+<p>The <code>maxAnisotropy</code> property controls <word>anisotropic filtering</word>,
+which is explained in <localref href="webgl3d.5.1"/>. The default value, 1, says that anisotropic
+filtering is used.  Higher values give better quality for textures that are viewed edge-on.
+The maximum value depends on the device, but it's OK to specify a value larger than
+the maximum; in that case, the maximum value will be used.</p>
+
+<break/>
+
+<p>Textures are created on the JavaScript side using <code>device.createTexture()</code>.
+But is important to understand that this function only allocates the memory on the GPU
+that will hold the texture data.  The actual data will have to be stored later.
+This is similar to creating a GPU buffer.
+Here is how the checkerboard texture is created in the sample program:</p>
+
+<pre>let checkerboardTexture = device.createTexture({
+   size: [2,2],  // Two pixels wide by two pixels high.
+   format: "rgba8unorm",  // One 8-bit unsigned int for each color component.
+   usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+});</pre>
+
+<np>This is a 2D texture, which is the default.  The <code>size</code> property
+specifies the width and height of the texture, either as an array or
+as an object, <code>{width:&nbsp;2, height:&nbsp;2}</code>.  The texture
+<code>format</code> specified here, "rgba8unorm", is a common one for images: four
+RGBA color components for each pixel, with 8 bits for each color component.
+The "unorm" in the name means that the 8 bits represent unsigned integers in the
+range 0 to 255 which are scaled to the range 0.0 to 1.0 to give a floating-point
+color value.  (The scaling is referred to as "normalizing" the values&mdash;yet
+another meaning of the overworked term "normal.")  In the <code>usage</code>
+property, <code>TEXTURE_BINDING</code> means that the texture can be
+sampled in a shader program, and <code>COPY_DST</code> means that data can
+be copied into the texture from elsewhere.  It is also possible to fill the
+texture with data by attaching the texture to a pipeline as a render target;
+that requires the usage <code>GPUTextureUsage.RENDER_ATTACHMENT</code>.
+The other possible usage is <code>COPY_SRC</code>, which allows the
+texture to be used as a source of copied data.</np>
+
+<p>The <code>size</code>, <code>format</code>, and <code>usage</code> properties
+are required.  There are a few optional properites.  The <code>mipLevelCount</code> property
+specifies the number of mipmaps that you will provide for the texture.  The
+default value, 1, means that only the main image will be provided.  The <code>dimension</code>
+property can be "1d", "2d", or "3d", with a default of "2d".  The <code>sampleCount</code>
+property has a default value of 1 and can be set to 4 to create a multisampled texture.</p>
+
+<p>We have already used <code>device.createTexture()</code> to create the special
+purpose textures that are used for multisampling and for the depth test.  See,
+for example, <sourceref href="webgpu/depth_test.html"/>.  Those textures were used
+as render attachments, and the data for the textures were created by drawing an image.</p>
+
+
+
+</subsection>
+
+
+
+
+<subsection title="Mipmaps" id="webgpu.5.3">
+</subsection>
+
+
+
+<subsection title="Texture Formats" id="webgpu.5.4">
+</subsection>
+
+
+
 
 </section>

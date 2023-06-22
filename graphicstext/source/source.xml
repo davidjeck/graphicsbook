@@ -452,6 +452,14 @@ From <localref href="webgpu.4.2"/></li>
 <li><sourceref href="webgpu/diskworld_webgpu.html"/> &mdash; A direct port of <sourceref href="webgl/diskworld-2.html"/>
 to WebGPU.  It is an example of the implementation of hierarchical 3D graphics and of the OpenGL lighting model.
 From <localref href="webgpu.4.5"/></li>
+<li><sourceref href="webgpu/first_texture.html"/> &mdash; A first example of using textures in WebGPU.  The user
+can select among three different kinds of texture, applied to a triangle.  From <localref href="webgpu.5"/>.</li>
+<li><sourceref href="webgpu/textured_shapes.html"/> &mdash; Applies texture images to 3D shapes, with
+basic lighting.  From <localref href="webgpu.5"/>.</li>
+<li><sourceref href="webgpu/texture_from_canvas.html"/> &mdash; Takes the image for a texture from
+another canvas on the same page and applies it to 3D shapes.  The user can do some very simple drawing
+on the canvas.  (Aside from grabbing the texture from a canvas, there is nothing new in this program.)
+From <localref href="webgpu.5"/>.</li>
 </ul>
 </subsection>
 

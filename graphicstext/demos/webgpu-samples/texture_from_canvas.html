@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<!--
+   This program applys the image from an HTML canvas as
+   a texture image on a  3D object.  The user can draw
+   on the canvas, select the object that is shown, and
+   rotate the object.
+   
+   Comments are sparse.  Most of the WebGPU-related code
+   is extracted from textured_objects.html.
+-->
+<head>
+<title>WebGPU Texture From Canvas</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+    .canvas-holder {
+       border: 2px solid black;
+       display: inline-block;
+    }
+    canvas {
+        display: block;
+    }
+    label {
+        white-space: pre;
+        margin-left: 25px;
+    }
+</style>
+
+<script src="wgpu-matrix.min.js"></script>  <!-- matrix and vector algebra from Gregg Tavares -->
+<script src="trackball-rotator.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+<script src="teapot-model-IFS.js"></script>
+
+<script>
+
+"use strict";
+
+
+const shaderSource = `  // (unchanged from textured_objects.html)
+    struct VertexOutput {
+        @builtin(position) coords : vec4f,
+        @location(0) v_normal : vec3f,
+        @location(1) v_eyeCoords : vec3f,
+        @location(2) v_texcoords : vec2f 
+    }
+
+    @group(0) @binding(0) var<uniform> modelview : mat4x4f;
+    @group(0) @binding(1) var<uniform> projection : mat4x4f;
+        
+    @vertex
+    fn vertMain( @location(0) a_coords : vec3f,
+                 @location(1) a_normal : vec3f,
+                 @location(2) a_texcoords :vec2f 
+             ) -> VertexOutput{
+        var coords = vec4f(a_coords,1.0);
+        var eyeCoords = modelview * coords;
+        var output : VertexOutput;
+        output.coords = projection * eyeCoords;
+        output.v_normal = normalize(a_normal);
+        output.v_eyeCoords = eyeCoords.xyz/eyeCoords.w;
+        output.v_texcoords = a_texcoords;
+        return output;
+    }
+    
+    @group(1) @binding(0) var<uniform> baseColor : vec3f;    
+    @group(1) @binding(1) var<uniform> normalMatrix : mat3x3f;
+    
+    @group(1) @binding(2) var tex : texture_2d<f32>;
+    @group(1) @binding(3) var samp : sampler;
+    
+    @fragment
+    fn fragMain(
+             @builtin(front_facing) front_facing : bool,
+             @location(0) v_normal : vec3f, 
+             @location(1) v_eyeCoords : vec3f,
+             @location(2) v_texcoords : vec2f
+     ) -> @location(0) vec4f {
+        let normal = normalize( normalMatrix*v_normal );
+        let viewDirection = normalize( -v_eyeCoords); 
+        let colorFromTexture = textureSample( tex, samp, v_texcoords ); 
+        let diffuseColor = colorFromTexture.rgb * baseColor; 
+        var color = vec3f(0.1);
+        color += lightingEquation( vec4f(0,0,1,0), 0.8f, diffuseColor, v_eyeCoords,
+                                                    normal, viewDirection);
+        color += lightingEquation( vec4f(7,12,-7,1), 0.25f, diffuseColor, v_eyeCoords,
+                                                    normal, viewDirection);
+        return vec4f(color, colorFromTexture.a);
+    }
+    
+    fn lightingEquation( lightPosition : vec4f, lightIntensity : f32, diffuseColor : vec3f, 
+                                eyeCoords : vec3f, N : vec3f, V : vec3f )-> vec3f {
+           // N is normal vector, V is direction to viewer.
+        var L : vec3f;  // Light direction
+        var R : vec3f;  // reflected light direction.
+        if ( lightPosition.w == 0.0 ) {
+            L = normalize( lightPosition.xyz );
+        }
+        else {
+            L = normalize( lightPosition.xyz/lightPosition.w - eyeCoords );
+        }
+        if (dot(L,N) <= 0.0) { // light does not illuminate this side
+            return vec3f(0.0);
+        }
+        var reflection = dot(L,N) * vec3f(lightIntensity) * diffuseColor.rgb;
+        R = -reflect(L,N);
+        if (dot(R,V) > 0.0) {
+            let factor = pow(dot(R,V), 20);
+            reflection += factor * vec3f(0.3*lightIntensity);
+        }
+        return reflection;
+    }
+`;
+
+        
+let context;
+let device; 
+let pipeline;
+let depthTexture;
+
+let bindBuffer0;
+let bindBuffer1;
+    
+let bindGroup0; 
+
+let currentObject; 
+let objects = [];
+
+let textureFromCanvas;  // The texture containing the image from the canvas.
+let bindGroup1;  // Bind group containing fragment shader resource, including sampler and texture.
+
+let rotator;
+
+let imageCanvas; // The canvas that is the source of the image for the texture.
+
+const baseColors = [ // base material colors, selected by "Base Color" popup menu
+        new Float32Array([ 1.0, 1.0, 1.0 ]),
+        new Float32Array([ 1.0, 0.75, 0.75 ]),
+        new Float32Array([ 0.75, 1.0, 0.75 ]),
+        new Float32Array([ 0.75, 0.75, 1.0 ]),
+        new Float32Array([ 1.0, 1.0, 0.66 ])
+    ];
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+
+   let shader = device.createShaderModule({
+      code: shaderSource
+   });
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   let vertexBufferLayout = [
+      { // first vertex buffer, for coords
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      },
+      { // second vertex buffer, for normals
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      },
+      { // third vertex buffer, for texture coordinates
+         attributes: [ { shaderLocation:2, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "vertex" 
+      }
+    ];
+
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       depthStencil: {  
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: "auto"
+    };
+    
+    pipeline = device.createRenderPipeline(pipelineDescriptor);
+    
+    bindBuffer0 = device.createBuffer({ 
+       size: 256 + 64, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    }); 
+
+    bindGroup0 = device.createBindGroup({
+       layout: pipeline.getBindGroupLayout(0),
+       entries: [
+         { // projection matrix
+            binding: 0,
+            resource: {buffer: bindBuffer0, offset: 0, size: 64}
+         },
+         { // modelview matrix
+            binding: 1,
+            resource: {buffer: bindBuffer0, offset: 256, size: 64}
+         }
+       ]
+    });
+
+    let projectionMatrix = wgpuMatrix.mat4.perspective( Math.PI/4, 1, 1, 50 );
+    device.queue.writeBuffer(bindBuffer0, 256, projectionMatrix);
+    
+    depthTexture = device.createTexture({ 
+       size: [canvas.width, canvas.height],
+       format: 'depth24plus',
+       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    
+    bindBuffer1 = device.createBuffer({
+       size: 256 + 48, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+       
+} // end initWebGPU()
+
+
+/**
+ * Called during initialization and whenever the user draws on the canvas
+ * to copy the image from the canvas into tge WebGPU texture and use the
+ * texture on the currently displayed 3D object.
+ */
+function getTextureFromCanvas() {
+   if ( ! textureFromCanvas ) {
+         // Create the WebGPU texture and a bind group containing
+         // the texture as well as the sampler and other fragment
+         // shader resources.  This is only done once.  To change
+         // the image in the texture, it is only necessary to
+         // copy the new image data to the texture.
+      textureFromCanvas = device.createTexture({
+          size: [imageCanvas.width, imageCanvas.height],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
+                      GPUTextureUsage.RENDER_ATTACHMENT
+       });
+      let sampler = device.createSampler({
+         addressModeU: "repeat", 
+         addressModeV: "repeat",
+         magFilter: "linear",
+         minFilter: "linear"
+      });
+      bindGroup1 = device.createBindGroup( { 
+         layout: pipeline.getBindGroupLayout(1),
+         entries: [
+           {  //  base color
+              binding: 0,
+              resource: {buffer: bindBuffer1, offset: 0, size: 12}
+           },
+           {  // normal matrix
+              binding: 1,
+              resource: {buffer: bindBuffer1, offset: 256, size: 48}
+           },
+           {  // the texture
+               binding: 2,
+               resource: textureFromCanvas.createView()
+           },
+           {  // the sampler
+              binding: 3,
+              resource: sampler
+           }
+         ]
+      } );
+   }
+   device.queue.copyExternalImageToTexture( // Copy image from canvas to texture.
+      { source: imageCanvas, flipY: true },
+         // Note that a canvas can be used directly as a source here!
+         // (flipy is required because texcoords fo objects were designed
+         // assuming texcoords (0,0) are the bottom left corner of the
+         // image, but on a canvas, they are the top left corner.)
+      { texture: textureFromCanvas },
+      [imageCanvas.width, imageCanvas.height]
+   );
+}
+
+
+function installModel() {
+   let modelNum = Number(document.getElementById("objectSelect").value);
+   if ( ! objects[modelNum] ) { 
+        let model;
+        switch (modelNum) { // Calling functions from basic-object-models-IFS.js,
+                            // except the teapot is defined in teapot-model-IFS.js.
+            case 0:  model = cube(5); break;
+            case 1:  model = uvTorus(3,1,64,32); break;
+            case 2:  model = uvCylinder(1.5,5.5); break;
+            case 3:  model = uvCone(2.5,5.5); break;
+            case 4:  model = uvSphere(3, 64, 32); break;
+            default: model = teapotModel; break;
+        }
+        model.count = model.indices.length;
+        model.coordsBuffer = device.createBuffer({ 
+           size: model.vertexPositions.byteLength, 
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        model.normalBuffer = device.createBuffer({ 
+           size: model.vertexNormals.byteLength, 
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        model.texcoordsBuffer = device.createBuffer({ 
+           size: model.vertexTextureCoords.byteLength, 
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        model.indexBuffer = device.createBuffer({ 
+           size: model.indices.byteLength, 
+           usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+        });
+        device.queue.writeBuffer(model.coordsBuffer,0,model.vertexPositions);
+        device.queue.writeBuffer(model.normalBuffer,0,model.vertexNormals);
+        device.queue.writeBuffer(model.texcoordsBuffer,0,model.vertexTextureCoords);
+        device.queue.writeBuffer(model.indexBuffer,0,model.indices);
+        objects[modelNum] = model; // Cache the model for future use.
+   }
+   currentObject = objects[modelNum];
+   draw();
+}
+
+
+function installBaseColor() {
+   let colorNum = Number(document.getElementById("colorSelect").value);
+   device.queue.writeBuffer(bindBuffer1,0,baseColors[colorNum]);
+   draw();
+}
+
+
+function draw() {
+   let viewMatrix = new Float32Array(rotator.getViewMatrix());
+   if (currentObject === teapotModel) { // (teapot model has to be scaled down)
+      wgpuMatrix.mat4.scale( viewMatrix, [0.25,0.25,0.25], viewMatrix );
+   }
+   device.queue.writeBuffer(bindBuffer0, 0, viewMatrix);
+   let normalMatrix = wgpuMatrix.mat3.fromMat4(viewMatrix);
+   device.queue.writeBuffer(bindBuffer1, 256, normalMatrix);
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.4, g: 0.4, b: 0.4, a: 1 },
+          loadOp: "clear",
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }],
+      depthStencilAttachment: {
+        view: depthTexture.createView(),
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      }
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setBindGroup(0,bindGroup0);
+   passEncoder.setBindGroup(1,bindGroup1);  // incldues the sampler and texture resources
+   passEncoder.setVertexBuffer(0,currentObject.coordsBuffer);
+   passEncoder.setVertexBuffer(1,currentObject.normalBuffer);
+   passEncoder.setVertexBuffer(2,currentObject.texcoordsBuffer);  // texture coords for curren object
+   passEncoder.setIndexBuffer(currentObject.indexBuffer,"uint16");
+   passEncoder.drawIndexed(currentObject.count);
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);       
+}
+
+
+function initImageCanvas() {
+   let g;  // graphics context for the canvas
+   let tool = 0;
+   let canvas = document.getElementById("imageCanvas");
+   g = canvas.getContext("2d");
+   g.fillStyle = "white";
+   g.fillRect(0,0,canvas.width,canvas.height);
+   g.fillStyle = "blue";
+   g.fillRect(50,60,125,40);
+   g.fillRect(225,60,125,40);
+   g.fillStyle = "yellow";
+   g.fillRect(180,140,40,150);
+   g.fillStyle = "red";
+   g.fillRect(75,325,250,40);
+   g.font = "28px serif";
+   g.fillStyle = "black";
+   g.fillText("Draw on canvas (on the right)!",20,40);
+   g.fillStyle = "red";
+   g.strokeStyle = "red";
+   g.lineCap = "round";
+   g.lineWidth = 5;
+   document.getElementById("clearButton").onclick = function() {
+      g.fillStyle = "white";
+      g.fillRect(0,0,canvas.width,canvas.height);
+      g.fillStyle = document.getElementById("drawColorSelect").value;
+      getTextureFromCanvas();
+      draw();
+   }
+   document.getElementById("drawColorSelect").value = "red";
+   document.getElementById("drawColorSelect").onchange = function() {
+      g.fillStyle = document.getElementById("drawColorSelect").value;
+      g.strokeStyle = document.getElementById("drawColorSelect").value;
+   };
+   document.getElementById("toolSelect").value = 0;
+   document.getElementById("toolSelect").onchange = function() {
+      tool = Number(document.getElementById("toolSelect").value);
+   };
+   canvas.addEventListener("mousedown", doMouseDown, false);
+   canvas.addEventListener("touchstart", doTouchStart, false);
+   imageCanvas = canvas;
+   let startx, starty, prevx, prevy;
+   let dragging = false;
+   let touchStarted = false;
+   function doMouseDown(evt) {
+       if (dragging)
+          return;
+       dragging = true;
+       document.addEventListener("mousemove", doMouseDrag, false);
+       document.addEventListener("mouseup", doMouseUp, false);
+       var box = canvas.getBoundingClientRect();
+       startx = prevx = evt.clientX - box.left;
+       starty = prevy = evt.clientY - box.top;
+   }
+   function doMouseDrag(evt) {
+       if (!dragging)
+          return;
+       var box = canvas.getBoundingClientRect();
+       var x = evt.clientX - box.left;
+       var y = evt.clientY - box.top;
+       applyTool(x,y);
+       prevx = x;
+       prevy = y;
+   }
+   function doMouseUp(evt) {
+       if (dragging) {
+           document.removeEventListener("mousemove", doMouseDrag, false);
+           document.removeEventListener("mouseup", doMouseUp, false);
+           dragging = false;
+       }
+   }
+   function doTouchStart(evt) {
+       if (evt.touches.length != 1) {
+          doTouchCancel();
+          return;
+       }
+       evt.preventDefault();
+       var r = canvas.getBoundingClientRect();
+       startx = prevx = evt.touches[0].clientX - r.left;
+       startx = prevy = evt.touches[0].clientY - r.top;
+       canvas.addEventListener("touchmove", doTouchMove, false);
+       canvas.addEventListener("touchend", doTouchEnd, false);
+       canvas.addEventListener("touchcancel", doTouchCancel, false);
+       touchStarted = true;
+   }
+   function doTouchMove(evt) {
+       if (evt.touches.length != 1 || !touchStarted) {
+          doTouchCancel();
+          return;
+       }
+       evt.preventDefault();
+       var r = canvas.getBoundingClientRect();
+       var x = evt.touches[0].clientX - r.left;
+       var y = evt.touches[0].clientY - r.top;
+       applyTool(x,y);
+       prevx = x;
+       prevy = y;
+   }
+   function doTouchEnd(evt) {
+       doTouchCancel();
+   }
+   function doTouchCancel() {
+       if (touchStarted) {
+          touchStarted = false;
+          canvas.removeEventListener("touchmove", doTouchMove, false);
+          canvas.removeEventListener("touchend", doTouchEnd, false);
+          canvas.removeEventListener("touchcancel", doTouchCancel, false);
+       }
+   }
+   function applyTool(x,y) {
+      switch (tool) {
+         case 0:
+            g.beginPath();
+            g.moveTo(prevx,prevy);
+            g.lineTo(x,y);
+            g.stroke();
+            break;
+         case 1:
+            let left = Math.min(x,startx);
+            let top = Math.min(y,starty);
+            let w = Math.abs(x-startx);
+            let h = Math.abs(y-starty);
+            g.fillRect( left, top, w, h);
+            break;
+         case 2:
+            let r = Math.max( Math.abs(x-startx), Math.abs(y-starty) );
+            g.beginPath();
+            g.arc(startx,starty,r,0,2*Math.PI);
+            g.fill();
+            break;
+      }
+      getTextureFromCanvas();
+      draw();
+   }
+}
+
+
+async function init() {
+   try {
+      initImageCanvas();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize canvas graphics!</b></span>";
+       console.log(e);
+       return;
+   }
+   try {
+      await initWebGPU();
+      getTextureFromCanvas();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("colorSelect").value = "0";
+   document.getElementById("colorSelect").onchange = installBaseColor;
+   document.getElementById("objectSelect").value = "0";
+   document.getElementById("objectSelect").onchange = installModel;
+   rotator = new TrackballRotator(context.canvas, draw, 12, [4,5,10]);
+   installModel();
+   installBaseColor();
+}
+
+window.onload = init;
+
+</script>
+</head>
+<body>
+    
+<h2>WebGPU: Get Texture Image from Canvas</h2>
+
+<noscript><hr><h3>Error: This page requires Javascript and a web browser that supports WebGPU</h3><hr></noscript>
+
+<p id="message">Drag your mouse on the object to rotate it.</p>
+
+
+<table border=2 cellpadding=15 cellspacing=0 bgcolor="white">
+<tr>
+<td>
+   <p>
+      <label><b>Object:</b> <select id="objectSelect">
+          <option value="0">Cube</option>
+          <option value="1">Torus</option>
+          <option value="2">Cylinder</option>
+          <option value="3">Cone</option>
+          <option value="4">Sphere</option>
+          <option value="5">Teapot</option>
+      </select></label>
+      <label stype="margin-left:40px"><b>Base Color:</b> <select id="colorSelect">
+          <option value="0">White</option>
+          <option value="1">Pink</option>
+          <option value="2">Light Green</option>
+          <option value="3">Light Blue</option>
+          <option value="4">Light Yellow</option>
+      </select></label>
+   </p>
+   <p><div class="canvas-holder">
+      <canvas width=400 height=400 id="webgpuCanvas"></canvas>
+   </div></p>
+</td>
+<td>
+   <p>
+      <button id="clearButton">Clear</button>
+      <label><b>Tool:</b> <select id="toolSelect">
+          <option value="0">Sketch</option>
+          <option value="1">Rectangle</option>
+          <option value="2">Circle</option>
+      </select></label>
+      <label><b>Color:</b> <select id="drawColorSelect">
+          <option value="black">Black</option>
+          <option value="red">Red</option>
+          <option value="green">Green</option>
+          <option value="blue">Blue</option>
+          <option value="yellow">Yellow</option>
+          <option value="purple">Purple</option>
+      </select></label>
+   </p>
+   <p><div class="canvas-holder">
+      <canvas width=400 height=400 id="imageCanvas"></canvas>
+   </div></p>
+</td>
+
+</tr>
+</table>
+
+</body>
+</html>

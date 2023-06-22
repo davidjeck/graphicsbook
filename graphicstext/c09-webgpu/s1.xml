@@ -616,7 +616,7 @@ GPU side of the application.</p>
 <img src="rgb-triangle.png" width="100" height="83" align="right" alt="The standarad RGB triangle example"/>
 </webdiv>
 
-<p>We finish this section by looking at two variations on our basic example:
+<p>Before ending this section, we look at two variations on our basic example:
 <sourceref href="webgpu/basic_webgpu_2.html">basic_webgpu_2.html</sourceref> 
 and <sourceref href="webgpu/basic_webgpu_3.html">basic_webgpu_3.html</sourceref>.
 Instead of drawing a solid colored triangle, these programs draw a triangle in which
@@ -736,6 +736,40 @@ of each program are commented.</p>
 
 </subsection>
 
+
+<subsection title="Auto Bind Group Layout" id="webgpu.1.7">
+
+<p>One final note.  A bind group layout contains information about each binding in the
+group: what kind of resource the binding refers to and which shader stage it is used in.  In general,
+that information can be deduced from the shader program.  The full shader program is assembled when
+the pipeline is created, and the pipeline can automatically construct the bind group layouts that
+it uses.  You can ask the pipeine to create the bind group layouts by setting the <code>layout</code>
+property of the pipeline descriptor to <code>"auto"</code>:</p>
+
+<pre>pipelineDescriptor = {
+     .
+     .
+     .
+   <newcode>layout: "auto"</newcode>
+};
+pipeline = device.createRenderPipeline( pipelineDescriptor );</pre>
+
+<p>You can then use the function <code>pipeline.getBindGroupLayout(N)</code>, where N is
+the bind group number, to get the layout from the pipeline.  The layout is needed to create
+the actual bind group:</p>
+
+<pre>bndGroup = device.createBindGroup({
+   layout: <newcode>pipeline.getBindGroupLayout(0),</newcode>,
+   entries: [ 
+      .
+      .
+      .</pre>
+      
+<np>I will use auto bind group layout in most of my examples from now on, but I will 
+occasionally specify the layout myself, to show what it looks like for various
+kinds of resources.</np>
+
+</subsection>
 
 
 </section>

@@ -143,8 +143,7 @@ function createPipelineConfig() {
        primitive: { 
           topology: "triangle-list"
        },
-       layout: "auto" // There are no bind groups in this program,
-                      // so we can just use "auto" as the value for layout.
+       layout: "auto" 
     };
     
    pipelineForDisk = device.createRenderPipeline(pipelineDescriptor);

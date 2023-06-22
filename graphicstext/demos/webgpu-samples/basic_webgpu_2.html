@@ -179,9 +179,9 @@ function createPipelineConfig() {
        primitive: {
           topology: "triangle-list"
        },
-       layout: "auto"  // The previous program specified a uniform buffer here.
-                       // Since there is no uniform buffer for this program,
-                       // it can use "automatic" layout.
+       layout: "auto"  // Let the pipeline create the layout.  For this program, we don't
+                       // need a bind group layout in any case, since there is no uniform 
+                       // buffer or other shader resource.
     };
     
    pipeline = device.createRenderPipeline(pipelineDescriptor);  

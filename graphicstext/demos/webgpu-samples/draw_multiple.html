@@ -184,6 +184,10 @@ function createPipelineConfig() {
        layout: device.createPipelineLayout({
           bindGroupLayouts: [uniformBindGroupLayout]
        })
+            // Note:  I am not using "auto" here because I want to use
+            // the same bind group in two pipelines.  When a pipeline
+            // uses "auto" layout, it will only accept bind groups that
+            // are created using bind group layouts from the pipeline.
    };
     
    pipelineForDisk = device.createRenderPipeline(pipelineDescriptor);  
