@@ -344,9 +344,9 @@ async function installTexture() {
     let URL = textureURL[imageNum];
     if ( ! textureBindGroups[imageNum]) {
        document.getElementById("message2").innerHTML = "Loading image from " + URL;
-       let imageBitmap;  // the data for the texture image
+       let texture;
        try {
-          imageBitmap = await loadimageBitmap(URL);
+          texture = await loadTexture(URL);
        }
        catch (e) {
            if (waitingForFirstImage)
@@ -356,7 +356,6 @@ async function installTexture() {
            console.log("Error loading image from " + URL + ": " + e);
            return;
        }
-       let texture = makeTexture(imageBitmap);
        textureBindGroupDescriptor.entries[2].resource = texture.createView();
        textureBindGroups[imageNum] = device.createBindGroup(textureBindGroupDescriptor);
        if (waitingForFirstImage) {
@@ -372,15 +371,11 @@ async function installTexture() {
     bindGroup1 = textureBindGroups[imageNum];
     draw();
 }
-async function loadimageBitmap(URL) {
-       // standard method using the fetch API to get an ImageBitmap from a ULR
+async function loadTexture(URL) {
+       // Standard method using the fetch API to get a texture from a ULR.
     let response = await fetch(URL);
-    let blob = await response.blob();
+    let blob = await response.blob();  // Get image data as a "blob".
     let imageBitmap = await createImageBitmap(blob);
-    return imageBitmap;
-}
-function makeTexture(imageBitmap) {
-       // standard method for createing a WebGPU texture from an ImageBitmap
     let texture = device.createTexture({
         size: [imageBitmap.width, imageBitmap.height],
         format: 'rgba8unorm',

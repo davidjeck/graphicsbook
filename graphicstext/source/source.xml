@@ -460,6 +460,16 @@ basic lighting.  From <localref href="webgpu.5"/>.</li>
 another canvas on the same page and applies it to 3D shapes.  The user can do some very simple drawing
 on the canvas.  (Aside from grabbing the texture from a canvas, there is nothing new in this program.)
 From <localref href="webgpu.5"/>.</li>
+<li><sourceref href="webgpu/making_mipmaps.html"/> &mdash; Defines and tests a function that creates
+an image texture with a full set of mipmaps from an ImageBitmap.  From <localref href="webgpu.5.3"/>.</li>
+<li><sourceref href="webgpu/cubemap_texture.html"/> &mdash; Loads a cubemap texture and uses it for
+a skybox and for reflection mapping.  It is functionally identical to the WebGL example
+<sourceref href="webgl/skybox-and-env-map.html"/>.  From <localref href="webgpu.5.4"/>.</li>
+<li><sourceref href="webgpu/life_1.html"/> &mdash; Conway's "Game of Life", using integer-format "r32uint"
+textures and the WGSL functions <code>textureLoad()</code> and <code>textureStore()</code>.
+The program <sourceref href="webgpu/life_2.html"/> performs the same task, but does it
+using two "r8unorm" textures, one used for sampling in the shader and one used as a color attachment
+for the render pipeline.  From <localref href="webgpu.5.5"/>.</li>
 </ul>
 </subsection>
 

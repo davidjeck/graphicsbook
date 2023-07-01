@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<!--
+   This program implements John H. Conway's "Game of Life". It starts
+   with a board containing one line of living cells across the board.
+   To differentiate it from version 1, it also adds an R-pentomino shape.
+   There is also an option to start with a randomly filled board.
+   Each cell is a single pixel. When run, it generates about 20
+   generations per second.
+   
+   This program is functionally identical to life_1.html, but it uses
+   textures of type r8unorm to represent the board.  It uses one
+   texture to represent the current board; that texture is sampled.
+   It uses the second texture to represent the next generation of the
+   board; that texture is attached to the pipeline as a render output.
+   (You can't do either of those things with integer-format textures.)
+   The fragment shader has two outputs -- one for the color of the
+   fragment and one for the next state of the cell.
+-->
+<head>
+<title>WebGPU Game of Life, Version 2</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+   
+   @vertex
+   fn vertexMain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {  
+      return vec4f( coords, 0, 1 ); // pass on the position to the fragment shader.
+   }
+   
+   // The inputBoard and outputBoard are the same size as the canvas.  The
+   // inputBoard contains the current Life generation, with 1 representing
+   // a live cell and 0 representing a dead cell.  The fragment shader displays
+   // the current generation by showing live cells as white and dead cells
+   // as black.  It also computes the state of the cell in the next generation
+   // and outputs that value as a second output.
+   
+   @group(0) @binding(0) var samp: sampler;
+       // It is essential that the sampler use "nearest" filtering and "repeat" wrapping.
+       // This means textureSample() will return the exact value of a single pixel, and
+       // when a pixel is on an edge of the board, the offset texture coordinates for
+       // sampling a neighboring cell will wrap around to the opposit edge of the board.
+   @group(0) @binding(1) var inputBoard: texture_2d<f32>;
+   
+   struct FragmentOut { // The two outputs of the fragment shader
+      @location(0) fragmentColor : vec4f,
+      @location(1) nextState : vec4f
+   }
+   
+   @fragment
+   fn fragmentMain(@builtin(position) position : vec4f) -> FragmentOut {
+      let boardSize = textureDimensions(inputBoard);
+      let texCoords = position.xy / vec2f(boardSize);
+           // Map position.x and posiion.y to the range 0 to 1 to get texCoords
+           // for sampling the texture.
+      let alive = textureSample(inputBoard, samp, texCoords).r;
+           // The texture has only the "r" color channel, which gives the state of the cell.
+      
+      var neighbors = 0u; // Count the living cells among the eight neigboring cells.
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(-1,-1)).r > 0) { // upper left neighbor
+             // The fourth parameter to textureSample() is an offset value,
+             // given in texels, so we are getting the value of upper left
+             // neighbor of this cell.  Because the sampler uses "nearest"
+             // wrapping, this will wrap around to the opposit side of the
+             // texture if necessary.
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(-1,0)).r > 0) { // left neighbor
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(-1,1)).r > 0) { // lower left neighbor
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(1,-1)).r > 0) { // upper right neighbor
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(1,0)).r > 0) { // right neighbor
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(1,1)).r > 0) { // lower right neighbor
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(0,-1)).r > 0) { // upper neighbor
+         neighbors++;
+      }
+      if ( textureSample(inputBoard, samp, texCoords, vec2i(0,1)).r > 0) { // lower neighbor
+         neighbors++;
+      }
+      
+      var newAlive = 0.0; // The value for this cell in the next generation.
+      if ( alive == 1.0 && (neighbors == 2 || neighbors == 3) ) {
+              // A living cell stays alive if it has 2 or 3 living neighbors.
+          newAlive = 1;
+      }
+      if ( alive == 0.0 && neighbors == 3) {
+              // A dead cell comes to life if it has exactly three living neighbors.
+          newAlive = 1;
+      }
+      
+      return FragmentOut(
+               vec4f(alive,alive,alive,1),  // Color for this fragment.
+               vec4f(newAlive,0,0,1)  // New state of this cell, in the "r" color channel.
+         );
+   }
+`;
+
+/* Vertex coords to draw a square covering the entire canvas, as a triangle-strip.
+   In each generation, the program draws the square, ensuring that each pixel is
+   touched exactly once. */
+const vertexData = new Float32Array([
+    -1,-1,  1,-1,  -1,1,  1,1  
+]);
+
+let context;   // Basic WebGPU objects.
+let device;
+let pipeline;
+
+let vertexBuffer;  // buffer containing the vertex coords for the square.
+
+let bindGroupA;   // There are two textures, one used as input in the shader,
+let bindGroupB;   // one used as a color attachment.  The two bind groups
+                  // contain the two textures, plus the sampler.
+                  // The bind groups and textures are swapped between
+                  // calls to draw
+
+let textureA; // The two textures, of type r32float.
+let textureB;
+
+let useA = true;  // In draw(), this tells whether to use bindGroupA and textureA or
+                  // bindGroupB and textureB.  Its value is reversed after each call to draw().
+
+
+/**
+ *  Initialization function, initializes WebGPU and creates the pipeline,
+ *  vertex buffer, textures, and bind groups.
+ */
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   let shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader; see Console for details.");
+   }   
+
+   let vertexBufferLayout = [
+      { 
+         attributes: [
+             { shaderLocation:0, offset:0, format: "float32x2" }
+           ],
+         arrayStride: 8,
+         stepMode: "vertex" 
+      }
+   ];
+   
+   let bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+         {    // for the sampler variable in the fragment shader
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: { } // defaults are OK
+         },
+         {    // for the texture_2d<f32> in the fragment shader
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { } // defaults are OK
+         }
+      ]
+   });
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMain",
+          targets: [
+               { format: navigator.gpu.getPreferredCanvasFormat() },
+               { format: "r8unorm"}
+          ]
+       },
+       primitive: {
+          topology: "triangle-strip"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [bindGroupLayout]
+       })
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);  
+         
+   vertexBuffer = device.createBuffer({ 
+       size: vertexData.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+   
+   textureA = device.createTexture({
+      size: [context.canvas.width, context.canvas.height],
+      format: "r8unorm",
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
+               GPUTextureUsage.RENDER_ATTACHMENT
+   });
+   
+   textureB = device.createTexture({
+      size: [context.canvas.width, context.canvas.height],
+      format: "r8unorm",
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT
+   });
+   
+   let sampler = device.createSampler({
+       addressModeU: "repeat",
+       addressModeV: "repeat",
+       minFilter: "nearest",
+       maxFilter: "nearest"
+   });
+   
+   bindGroupA = device.createBindGroup({
+         // A bind group using textureA
+      layout: bindGroupLayout,
+      entries: [
+         {
+            binding: 0,
+            resource: sampler
+         },
+         { 
+            binding: 1,
+            resource: textureA.createView()
+         }
+      ]
+   });
+   bindGroupB = device.createBindGroup({
+         // A bind group using textureB
+      layout: bindGroupLayout,
+      entries: [
+         {
+            binding: 0,
+            resource: sampler
+         },
+         { 
+            binding: 1,
+            resource: textureB.createView()
+         }
+      ]
+   });
+   
+   // Create the initial board as a Float32Array, then copy the boad
+   // from the array into textureA.
+   
+   let w = context.canvas.width;
+   let h = context.canvas.height;
+   let textureData = new Uint8Array(w*h); // All values are initially zero.
+   let c = w*Math.floor(2*h/3) + Math.floor(w/2);  // Horizontal center, 2/3 of the way down.
+   for (let i = c-200; i < c+200; i++) {   // Bring a line of cells to life.
+       textureData[i] = 255;
+          // Note: With texture format r8unorm, the integer 255 is "normalized"
+          // to represent the floating point value 1.0.
+   }
+   c = c - w*Math.floor(h/3); // Add an R-pentomino shape 1/3 of the way down.
+   textureData[c-w] = 255;
+   textureData[c] = 255;
+   textureData[c+w] = 255;
+   textureData[c-1] = 255;
+   textureData[c-w+1] = 255;
+   device.queue.writeTexture(
+            { texture: textureA }, 
+            textureData,  
+            { bytesPerRow: w }, 
+            [w,h]  
+   );
+} // end initWebGPU()
+
+
+/**
+ * Called in response to a click on "Restart with Random" buttom.
+ * Fills the board randomly, each cell having a 25% chance of
+ * being alive.  Stop the animation if it is running, and draw
+ * the new board.
+ */
+function randomFill() {
+   running = false;
+   document.getElementById("run").checked = false;
+   document.getElementById("next").disabled = false;
+   let w = context.canvas.width;
+   let h = context.canvas.height;
+   let textureData = new Uint8Array(w*h);
+   for (let i = 0; i < textureData.length; i++) {
+       textureData[i] = Math.random() < 0.25 ? 255 : 0;
+   }
+   device.queue.writeTexture(
+            { texture: textureA }, 
+            textureData,  
+            { bytesPerRow: w }, 
+            [w,h]  
+   );
+   useA = true;
+   draw();
+}
+
+
+/**
+ *  Draw the current board, computing the next generation at the same time.
+ */
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [
+         {
+            clearValue: { r: 0, g: 0, b: 0, a: 1 }, 
+            loadOp: "clear",
+            storeOp: "store", 
+            view: context.getCurrentTexture().createView()
+         },
+         {  // The second color attachment is one of the r8unorm texture.
+            loadOp: "load",
+            storeOp: "store",
+            view: useA ? textureB.createView() : textureA.createView()
+         }
+      ]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setBindGroup(0, useA ? bindGroupA : bindGroupB);
+   passEncoder.draw(4);
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+   useA = ! useA;
+}
+
+
+//----------------- Animation support ---------------------
+
+let running = false;
+let prevTime = 0;
+function frame(time) {
+   if (running) {
+      if (time - prevTime > 50) {
+         draw();
+         prevTime = time;
+      }
+      requestAnimationFrame(frame);
+   }
+}
+function setRunning() {
+   let newRunning = document.getElementById("run").checked;
+   if (running == newRunning)
+      return;
+   running = newRunning;
+   document.getElementById("next").disabled = running;
+   if (running)
+      requestAnimationFrame(frame);
+}
+
+//-----------------------------------------------------------
+
+
+async function init() {
+   try {
+      await initWebGPU();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       console.log(e);
+       return;
+   }
+   document.getElementById("run").checked = false;
+   document.getElementById("run").onchange = setRunning;
+   document.getElementById("next").disabled = false;
+   document.getElementById("next").onclick = draw;
+   document.getElementById("random").onclick = randomFill;
+   draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU Life, version 2</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type="checkbox" id="run"> Run</label>
+   <button id="next" style="margin-left:50px">Next</button>
+   <button id="random" style="margin-left:50px">Restart with Random</button>
+</p>
+
+<div id="canvasholder">
+<canvas width=512 height=512 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+

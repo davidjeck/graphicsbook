@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebGPU Reflection Mapping With Skybox</title>
+
+<!--
+     This program is a port of the WebGL program skybox-and-env-map.html
+     to WebGPU.  It illustrates using a cubemap texture for environment,
+     or reflection, mapping.
+
+     This example combines a skybox with a fully reflective object.
+     The skybox and teapot can be rotated independently. The object
+     seems to be reflecting its environment, but it's really just that
+     the object and skybox use the same cubemap texture.  To get this
+     to work, I use two shader programs, one for the skybox and one for the
+     teapot.  To get the reflection map to work with a rotatable skybox,
+     the reflected ray in the teapot shader is transformed by the
+     inverse of the view transform rotation matrix.  The view transform
+     is applied to both the skybox and the teapot.  The teapot is
+     rotated by an additional modeling transform.
+     
+     Note that the cubemap texture needs mipmaps in order to get good
+     reflections from sharply cureved objects such as the handle and spout
+     of the teapot.  I have added the ability to turn off the use of
+     mipmaps so that you can see the effect.
+-->
+
+<script src="wgpu-matrix.min.js"></script>  <!-- matrix and vector math from Gregg Tavares -->
+<script src="simple-rotator.js"></script>
+<script src="basic-object-models-IFS.js"></script>
+<script src="teapot-model-IFS.js"></script>
+
+<script>
+
+"use strict";
+
+const shaderSourceSkybox = `   // shader program for the skybox
+     @group(0) @binding(0) var<uniform> projection : mat4x4f;
+     @group(0) @binding(1) var<uniform> modelview : mat4x4f;
+     struct VertexOutput {
+        @builtin(position) position : vec4f,
+        @location(0) objCoords : vec3f
+     }
+     @vertex fn vmain( @location(0) coords: vec3f ) -> VertexOutput {
+        let eyeCoords = modelview * vec4f(coords,1.0);
+        return VertexOutput( projection * eyeCoords, coords);
+     }
+
+     @group(1) @binding(0) var samp: sampler;
+     @group(1) @binding(1) var cubeTex : texture_cube<f32>;
+     @fragment fn fmain(@location(0) objCoords : vec3f) -> @location(0) vec4f {
+          return textureSample(cubeTex, samp, objCoords);
+     }`;
+
+const shaderSourceEnv = `    // shader program for the reflecting object
+     @group(0) @binding(0) var<uniform> projection : mat4x4f;
+     @group(0) @binding(1) var<uniform> modelview : mat4x4f;
+     struct VertexOutput {
+        @builtin(position) position : vec4f,
+        @location(0) eyeCoords : vec3f,
+        @location(1) normal : vec3f
+     }
+     @vertex fn vmain( @location(0) coords: vec3f, @location(1) normal : vec3f) -> VertexOutput {
+        let eyeCoords4 = modelview * vec4f(coords,1.0);
+        let position = projection * eyeCoords4;
+        return VertexOutput(position, eyeCoords4.xyz, normalize(normal));
+     }
+
+     @group(1) @binding(0) var samp: sampler;
+     @group(1) @binding(1) var cubeTex : texture_cube<f32>;
+     @group(1) @binding(2) var<uniform> normalMatrix : mat3x3f;
+     @group(1) @binding(3) var<uniform> inverseViewTransform : mat3x3f;
+     @fragment fn fmain(@location(0) eyeCoords: vec3f, @location(1) normal: vec3f) -> @location(0) vec4f {
+          let N = normalize(normalMatrix * normal);
+          //let V = -eyeCoords;
+          //let R = -reflect(V,N);
+          let R = reflect(eyeCoords, N);
+//          let R = 2.0 * dot(V,N) * N - V; // This is how to compute R without the reflect() function.
+          let T = inverseViewTransform * R; // Transform by inverse of the view transform that was applied to the skybox
+          return textureSample(cubeTex, samp, T);
+     }`;
+
+let mat3 = wgpuMatrix.mat3; 
+let mat4 = wgpuMatrix.mat4;
+
+let context;   // The webgpu context.
+let device;    // The webgpu device.
+
+let cubeTexture;   // The cubemap texture.
+
+let bindBuffer0;  // projection and modelview matrices
+let bindBuffer1;  // normal and inverse view matrices
+
+let pipeline_SB;        // for drawing the skybox
+let vertexBuffer_SB;
+let indexBuffer_SB;
+let vertexCount_SB;
+let bindGroup0_SB;
+let bindGroup1_SB;
+
+let pipeline_env;     // for drawing the reflective object with environment map.
+let bindGroup0_env;
+let bindGroup1_env;
+let bindGroup1_env_no_mipmaps;
+
+let depthTexture;  // for the depth test, used by pipeline_env
+
+const projection = mat4.create();   // projection matrix
+let modelview;  // modelview matrix
+const normalMatrix = mat3.create();  // normal transformation matrix
+const inverseViewTransform = mat3.create();  // inverse of the view transform rotation matrix
+
+let objects;  // an array containing the six available objects for rendering
+
+let rotator;   // A SimpleRotator object to enable rotation by mouse/finger dragging.
+               // Provides the view transform that is applied to both skybox and object.
+
+let rotX = 0, rotY = 0;  // Additional rotations applied as modeling transform to the reflective object.
+                         // Modified by pressing arrow and home keys.
+
+                         
+/**
+ * Initialize WebGPU and as much of the pipeline/buffer/etc config as can be done
+ * before the cubemap texture has been loaded.
+ */
+async function initWebGPU() {
+
+    if (!navigator.gpu) {
+       throw Error("WebGPU not supported in this browser.");
+    }
+    let adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) {
+       throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+    }
+ 
+    device = await adapter.requestDevice();
+ 
+    let shader_SB = device.createShaderModule({
+       code: shaderSourceSkybox
+    });
+    let shader_env = device.createShaderModule({
+       code: shaderSourceEnv
+    });
+    
+    let canvas = document.getElementById("webgpuCanvas");
+    context = canvas.getContext("webgpu");
+    context.configure({
+       device: device,
+       format: navigator.gpu.getPreferredCanvasFormat(),
+       alphaMode: "premultiplied"
+    });
+   
+    //--------- pipeline config for the skybox -------------
+   
+    let vertexBufferLayout_SB = [
+        { 
+           attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+           arrayStride: 12,
+           stepMode: "vertex" 
+        }
+    ];
+    pipeline_SB = device.createRenderPipeline({
+       vertex: {
+          module: shader_SB,
+          entryPoint: "vmain",
+          buffers: vertexBufferLayout_SB
+       },
+       fragment: {
+          module: shader_SB,
+          entryPoint: "fmain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-list"
+       },
+       layout: "auto"
+    });
+    let skybox = cube(100);
+    vertexBuffer_SB = device.createBuffer({ 
+        size: skybox.vertexPositions.byteLength, 
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(vertexBuffer_SB, 0, skybox.vertexPositions);
+    indexBuffer_SB = device.createBuffer({ 
+        size: skybox.indices.byteLength, 
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+    });
+    vertexCount_SB = skybox.indices.length;
+    device.queue.writeBuffer(indexBuffer_SB, 0, skybox.indices);
+    
+    bindBuffer0 = device.createBuffer({ // buffer used by both pipelines
+       size: 256 + 64, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+    mat4.perspective(Math.PI/4, 1, 1, 200, projection);
+    device.queue.writeBuffer(bindBuffer0, 0, projection);    
+    bindBuffer1 = device.createBuffer({ // buffer used by both pipelines
+       size: 256 + 48, 
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+    
+    bindGroup0_SB = device.createBindGroup({
+       layout: pipeline_SB.getBindGroupLayout(0),
+       entries: [
+         { // projection matrix
+            binding: 0,
+            resource: {buffer: bindBuffer0, offset: 0, size: 64}
+         },
+         { // modelview matrix
+            binding: 1,
+            resource: {buffer: bindBuffer0, offset: 256, size: 64}
+         }
+       ]
+    });
+       
+    //--------- pipeline config for the environment-mapped object -------------
+    
+    let vertexBufferLayout_env = [
+        { // first vertex buffer, for coords
+           attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+           arrayStride: 12,
+           stepMode: "vertex" 
+        },
+        { // second vertex buffer, for normals
+           attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+           arrayStride: 12,
+           stepMode: "vertex" 
+        }
+    ];
+    pipeline_env = device.createRenderPipeline({
+       vertex: {
+          module: shader_env,
+          entryPoint: "vmain",
+          buffers: vertexBufferLayout_env
+       },
+       fragment: {
+          module: shader_env,
+          entryPoint: "fmain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       depthStencil: {  
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: {
+          topology: "triangle-list",
+          cullMode: "back"  // cull back faces
+       },
+       layout: "auto"
+    });
+    bindGroup0_env = device.createBindGroup({
+            // (Note:  bindgroup0_SB is identical, but because I use "auto" layout
+            //  for the pipelines, the bindgroup layout must come from the pipeline.)
+       layout: pipeline_env.getBindGroupLayout(0),
+       entries: [
+         { // projection matrix
+            binding: 0,
+            resource: {buffer: bindBuffer0, offset: 0, size: 64}
+         },
+         { // modelview matrix
+            binding: 1,
+            resource: {buffer: bindBuffer0, offset: 256, size: 64}
+         }
+       ]
+    });
+    depthTexture = device.createTexture({ 
+       size: [canvas.width, canvas.height],
+       format: 'depth24plus',
+       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });  
+} // end initWebGPU()
+
+
+/**
+ *  Create the bind groups that use the cubemap texture.  This is
+ *  postponed until after the texture has been created.
+ */
+function makeBindGroups() {
+    let sampler = device.createSampler({
+        minFilter: "linear",
+        magFilter: "linear",
+        mipmapFilter: "linear"
+    });
+    bindGroup1_SB = device.createBindGroup({
+        layout: pipeline_SB.getBindGroupLayout(1),
+        entries: [
+            {
+                binding: 0,
+                resource: sampler
+            },
+            {
+                binding: 1,
+                resource: cubeTexture.createView({dimension: "cube"})
+            }
+        ]
+    });
+    bindGroup1_env = device.createBindGroup({
+        layout: pipeline_env.getBindGroupLayout(1),
+        entries: [
+            {
+                binding: 0,
+                resource: sampler
+            },
+            {
+                binding: 1,
+                resource: cubeTexture.createView({dimension: "cube"})
+            },
+            { // the normal matrix
+                binding: 2,
+                resource: {buffer: bindBuffer1, offset: 0, size: 48}
+            },
+            { // the inverse view matrix
+                binding: 3,
+                resource: {buffer: bindBuffer1, offset: 256, size: 48}
+            }
+        ]
+    });
+    bindGroup1_env_no_mipmaps = device.createBindGroup({
+        layout: pipeline_env.getBindGroupLayout(1),
+        entries: [
+            {
+                binding: 0,
+                resource: sampler
+            },
+            {
+                binding: 1,
+                resource: cubeTexture.createView({dimension: "cube",
+                                                 baseMipLevel: 0, mipLevelCount: 1})
+            },
+            { // the normal matrix
+                binding: 2,
+                resource: {buffer: bindBuffer1, offset: 0, size: 48}
+            },
+            { // the inverse view matrix
+                binding: 3,
+                resource: {buffer: bindBuffer1, offset: 256, size: 48}
+            }
+        ]
+    });
+}
+
+
+/**
+ *   Draws the scene in two passes, one for drawing the skybox background and
+ *   one for drawing the environment-mapped object.
+ */
+function draw() {
+    
+    modelview = new Float32Array(rotator.getViewMatrix());
+    mat3.fromMat4(modelview,normalMatrix);
+    device.queue.writeBuffer(bindBuffer0, 256, modelview);
+    
+    let commandEncoder, passEncoder, renderPassDescriptor;
+    
+    // Draw the skybox, with the viewing transform from the rotator.
+    
+    renderPassDescriptor = {
+        colorAttachments: [{
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: "clear",
+            storeOp: "store",
+            view: context.getCurrentTexture().createView()
+         }]
+    };
+    commandEncoder = device.createCommandEncoder();
+    passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+    passEncoder.setPipeline(pipeline_SB);
+    passEncoder.setBindGroup(0,bindGroup0_SB);
+    passEncoder.setBindGroup(1,bindGroup1_SB);
+    passEncoder.setVertexBuffer(0,vertexBuffer_SB);
+    passEncoder.setIndexBuffer(indexBuffer_SB,"uint16");
+    passEncoder.drawIndexed(vertexCount_SB);
+    passEncoder.end();
+    device.queue.submit([commandEncoder.finish()]);       
+
+    // Get the inverse of the rotation that was applied to the skybox.
+    // This is needed in the environment map shader to account for the rotation
+    // of the skybox.
+    
+    mat3.fromMat4(modelview,inverseViewTransform);
+    mat3.inverse(inverseViewTransform,inverseViewTransform);
+
+    // Add modeling rotations to the view transform, to rotate the object.
+
+    mat4.rotateX(modelview,rotX,modelview);
+    mat4.rotateY(modelview,rotY,modelview);
+    device.queue.writeBuffer(bindBuffer0, 256, modelview);
+    
+    mat3.fromMat4(modelview, normalMatrix);
+    device.queue.writeBuffer(bindBuffer1, 0, normalMatrix);
+    device.queue.writeBuffer(bindBuffer1, 256, inverseViewTransform);
+    
+    // Draw the object.
+    
+    let objectNum = Number(document.getElementById("object").value);
+    let model = objects[objectNum];
+    
+    let useMipmaps = document.getElementById("mipmapCheck").checked;
+    
+    renderPassDescriptor = {
+        colorAttachments: [{
+            loadOp: "load",
+            storeOp: "store",
+            view: context.getCurrentTexture().createView()
+         }],
+        depthStencilAttachment: {
+          view: depthTexture.createView(),
+          depthClearValue: 1.0,
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+        }
+    };
+    commandEncoder = device.createCommandEncoder();
+    passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+    passEncoder.setPipeline(pipeline_env);
+    passEncoder.setBindGroup(0,bindGroup0_env);
+    if (useMipmaps)
+        passEncoder.setBindGroup(1,bindGroup1_env);
+    else
+        passEncoder.setBindGroup(1,bindGroup1_env_no_mipmaps);
+    passEncoder.setVertexBuffer(0,model.coordsBuffer);
+    passEncoder.setVertexBuffer(1,model.normalBuffer);
+    passEncoder.setIndexBuffer(model.indexBuffer,"uint16");
+    passEncoder.drawIndexed(model.count);
+    passEncoder.end();
+    device.queue.submit([commandEncoder.finish()]);
+    
+}  // end draw()
+
+
+/**
+ *  Loads the images for the cubemap texture; creates and returns the texture.
+ *  Will throw an exception if the images can't be loaded.
+ */
+async function loadTextureCube() {
+    document.getElementById("headline").innerHTML = "WebGPU Reflection Map With Skybox -- LOADING CUBEMAP TEXTURE";
+    let urls = [
+       "cubemap-textures/park/posx.jpg", "cubemap-textures/park/negx.jpg", 
+       "cubemap-textures/park/posy.jpg", "cubemap-textures/park/negy.jpg", 
+       "cubemap-textures/park/posz.jpg", "cubemap-textures/park/negz.jpg"
+    ];
+    let texture;
+    let mipmapCount = 1;
+    for (let i = 0; i < 6; i++) {
+        let response = await fetch( urls[i] );
+        let blob = await response.blob(); 
+        let imageBitmap = await createImageBitmap(blob);
+        if (i == 0) {
+            let size = imageBitmap.width;
+            while (size > 1) {
+                size = size >> 1;
+                mipmapCount++;
+            }
+            texture = device.createTexture({ // (We need to know the image size to create the texture.)
+                size: [imageBitmap.width, imageBitmap.height, 6],
+                    // (The 6 at the end means that there are 6 images, the 6 sides of the cube.)
+                format: 'rgba8unorm',
+                mipLevelCount: mipmapCount,
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
+                            GPUTextureUsage.RENDER_ATTACHMENT
+            });
+        }
+        device.queue.copyExternalImageToTexture(
+           { source: imageBitmap }, // (Note: Unlike WebGL, we don't have to flip the image.)
+           { texture: texture, origin: [0,0,i] },
+                // The i at the end puts the image into side number i of the cube.
+           [imageBitmap.width, imageBitmap.height]
+        );
+    }
+    for (let i = 0; i < 6; i++)
+        makeMipmaps(i);
+    document.getElementById("headline").innerHTML = "WebGPU Reflection Map With Skybox";
+    return texture;
+    function makeMipmaps(side) {
+        const shaderSource = `
+           struct VertexOutput {
+              @builtin(position) position: vec4f,
+              @location(0) texcoords : vec2f  
+           }
+           @vertex fn vertexMain( @location(0) coords : vec2f,
+                                  @location(1) texcoords : vec2f ) -> VertexOutput {  
+              return VertexOutput( vec4f(coords,0,1), texcoords );
+           }
+           @group(0) @binding(0) var samp : sampler;
+           @group(0) @binding(1) var tex : texture_2d<f32>;
+           @fragment fn fragmentMain(@location(0) texcoords : vec2f) -> @location(0) vec4f {
+              return textureSample( tex, samp, texcoords );
+           }
+        `;
+        let vertexBufferLayout = [{ 
+           attributes: [ { shaderLocation:0, offset:0, format: "float32x2" },
+                         { shaderLocation:1, offset:8, format: "float32x2" }  ],
+           arrayStride: 16, 
+           stepMode: "vertex" 
+        } ];
+        let vertexData = new Float32Array([ -1,-1, 0,1,   1,-1, 1,1,  -1,1, 0,0,  1,1, 1,0 ]);
+        let vertexBuffer = device.createBuffer({ size: vertexData.byteLength, 
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST  });
+        device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+        let shader = device.createShaderModule({code: shaderSource });
+        let pipelineDescriptor = {
+           vertex: { module: shader, entryPoint: "vertexMain", buffers: vertexBufferLayout },
+           fragment: { module: shader, entryPoint: "fragmentMain",
+                        targets: [{ format: texture.format }] },
+           primitive: { topology: "triangle-strip" },
+           layout: "auto"
+        };
+        let pipeline = device.createRenderPipeline(pipelineDescriptor);
+        let sampler = device.createSampler(
+                             { minFilter: "linear", magFilter: "linear" } );
+        let commandEncoder = device.createCommandEncoder();
+        for (let mipmap = 1; mipmap < mipmapCount; mipmap++) {
+            let inputView = texture.createView({
+                    dimension: "2d",
+                    baseMipLevel: mipmap - 1, mipLevelCount: 1,
+                    baseArrayLayer: side, arrayLayerCount: 1});
+            let outputView = texture.createView({
+                    dimension: "2d",
+                    baseMipLevel: mipmap, mipLevelCount: 1,
+                    baseArrayLayer: side, arrayLayerCount: 1});
+            let renderPassDescriptor = {
+               colorAttachments: [{
+                   loadOp: "load",
+                   storeOp: "store", 
+                   view: outputView
+               }]
+            };
+            let bindGroup = device.createBindGroup({
+               layout: pipeline.getBindGroupLayout(0),
+               entries: [ { binding: 0, resource: sampler },
+                          { binding: 1, resource: inputView } ]
+            });
+            let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+            passEncoder.setPipeline(pipeline);
+            passEncoder.setVertexBuffer(0,vertexBuffer);
+            passEncoder.setBindGroup(0,bindGroup);
+            passEncoder.draw(4);
+            passEncoder.end();
+        }
+        let commandBuffer = commandEncoder.finish();
+        device.queue.submit([commandBuffer]);
+    } // end nested function makeMipmaps()
+} // end loadTextureCube()
+
+
+/**
+ *  Create buffers needed to draw the object with data from modelData.
+ *  The modelData comes from basic-objects-IFS.js or teapot-model-IFS.js.
+ */
+function createModel(modelData) { 
+    let model = {};
+    model.count = modelData.indices.length;
+    model.coordsBuffer = device.createBuffer({ 
+       size: modelData.vertexPositions.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    model.normalBuffer = device.createBuffer({ 
+       size: modelData.vertexNormals.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    model.indexBuffer = device.createBuffer({ 
+       size: modelData.indices.byteLength, 
+       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(model.coordsBuffer,0,modelData.vertexPositions);
+    device.queue.writeBuffer(model.normalBuffer,0,modelData.vertexNormals);
+    device.queue.writeBuffer(model.indexBuffer,0,modelData.indices);
+    return model;
+}
+
+
+/**
+ *  An event listener for the keydown event.  It is installed by the init() function.
+ *  This lets the user use the keyboard to rotate the reflective object.
+ */
+function doKey(evt) {
+    let rotationChanged = true;
+    switch (evt.keyCode) {
+        case 37: rotY -= 0.15; break;        // left arrow
+        case 39: rotY +=  0.15; break;       // right arrow
+        case 38: rotX -= 0.15; break;        // up arrow
+        case 40: rotX += 0.15; break;        // down arrow
+        case 13:                             // return
+        case 36:                             // home
+            rotX = rotY = 0;
+            rotator.setAngles(0,0);
+            break;
+        default: rotationChanged = false;
+    }
+    if (rotationChanged) {
+        evt.preventDefault();
+        draw();
+    }
+}
+
+
+/**
+ * Initialization function that will be called when the page has loaded.
+ */
+async function init() {
+    try {
+       await initWebGPU();
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML =
+           "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                     e.message + "</span>";
+        return;
+    }
+    document.getElementById("mipmapCheck").checked = true;
+    document.getElementById("mipmapCheck").onchange = draw;
+    document.getElementById("object").value = "5";
+    document.getElementById("object").onchange = function() {
+        draw();
+        document.getElementById("reset").focus();  // to make sure arrow key input is not sent to popup menu
+    };
+    document.addEventListener("keydown", doKey, false);
+    document.getElementById("reset").onclick = function() {
+        rotX = rotY = 0;
+        rotator.setAngles(0,0);
+        draw();        
+    };
+    let canvas = document.getElementById("webgpuCanvas");
+    rotator = new SimpleRotator(canvas,draw,2.7);
+    objects = new Array(6);
+    objects[0] = createModel( cube(0.9) );
+    objects[1] = createModel( uvSphere(0.6,64,32) );
+    objects[2] = createModel( uvCylinder() );
+    objects[3] = createModel( uvCone() );
+    objects[4] = createModel( uvTorus(0.65,0.2,64,24) );
+    for (let i = 0; i < teapotModel.vertexPositions.length; i++) {
+        teapotModel.vertexPositions[i] *= 0.05; // scale teapot model to a size that matches other objects
+    }
+    objects[5] = createModel( teapotModel );
+    try {
+        cubeTexture = await loadTextureCube();
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML = "ERROR WHILE TRYING TO LOAD CUBEMAP TEXTURE";
+        console.log("Error loading texture: ", e);
+        return;
+    }
+    makeBindGroups();
+    draw();
+}
+
+window.onload = init;
+
+</script>
+</head>
+<body style="background-color:#DDDDDD">
+
+<h2 id="headline">WebGPU Reflection Map With Skybox</h2>
+
+<noscript><hr><h3>This page requires Javascript and a web browser that supports WebGL</h3><hr></noscript>
+
+<p id="message" style="font-weight:bold">Drag on the picture to rotate the view.<br>
+Use arrow keys to rotate the object. Home or Enter key resets view.</p>
+
+<p><label><b>The Reflective Object:</b> <select id="object">
+    <option value="0">Cube</option>
+    <option value="1">Sphere</option>
+    <option value="2">Cylinder</option>
+    <option value="3">Cone</option>
+    <option value="4">Torus</option>
+    <option value="5">Teapot</option>
+</select></label>
+<label style="margin-left:40px"><input type="checkbox" id="mipmapCheck"> Use Mipmaps</label>
+<button id="reset" style="margin-left:40px">Reset View</button>
+</p>
+
+
+<div id="canvas-holder">
+
+    <canvas width=600 height=600 id="webgpuCanvas"></canvas>
+
+</div>
+
+
+</body>
+</html>
+

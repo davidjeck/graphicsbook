@@ -27,7 +27,7 @@ The URL can be changed in the last line of the init() function.)
 "use strict";
 
 /**
- *  A self-contained function for createding an image texture on a
+ *  A self-contained function for creating an image texture on a
  *  WebGPU device, including a full set of mipmaps.  The image data is
  *  from an ImageBitmap object (typically created with createImageBitmap()).
  *  The parameters are the ImageBitmap and the WebGPU device.
@@ -93,19 +93,18 @@ function createImageTextureWithMipmaps( imageBitmap, webgpuDevice ) {
         let outputView = texture.createView({ baseMipLevel: mipmap, mipLevelCount: 1 });
         let renderPassDescriptor = {
            colorAttachments: [{
-               clearValue: { r: 0, g: 1, b: 1, a: 1 }, 
-               loadOp: "clear",
+               loadOp: "load",
                storeOp: "store", 
                view: outputView
            }]
         };
+        let bindGroup = webgpuDevice.createBindGroup({
+           layout: pipeline.getBindGroupLayout(0),
+           entries: [ { binding: 0, resource: sampler }, { binding: 1, resource: inputView } ]
+        });
         let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         passEncoder.setPipeline(pipeline);
         passEncoder.setVertexBuffer(0,vertexBuffer);
-        let bindGroup = webgpuDevice.createBindGroup({
-           layout: pipeline.getBindGroupLayout(0),
-           entries: [ { binding: 0,resource: sampler }, { binding: 1,resource: inputView } ]
-        });
         passEncoder.setBindGroup(0,bindGroup);
         passEncoder.draw(4);
         passEncoder.end();
@@ -118,7 +117,7 @@ function createImageTextureWithMipmaps( imageBitmap, webgpuDevice ) {
 
 /**
  *  This function is used in this program to load an image and create
- *  an image texture from it.It is called at the end of the init() funciton.
+ *  an image texture from it.  It is called at the end of the init() function.
  *  After creating the texture, it calls drawMipmaps() to render all the mipmaps.
  */
 function loadImageTexture(URL) {
@@ -249,6 +248,7 @@ function drawMipmaps(texture) {
    passEncoder.end();
    let commandBuffer = commandEncoder.finish();
    device.queue.submit([commandBuffer]);
+   vertexBuffer.destroy();
 }
 
 

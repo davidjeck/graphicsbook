@@ -234,7 +234,7 @@ function createPipelineConfig() {
     * outside the range 0 to 1 are used.  The minification and magnification
     * filters and other properties can also be specified.
     */
-   let checkreboardSampler = device.createSampler({
+   let checkerboardSampler = device.createSampler({
       addressModeU: "repeat",  // default is "clamp-to-edge"
       addressModeV: "repeat"
    });
@@ -290,13 +290,13 @@ function createPipelineConfig() {
       entries: [
          {    // The sampler. Note that the resource is the sampler itself.
             binding: 0,
-            resource: checkreboardSampler
+            resource: checkerboardSampler
          },
          {    // The texture.  Note that the resource is a view of the texture.
             binding: 1,
             resource: checkerboardTexture.createView()
          },
-         {
+         {    // The resource is the buffer containing the uniform variable.
             binding: 2,
             resource: {buffer: uniformBuffer, offset: 0, size: 4}
          }
