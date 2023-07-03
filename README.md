@@ -16,7 +16,7 @@ Since the source files were not originally meant for publication, they
 are not very cleanly written, and using them would require a lot of expertise.
 
 To produce the book from the XML/XSLT files, you will need a copy of the XSLT processor 
-(Xalan-J)[https://xml.apache.org/xalan-j/], and you will need command-line Java to run it.
+[Xalan-J](https://xml.apache.org/xalan-j/), and you will need command-line Java to run it.
 The XSLT files use some features that are specific to Xalan-J.  To produce the
 PDF versions, you will also need an installation of the TeX typesetting system.
 
