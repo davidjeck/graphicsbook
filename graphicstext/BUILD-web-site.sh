@@ -46,16 +46,12 @@ if  $XALAN_COMMAND -xsl convert-web.xsl -in graphicstext.xml ; then
    rm web/demos/demos.komodoproject
    rm -r web/demos/test
    cp -r source web
+   rm web/source/source.komodoproject
    rm web/source/source.xml
    mkdir web/source/java2d
    cp -r src-java2d/* web/source/java2d
    mkdir web/source/jogl
    cp -r src-jogl/* web/source/jogl
-   mv web/demos/samples web/source/canvas2d
-   mv web/demos/glsim-samples web/source/glsim
-   mv web/demos/threejs-samples web/source/threejs
-   mv web/demos/webgl-samples web/source/webgl
-   mv web/demos/webgpu-samples web/source/webgpu
 #   cp README.txt web/README-full-source.txt
 
    copyfiles c02-graphics2d c2
