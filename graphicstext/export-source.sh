@@ -32,7 +32,7 @@ mv $PROJECT/publish.sh .
 mv $PROJECT/BUILD* .
 chmod +x BUILD*.sh
 chmod +x publish.sh
-#cp $PROJECT/README.txt .
+cp $PROJECT/README.txt .
 if [ -x "$XALAN_DIR" ] ; then
    ln -s $XALAN_DIR xalan
 else
