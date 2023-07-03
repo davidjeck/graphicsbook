@@ -1,7 +1,7 @@
 # graphicsbook
 This git repository contains the full source files for the free textbook *Introduction to Computer Graphics,* Version 1.4.
 This version is under development in summer 2023.  The latest release version is 1.3.1.
-See the [preface](https://math.hws.edu/graphicsbook/) for information about the book.
+See the [preface](https://math.hws.edu/graphicsbook/preface.html) for information about the book.
 
 *Introduction to Computer Graphics* can be accessed on the web at
 [https://math.hws.edu/graphicsbook/](https://math.hws.edu/graphicsbook/).
@@ -16,7 +16,7 @@ Since the source files were not originally meant for publication, they
 are not very cleanly written, and using them would require a lot of expertise.
 
 To produce the book from the XML/XSLT files, you will need a copy of the XSLT processor 
-[https://xml.apache.org/xalan-j/](Xalan-J), and you will need command-line Java to run it.
+(Xalan-J)[https://xml.apache.org/xalan-j/], and you will need command-line Java to run it.
 The XSLT files use some features that are specific to Xalan-J.  To produce the
 PDF versions, you will also need an installation of the TeX typesetting system.
 
