@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<!--
+   This is a demo version of the WebGPU example diffusion.html.
+   See that file for comments.
+-->
+<head>
+<title>WebGPU Example: Diffusion Makes Dendrites</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+
+<link rel="stylesheet" href="../demo.css">
+<script src="../script/demo-core.js"></script>
+
+<script>
+
+"use strict";
+
+const CANVAS_WIDTH = 500;
+const CANVAS_HEIGHT = 350;
+const PARTICLE_COUNT = Math.floor(CANVAS_WIDTH*CANVAS_HEIGHT / 5);
+const FILAMENT_SIZE = 100;
+
+const COLOR0 = "vec4f(0.0,0.0,0.0,1.0)";  // black
+const COLOR1 = "vec4f(1.0,1.0,1.0,1.0)";  // white
+const COLOR2 = "vec4f(1.0,1.0,0.0,1.0)";  // yellow
+const COLOR3 = "vec4f(0.0,1.0,1.0,1.0)";  // cyan
+
+const renderShaderSource = `
+
+    const colors = array<vec4f,4>(${COLOR0},${COLOR1},${COLOR2},${COLOR3});
+    const width = ${CANVAS_WIDTH}u;
+    const height = ${CANVAS_HEIGHT}u;
+    
+    @group(0) @binding(0) var<storage> colorData : array<u32,${CANVAS_WIDTH*CANVAS_HEIGHT}>;
+    
+    @vertex
+    fn vmain( @location(0) coords : vec2f ) -> @builtin(position) vec4f {
+        return vec4f(coords,0,1);
+    }
+    
+    @fragment
+    fn fmain( @builtin(position) position : vec4f) -> @location(0) vec4f {
+        let dataIndex = u32(position.y)*${CANVAS_WIDTH} + u32(position.x);
+        let colorIndex = colorData[dataIndex];
+        return colors[colorIndex];
+    }
+`;
+
+const computeMoveShaderSource = `
+
+    const multiplier = vec3u(0x5, 0xDEEC, 0xE66D);
+    const addend = 0xBu;
+
+    @group(0) @binding(0) var<storage,read> colorData : array<u32,${CANVAS_WIDTH*CANVAS_HEIGHT}>;
+    @group(0) @binding(1) var<storage,read_write> particleData : array<vec4u,${PARTICLE_COUNT}>;
+    
+    @compute @workgroup_size(1)
+    fn main(@builtin(global_invocation_id) id : vec3u) {
+        let index = id.x;
+        let data = particleData[index];
+        let color = data.w >> 30;
+        if (color != 1) {
+            return;
+        }
+        
+        let seed = data.xyz;
+        var newSeed : vec3u;
+
+        newSeed.z = seed.z*multiplier.z + addend;
+        newSeed.y = seed.y*multiplier.z + (newSeed.z >> 16);
+        newSeed.z = newSeed.z & 0xFFFF;
+        newSeed.x = seed.x*multiplier.z + (newSeed.y >> 16);
+        newSeed.y = newSeed.y & 0xFFFF;
+
+        newSeed.y = newSeed.y + seed.z*multiplier.y;
+        newSeed.x = newSeed.x + seed.y*multiplier.y + (newSeed.y >> 16);
+        newSeed.y = newSeed.y & 0xFFFF;
+        
+        newSeed.x = newSeed.x + seed.z*multiplier.x;
+        newSeed.x = newSeed.x & 0xFFFF;
+        
+        let x = (data.w >> 15) & 0x7FFF;
+        let y = data.w & 0x7FFF;
+        var newx = x;
+        var newy = y;
+        
+        switch (newSeed.x & 3) {
+            case 0 {
+                if (newy > 0) {
+                    newy--;
+                }
+            }
+            case 1 {
+                if (newx > 0) {
+                    newx--;
+                }
+            }
+            case 2 {
+                if (newy < ${CANVAS_HEIGHT-1}) {
+                    newy++;
+                }
+            }
+            default {
+                if (newx < ${CANVAS_WIDTH-1}) {
+                    newx++;
+                }
+            }
+        }
+        
+        let colorAtNewXY = colorData[ newy*${CANVAS_WIDTH} + newx ];
+        if (colorAtNewXY > 1) {
+            particleData[index].w = (colorAtNewXY << 30) | (x << 15) | y;
+        }
+        else {
+            particleData[index] = vec4u(newSeed, (1 << 30) | (newx << 15) | newy);
+        }
+    }
+`;
+
+const computeColorShaderSource = `
+    @group(0) @binding(0) var<storage,read_write> colorData : array<u32,${CANVAS_WIDTH*CANVAS_HEIGHT}>;
+    @group(0) @binding(1) var<storage,read> particleData : array<vec4u,${PARTICLE_COUNT}>;
+    
+    @compute @workgroup_size(1)
+    fn main(@builtin(global_invocation_id) id : vec3u) {
+        let data = particleData[id.x];
+        let x = (data.w >> 15) & 0x7FFF;
+        let y = data.w & 0x7FFF;
+        let color = data.w >> 30;
+        colorData[ ${CANVAS_WIDTH}*y + x ] = color;
+    }
+`;
+
+let context;
+let device;
+
+let colorDataBuffer;
+let particleDataBuffer;
+
+let renderPipeline;
+let renderShader;
+let renderVertexBuffer;
+let renderBindGroup;
+
+let computeMovePipeline;
+let computeMoveShader;
+let computeMoveBindGroup;
+
+let computeColorShader;
+let computeColorPipeline;
+let computeColorBindGroup;
+
+
+async function initWebGPU() {
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied" 
+   });
+   
+   device.pushErrorScope("validation");
+   renderShader = device.createShaderModule({
+      code: renderShaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in render shader; see Console for details.");
+   }   
+   device.pushErrorScope("validation");
+   computeMoveShader = device.createShaderModule({
+      code: computeMoveShaderSource
+   });
+   error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in first compute shader; see Console for details.");
+   }   
+   device.pushErrorScope("validation");
+   computeColorShader = device.createShaderModule({
+      code: computeColorShaderSource
+   });
+   error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in second compute shader; see Console for details.");
+   }   
+}
+
+
+function createBuffers() {
+    
+    let colorData = new Uint32Array(CANVAS_HEIGHT*CANVAS_WIDTH);
+    let particleData = new Uint32Array(4*PARTICLE_COUNT)
+    
+    let midRow = Math.floor(CANVAS_HEIGHT/2);
+    
+    for (let i = 0; i < FILAMENT_SIZE; i++) {
+        colorData[i+CANVAS_WIDTH*midRow] = 2;
+        particleData[4*i + 3] = (2 << 30) | (i << 15) | midRow ;
+        colorData[CANVAS_WIDTH*(midRow-1)-i] = 3;
+        particleData[4*(i+FILAMENT_SIZE) + 3] = (3 << 30) | ((CANVAS_WIDTH-1-i) << 15) | midRow ;
+    }
+    for (let i = 2*FILAMENT_SIZE; i < PARTICLE_COUNT; i++) {
+        let x,y;
+        do {
+            x = Math.floor(CANVAS_WIDTH*Math.random());
+            y = Math.floor(CANVAS_HEIGHT*Math.random());
+        } while (colorData[CANVAS_WIDTH*y + x] != 0);
+        colorData[CANVAS_WIDTH*y + x] = 1;
+        particleData[4*i + 3] = (1 << 30) | (x << 15) | y;
+        particleData[4*i] = Math.floor( 0xFFFF*Math.random());
+        particleData[4*i+1] = Math.floor( 0xFFFF*Math.random());
+        particleData[4*i+2] = Math.floor( 0xFFFF*Math.random());
+    }
+    
+    colorDataBuffer = device.createBuffer({
+        label: "color buffer",
+        size: 4*CANVAS_HEIGHT*CANVAS_WIDTH,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(colorDataBuffer,0,colorData);
+    particleDataBuffer = device.createBuffer({
+        label: "particle buffer",
+        size: 16*PARTICLE_COUNT,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(particleDataBuffer,0,particleData);
+}
+
+function createRenderPipelineConfig() {
+   
+   let vertexBufferLayout = [
+      { 
+         attributes: [
+             { shaderLocation:0, offset:0, format: "float32x2" }
+           ],
+         arrayStride: 8,
+         stepMode: "vertex" 
+      }
+   ];
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: renderShader,
+          entryPoint: "vmain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: renderShader,
+          entryPoint: "fmain",
+          targets: [
+               { format: navigator.gpu.getPreferredCanvasFormat() }
+          ]
+       },
+       primitive: {
+          topology: "triangle-strip"
+       },
+       layout: "auto"
+    };
+    
+   renderPipeline = device.createRenderPipeline(pipelineDescriptor);  
+         
+   const vertexData = new Float32Array([
+      -1,-1,  1,-1,  -1,1,  1,1  
+   ]);
+
+   renderVertexBuffer = device.createBuffer({ 
+       size: vertexData.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(renderVertexBuffer, 0, vertexData);
+   
+   renderBindGroup = device.createBindGroup({
+      layout: renderPipeline.getBindGroupLayout(0),
+      entries: [
+         { 
+            binding: 0,
+            resource: {buffer: colorDataBuffer, offset: 0, size: 4*CANVAS_HEIGHT*CANVAS_WIDTH}
+         }
+      ]
+   });  
+}
+
+
+function createComputeMovePipelineConfig() {
+   
+   let pipelineDescriptor = {
+      compute: {
+         module: computeMoveShader,
+         entryPoint: "main"
+      },
+      layout: "auto"
+   };
+   
+   computeMovePipeline = device.createComputePipeline(pipelineDescriptor);
+   
+   computeMoveBindGroup = device.createBindGroup({
+      layout: computeMovePipeline.getBindGroupLayout(0),
+      entries: [
+         {
+            binding: 0,
+            resource: {buffer: colorDataBuffer, offset: 0, size: 4*CANVAS_HEIGHT*CANVAS_WIDTH}
+         },
+         {
+            binding: 1,
+            resource: {buffer: particleDataBuffer, offset: 0, size: 16*PARTICLE_COUNT}
+         }
+      ]
+   });
+}
+
+
+function createComputeColorPipelineConfig() {
+   
+   let pipelineDescriptor = {
+      compute: {
+         module: computeColorShader,
+         entryPoint: "main"
+      },
+      layout: "auto"
+   };
+   
+   computeColorPipeline = device.createComputePipeline(pipelineDescriptor);
+   
+   computeColorBindGroup = device.createBindGroup({
+      layout: computeColorPipeline.getBindGroupLayout(0),
+      entries: [
+         {
+            binding: 0,
+            resource: {buffer: colorDataBuffer, offset: 0, size: 4*CANVAS_HEIGHT*CANVAS_WIDTH}
+         },
+         {
+            binding: 1,
+            resource: {buffer: particleDataBuffer, offset: 0, size: 16*PARTICLE_COUNT}
+         }
+      ]
+   });
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [
+         {
+            clearValue: { r: 0, g: 0, b: 0, a: 1 }, 
+            loadOp: "clear",
+            storeOp: "store", 
+            view: context.getCurrentTexture().createView()
+         }
+      ]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(renderPipeline);
+   passEncoder.setVertexBuffer(0,renderVertexBuffer);
+   passEncoder.setBindGroup(0, renderBindGroup);
+   passEncoder.draw(4);
+   passEncoder.end();
+   device.queue.submit([commandEncoder.finish()]);
+}
+
+
+function updateParticles() {
+   let speedup = Number(document.getElementById("speedup").value);
+   let commandEncoder = device.createCommandEncoder();
+   let passEncoder;
+   for (let i = 0; i < speedup; i++) {
+    passEncoder = commandEncoder.beginComputePass();
+    passEncoder.setPipeline(computeMovePipeline);
+    passEncoder.setBindGroup(0,computeMoveBindGroup);
+    passEncoder.dispatchWorkgroups(PARTICLE_COUNT);
+    passEncoder.end();
+    commandEncoder.clearBuffer(colorDataBuffer);
+    passEncoder = commandEncoder.beginComputePass();
+    passEncoder.setPipeline(computeColorPipeline);
+    passEncoder.setBindGroup(0,computeColorBindGroup);
+    passEncoder.dispatchWorkgroups(PARTICLE_COUNT);
+    passEncoder.end();
+   }
+   device.queue.submit([commandEncoder.finish()]);
+}
+
+//----------------- Animation support ---------------------
+
+let running = false;
+let prevTime = 0;
+function frame(time) {
+   if (running) {
+      if (time - prevTime > 50) {
+         updateParticles();
+         draw();
+         prevTime = time;
+      }
+      requestAnimationFrame(frame);
+   }
+}
+function setRunning() {
+   let newRunning = document.getElementById("run").checked;
+   if (running == newRunning)
+      return;
+   running = newRunning;
+   if (running)
+      requestAnimationFrame(frame);
+}
+
+//-----------------------------------------------------------
+
+
+async function init() {
+   let canvas = document.getElementById("webgpuCanvas");
+   canvas.width = CANVAS_WIDTH;
+   canvas.height = CANVAS_HEIGHT;
+   try {
+      await initWebGPU();
+      createBuffers();
+      createRenderPipelineConfig();
+      createComputeMovePipelineConfig();
+      createComputeColorPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("run").checked = false;
+   document.getElementById("run").onchange = setRunning;
+   document.getElementById("speedup").value = "5";
+   draw();
+}
+
+window.onload = init; 
+
+</script>
+</head>
+
+<body>
+
+<div id="content">
+
+<h3>Diffusion and Dendrites</h3>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p>
+    <label><input type="checkbox" id="run"> <b>Run</b></label>
+    <label style="margin-left:80px"><b>Speedup:</b> <select id="speedup">
+        <option value="1">None</option>
+        <option value="2">2 Times</option>
+        <option value="3">3 Times</option>
+        <option value="5">5 Times</option>
+        <option value="7">7 Times</option>
+        <option value="10">10 Times</option>
+    </select></label>
+</p>
+
+<div id="canvasholder">
+<canvas id="webgpuCanvas"></canvas>
+</div>
+
+</div>
+
+
+<div id="help-content" style="display:none">
+<h3>About this demo...</h3>
+<p>To see the animation, turn on the "Run" option.  Give it a
+chance to run for a while to see the results.</p>
+<p>This demo simulates a cloud of white particals diffusing by
+Brownian motion.  At the start, there is also a solid line of yellow
+particles and a line of cyan particles.  Yellow and cyan particles
+don't move.  When a white particle hits a yellow or cyan particle,
+it changes color to match and stops moving.  The original lines of
+yellow and cyan particles grow in an interesting way, forming
+"dendrites" or filaments.</p>
+<p>In a single timestep, each white particle moves by one
+pixel.  The program can do several timesteps between frames.
+The "Speedup" menu controls the number of time steps per
+frame.  Larger values give a faster simulation.</p>
+<p>In addition to the render pass that draws the particles,
+the program uses two WebGPU compute shaders to update
+the partical positions.</p>
+</div>
+
+
+
+<!-- support for help text -- do not change. -->
+<div id="help-icon">
+<img src="../image/question32.png" onclick="showDemoHelp()"
+    title="Click here for information about this demo." width="32" height="32">
+</div>
+<div id="hide-help-icon">
+<img src="../image/close32.png" onclick="showDemoHelp()"
+    title="Click here to return to the demo." width="65" height="32">
+</div>
+<div id="helpBG" style="display:none"></div>
+
+</body>
+</html>
+

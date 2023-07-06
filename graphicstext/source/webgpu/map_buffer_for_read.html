@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<!--
+    Approximates a definite integral using the trapezoid rule.  But the real
+    purpose is to show how to map a GPU buffer and read data from the buffer into
+    a JavaScript array.  (Although it's not relevant to the main point, this
+    program also contains an example of implementing a "reduce" operation.)
+    
+    Examples of buffer mapping are in function compute() and function computeAndReduce().
+    (Search for "function reduce".)
+-->
+<html>
+<head>
+<title>WebGPU Example:  Mapping a Buffer for Read Access</title>
+<script>
+
+
+/**
+ *  Create the shader source for a WGSL compute shader that computes
+ *  the area of each trapezoid in the approximation of a definite integral
+ *  using the trapezoid rule.  It is a function since the function definition,
+ *  limits of integration (xmin and xmax), and the number of intervals for
+ *  the approximation are inserted into the template string that defines
+ *  the source code.
+ */
+function makeShaderSource( functionDefinition, xmin, xmax, intervals) {
+ return `
+
+    // This shader computes the areas of the trapezoids that are used
+    // for the trapezoid rule.  The i-th invocation computes the area
+    // for the i-th subinterval and stores it in areas[i].  The values
+    // in the buffer still have to be added up to get the final answer.
+     
+    @group(0) @binding(0) var<storage,read_write> areas : array<f32,${intervals}>;
+    
+    fn f( x : f32 ) -> f32 {
+        let y : f32 = ${functionDefinition};
+        return y;
+    }
+    
+    // Note that the workgroup size is 64.  With a workgroup size of 1, the maximum
+    // number of invocations would be 65535, since that is the maximum number of
+    // workgroup dispatches per dimension.  The number of invocations we need is equal
+    // to the number of intervals, and we want to allow that to be as large as 1,000,000.
+    // (A workgroup size of 64 presumably allows up to 64*65535 invocations.)
+    
+    @compute @workgroup_size(64)
+    fn main(@builtin(global_invocation_id) id : vec3u) {
+        if (id.x >= ${intervals}) {
+           return;
+        }
+        let dt = (f32(${xmax}) - f32(${xmin})) / f32(${intervals});
+        let x1 = f32(${xmin}) + dt*f32(id.x);
+        let x2 = x1 + dt;
+        areas[id.x] = (f(x2) + f(x1)) / 2 * dt;
+    }
+ `;
+}
+
+const reduceShaderSource = `
+
+    // This shader is used in a "reduce" operation on the array.
+    // It acts on an initial segment of the array, from A[0]
+    // to A[params.jobs + params.offset].  The values in the
+    // first half are added to the values in the second half,
+    // so that after it runs, the sum of the values in the first
+    // half are equal to the sum of the original values in the
+    // initial segment.  The reduce operation runs this
+    // repeatedly, with the size of the initial segment being
+    // cut in half each time, until in the end, A[0] contains
+    // the sum of all the values from the original A.
+    
+    // (This is complicated by the fact that I want it to work
+    // even when the size of the initial segment is odd.  When it
+    // is even, params.jobs and params.offsets are equal, and
+    // the elements of the initial segment pair up one-to-one.
+    // When the size is odd, params.jobs = params.offset - 1,
+    // and the middle element of the initial segment is unpaired;
+    // in that case, the value of the middle element is not changed.)
+
+    struct ReduceParams {
+       jobs: u32,   // Number of pairs that have to be combined.
+       offset: u32  // Distance from an item to its paired item.
+    }
+    
+    @group(0) @binding(0) var<storage,read_write> A : array<f32>;
+    @group(0) @binding(1) var<uniform> params: ReduceParams;
+    
+    @compute @workgroup_size(64)
+    fn main(@builtin(global_invocation_id) id : vec3u) {
+       let myIndex = id.x;
+       if (myIndex >= params.jobs) {
+          return;
+       }
+       A[myIndex] = A[myIndex] + A[myIndex + params.offset];
+    }
+
+`;
+
+let device;
+
+let pipeline;       // Compute pipeline for computing the trapezoid areas.
+let shader = null;  // Shader for that pipeline.
+let buffer = null;  // Buffer containing the areas, used by both pipelines.
+let bindGroup;      // Bindgroup for pipeline, containing only the buffer.
+
+let stagingBuffer = null;  // A staging buffer that will be mapped for reading GPU data.
+
+let reducePipeline;      // Compute pipeline that is used in the reduce operation.
+let reduceParamsBuffer;  // Uniform buffer containing the params struct in the reduce shader.
+let reduceBindGroup;     // Bindgroup for reducePipeline, containing buffer and reduceParamsBuffer.
+
+let functionDefinitionStr = "sin(x)";  // Strings from the four input boxes
+let xminStr = "0";
+let xmaxStr = "3.14159";
+let intervalsStr = "10000";
+
+let intervals = 10000;  // equal to Number(intervalsStr), number of area values to be computed.
+
+
+/**
+ * Initialize the WebGPU device. 
+ */
+async function initWebGPU() {
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+   device = await adapter.requestDevice();
+}
+
+
+/**
+ *  Create reducePipeline and reduceParamsBuffer.  This is called once, during initialization,
+ *  since the values do not change.
+ */
+function makeReducePipeline() {
+   let reduceShader = device.createShaderModule({
+      code: reduceShaderSource
+   });
+   let pipelineDescriptor = {
+       compute: {
+          module: reduceShader,
+          entryPoint: "main"
+       },
+       layout: "auto"
+   };
+   reducePipeline = device.createComputePipeline(pipelineDescriptor);
+   reduceParamsBuffer = device.createBuffer({
+      size: 8,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+   });
+}
+
+
+/**
+ *  Create the pipeline that is used to compute the areas and the bind group
+ *  for that pipeline.  This has to be called whenever the values in the four
+ *  input boxes changes.  It is called from getDataAndCompute(), if necessary,
+ *  after the new shader, using the new inputs, has been compiled, and after 
+ *  the buffer has been created (if necessary).
+ */
+function makePipeline() {
+     let pipelineDescriptor = {
+       compute: {
+          module: shader,
+          entryPoint: "main"
+       },
+       layout: "auto"
+   };
+   pipeline = device.createComputePipeline(pipelineDescriptor);
+   bindGroup = device.createBindGroup({ 
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+         {
+            binding: 0,
+            resource: {buffer: buffer, size: 4*intervals} 
+         }
+      ]
+   });
+}
+
+
+/**
+ *  Creates the buffer and stagingBuffer.  Also creates the bind group for renderPipeline.
+ *  It is called when the buffers are first created and when the size of the buffers must
+ *  be increased because the number of intervals has increased.  (Note that the buffer
+ *  size is never reduced.  The size of the data in the buffer is 4*intervalse, but the
+ *  buffer can be larger than that.)
+ */
+function makeBuffers() {
+   if (buffer !== null)
+      buffer.destroy();
+   buffer = device.createBuffer({
+      size: 4*intervals,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+   });
+   if (stagingBuffer !== null)
+      stagingBuffer.destroy();
+   stagingBuffer = device.createBuffer({
+      size: 4*intervals,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
+   });
+   reduceBindGroup = device.createBindGroup({ 
+      layout: reducePipeline.getBindGroupLayout(0),
+      entries: [
+         {
+            binding: 0,
+            resource: {buffer: buffer, size: 4*intervals} 
+         },
+         {
+            binding: 1,
+            resource: {buffer: reduceParamsBuffer}
+         }
+      ]
+   });
+}
+
+
+/**
+ *  Called from getDataAndCompute() when the user had clicked the "Compute" button.
+ *  Runs the compute shader that computes all the trapezoid areas, then maps those
+ *  areas into a typed array so that they can be added up on the JavaScript side.
+ *  
+ */
+async function compute() {
+
+   // Run the shader. The number of times it should be invoked is given by
+   // intervals.  But since the workgroup size is 64, we need to dispatch
+   // Math.ceil(intervals/64) workgroups.
+
+   let commandEncoder = device.createCommandEncoder();
+   let passEncoder = commandEncoder.beginComputePass();
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setBindGroup(0, bindGroup);
+   passEncoder.dispatchWorkgroups( Math.ceil(intervals/64) );
+   passEncoder.end();
+      // The last thing in the commandEncoder is a command to copy
+      // the output from buffer into a stagingBuffer.
+   commandEncoder.copyBufferToBuffer( buffer, 0, stagingBuffer, 0, intervals*4 );
+   device.queue.submit([commandEncoder.finish()]);
+   
+   // Map the stagingBuffer for reading.  stagingBuffer.mapAsync()
+   // is a promise that resolves when stagingBuffer is ready.  Here,
+   // we use "await" to wait for that to happen.
+   
+   await stagingBuffer.mapAsync(GPUMapMode.READ,0,intervals*4);
+   
+   // To access the data in the staging buffer, we need to call
+   // stagingBuffer.getMappedRange().  This views the contents of the
+   // buffer as a JavaScript ArrayBuffer.  We want to treat it as
+   // a Float32Array, so the ArrayBuffer is wrapped in a Float32Array.
+   
+   let data = new Float32Array(stagingBuffer.getMappedRange(0,intervals*4));
+   
+   // Add up the values in the array.
+   
+   let sum = 0;
+   data.forEach( x => sum = sum+x );
+   
+   // unmap the staging buffer.  The buffer must be unmapped before it can be
+   // used again by the GPU.  In general, you want to unmap the buffer quickly.
+   // If processing the data will take much time, or if it needs to be saved
+   // for use elsewhere in the program, it should be copied before unmapping
+   // the buffer.
+   
+   stagingBuffer.unmap();
+   
+   document.getElementById("output").innerHTML =
+         "The computed approximate value for the integral is: " + sum.toPrecision(6);
+}
+
+
+/**
+ *  Called from getDataAndCompute() when the user had clicked the "Compute" button.
+ *  Runs the compute shader, then adds up the numbers in the buffer on the GPU side.
+ *  This involves several calls to the reduce shader.  After the last call, 
+ *  the total is the first floating-point value in the buffer.  Only that
+ *  item is copied to the staging buffer and read back into JavaScript.  
+ */
+async function computeAndReduce() {
+
+   // Run the shader that computes the areas of all the trapezoids.
+
+   let commandEncoder = device.createCommandEncoder();
+   let passEncoder = commandEncoder.beginComputePass();
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setBindGroup(0, bindGroup);
+   passEncoder.dispatchWorkgroups( Math.ceil(intervals/64) );
+   passEncoder.end();
+   device.queue.submit([commandEncoder.finish()]);
+   
+   // Perform a reduce operation to add up all the values.
+   
+   let reduceParams = new Uint32Array(2);
+   for (let count = intervals; count > 1; count = Math.ceil(count/2)) {
+          // Perform one pass of the reduce operation.  Before the pass,
+          // the final answer is equal to the sum of the values in array
+          // locations 0 through count-1.  After the pass, the final
+          // answer will be equal to the sum of the values in array
+          // locations 0 through Math.ceil(count/2) - 1.  After the
+          // final pass, when count is 2, the final answer will be
+          // in array location 0.
+      let jobs = Math.floor(count/2);  // Number of invocations for this pass.
+      let offset = Math.ceil(count/2); // Distance from an item to its paird item.
+      reduceParams[0] = jobs;
+      reduceParams[1] = offset;
+      //console.log(count, jobs, offset);
+      device.queue.writeBuffer(reduceParamsBuffer,0,reduceParams);
+      commandEncoder = device.createCommandEncoder();
+      passEncoder = commandEncoder.beginComputePass();
+      passEncoder.setPipeline(reducePipeline);
+      passEncoder.setBindGroup(0,reduceBindGroup);
+      passEncoder.dispatchWorkgroups(Math.ceil(jobs/64));
+      passEncoder.end();
+      if (count == 2) {
+           // This is the last step, so copy the final answer to the staging buffer.
+         commandEncoder.copyBufferToBuffer( buffer, 0, stagingBuffer, 0, 4 );
+      }
+      device.queue.submit([commandEncoder.finish()]);
+   }
+   
+   // Map the first 4  byte of the staging buffer to JavaScript, and interpret
+   // its value as a float.
+   
+   await stagingBuffer.mapAsync(GPUMapMode.READ,0,4);
+   let data = new Float32Array(stagingBuffer.getMappedRange(0,4));
+   let sum = data[0];
+   
+   // Unmap the staging buffer.
+   
+   stagingBuffer.unmap();
+   document.getElementById("output").innerHTML =
+          "The computed approximate value for the integral is: " + sum.toPrecision(6);
+}
+
+
+/**
+ *  This function is called with reduce == false when the user clicks the "Compute"
+ *  button and with reduce == true when the user clicks "Computer With Reduce".
+ *  It reads the values of the four input boxes and check them for errors.  If there is
+ *  an error, report it and return.  New pipeline, buffer, and bind group are created
+ *  if necessary.  Creating a new pipeline requires compiling a new shader, and an
+ *  error might occur at that point.  If no error has occurred, this function calles
+ *  computeAndReduce() or compute(), as appropriate.
+ */
+async function getDataAndCompute(reduce) {
+   function error(message,sourceID) {
+       document.getElementById("output").innerHTML = "Error in your input: " + message;
+       document.getElementById(sourceID).focus();
+       document.getElementById(sourceID).select();
+   }
+   document.getElementById("compilererror").innerHTML = "";
+   document.getElementById("output").innerHTML = "&nbsp;";
+   let f = document.getElementById("func").value.trim();
+   let x1s = document.getElementById("xmin").value.trim();
+   let x1 = Number(x1s);
+   let x2s = document.getElementById("xmax").value.trim();
+   let x2 = Number(x2s);
+   let is = document.getElementById("intervals").value.trim();
+   let i = Number(is);
+   if (f === "") {
+       error("The function definition cannot be empty.", "func");
+       return;
+   }
+   if (x1s === "") {
+       error("xmin cannot be empty.","xmin");
+       return;
+   }
+   if (isNaN(x1)) {
+       error("xmin must be a number.","xmin");
+       return;
+   }
+   if (x2s === "") {
+       error("xmax cannot be empty.","xmax");
+       return;
+   }
+   if (isNaN(x2)) {
+       error("xmax must be a number.","xmax");
+       return;
+   }
+   if (x2 <= x1) {
+       error("xmax must be a greater than xmin.","xmax");
+       return;
+   }
+   if (is === "") {
+       error("intervals cannot be empty.","intervals");
+       return;
+   }
+   if (isNaN(i) || i != Math.round(i) || i <= 0) {
+       error("intervals must be a positive integer.","intervals");
+       return;
+   }
+   if ( i > 1000000 ) {
+       error("intervals must be in the range 1 to 1000000.","intervals");
+       return;
+   }
+   if (reduce && i < 2) {
+      error("For reduce, intervals must be at least 2","intervals");
+      return;
+   }
+   intervals = i;
+   if (buffer === null || buffer.size < intervals*4) {
+      makeBuffers();
+   }
+   if (shader === null || f !== functionDefinitionStr ||
+                             x1s != xminStr || x2s != xmaxStr || is != intervalsStr) {
+      functionDefinitionStr = f;
+      xminStr = x1s;
+      xmaxStr = x2s;
+      intervalsStr = is;
+      intervals = i;
+      device.pushErrorScope("validation");
+      let shaderSource = makeShaderSource(functionDefinitionStr,x1,x2,intervals);
+      shader = device.createShaderModule({
+         code: shaderSource
+      });
+      let err = await device.popErrorScope();
+      if (err) {
+         document.getElementById("output").innerHTML =
+                          "Error in the shader, probably a bad function definition.<br>" +
+                          "The function must use the syntax of the WGSL shading language.<br>" +
+                          "Here is the message from the compiler:";
+         document.getElementById("compilererror").innerHTML = err.message.replace(/</g, "&lt;");
+         return;
+      }
+      makePipeline();
+   }
+   if (reduce) {
+      computeAndReduce();
+   }
+   else {
+      compute();
+   }
+}
+
+
+/**
+ *  Called after the page has loaded to do initialization.
+ */
+async function init() {
+   try {
+      await initWebGPU();
+      makeReducePipeline();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       console.log(e);
+       return;
+   }
+   document.getElementById("compute").onclick = function() { getDataAndCompute(false) };
+   document.getElementById("reduce").onclick = function() { getDataAndCompute(true) };
+   document.getElementById("func").value = functionDefinitionStr;
+   document.getElementById("xmin").value = xminStr;
+   document.getElementById("xmax").value = xmaxStr;
+   document.getElementById("intervals").value = intervalsStr;
+}
+
+window.onload = init;
+
+</script>
+</head>
+<body>
+ 
+
+<h2>WebGPU Example:  Mapping a Buffer for Read Access</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p style="max-width: 600px; margin-left:20px">
+This program is meant to illustrate using a "staging buffer" to read data
+from a buffer on the GPU back to the JavaScript side of the program.
+The computation uses the trapezoid rule to approximate a definite
+integral, but the point is that a bunch of numbers have to be computed
+and then added up.  When you click the "Compute" button, the numbers are
+computed in the GPU, then copied back to JavaScript and added up.
+The sum is reported at the bottom of the page.  If you click
+"Compute With Reduce", the sum is computed more efficiently on the GPU,
+and only the final answer is copied back to JavaScript.
+</p>
+
+
+<p id="message">&nbsp;</p>
+
+<p><b>f(x) = </b> <input id="func" size=30></p>
+<p><b>xmin = </b> <input id="xmin" size=10></p>
+<p><b>xmax = </b> <input id="xmax" size=10></p>
+<p><b>intervals = </b> <input id="intervals" size=8></p>
+<p style="margin-left:80px"><button id="compute">Compute</button></p>
+<p style="margin-left:80px"><button id="reduce">Compute With Reduce</button></p>
+
+<p style="margin-top:40px; font-weight:bold" id="output">&nbsp;</p>
+
+<pre id="compilererror" style="margin-left:40px; margin-top: 20px"></pre>
+    
+</body>
+</html>

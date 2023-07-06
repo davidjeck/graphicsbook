@@ -4,4 +4,31 @@
 
 <p1>To Be Written!</p1>
 
+<subsection title="Compute Shaders in WGSL" id="webgpu.6.1">
+</subsection>
+
+
+
+<subsection title="Compute Passes" id="webgpu.6.2">
+</subsection>
+
+
+
+<subsection title="A Simulation" id="webgpu.6.3">
+
+<demo height="450" width="530" src="c9/diffusion-demo.html"><p>About...</p></demo>
+
+<texdiv>
+<img tex="webgpu-diffusion.eps" texscale="1.0"/>
+</texdiv>
+
+</subsection>
+
+
+
+<subsection title="Retrieving Output" id="webgpu.6.4">
+</subsection>
+
+
+
 </section>

@@ -10,7 +10,7 @@ Other kinds of texture, such as variations in reflectivity or normal vector,
 are also possible.</p1>
 
 <p>Image textures were covered in <localref href="gl1light.3"/> for OpenGL
-and in <localref href="webgl.4"/> and <sourceref href="webgl3d.3"/> for WebGL.  Most of the basic ideas 
+and in <localref href="webgl.4"/> and <localref href="webgl3d.3"/> for WebGL.  Most of the basic ideas 
 carry over to WebGPU, even though the coding details are different.</p>
 
 <p>WebGPU has one-, two-, and three-dimensional image textures plus
@@ -74,7 +74,7 @@ the texture across and down the square.  (This is a very simple example of a
 
 <p>Although we will spend much of this section on this basic example, you can also
 look at <sourceref href="webgpu/textured_objects.html"/>, which applies textures
-to three-dimensional shapes, and <sourceref href="webgpu/texture-from-canvas.html"/>,
+to three-dimensional shapes, and <sourceref href="webgpu/texture_from_canvas.html"/>,
 which takes the image for a texture from a <word term="HTML canvas">canvas</word>
 on the same page.</p>
 

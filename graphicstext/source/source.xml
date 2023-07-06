@@ -470,6 +470,13 @@ textures and the WGSL functions <code>textureLoad()</code> and <code>textureStor
 The program <sourceref href="webgpu/life_2.html"/> performs the same task, but does it
 using two "r8unorm" textures, one used for sampling in the shader and one used as a color attachment
 for the render pipeline.  From <localref href="webgpu.5.5"/>.</li>
+<li><sourceref href="webgpu/diffusion.html"/> &mdash; Uses compute shaders to run a simulation
+of Brownian motion.  White particles move randomly.  When they hit a yellow or cyan particle,
+they change color and stop moving.  Over time, an interesting dendrite-like pattern will forms.
+From <localref href="webgpu.6.3"/>.</li>
+<li><sourceref href="map_buffer_for_read.html"/> &mdash; Illustrates reading data from a GPU buffer
+into the JavaScript side of the program.  The application (which is really not the point or the exercise)
+is to use the trapezoid rule to approximate a definite integral.  From <localref href="webgpu.6.4"/>.</li>
 </ul>
 </subsection>
 
@@ -662,8 +669,14 @@ drawing.  The demo uses multisampling for antialiasing, and lets the user turn m
 on and off to see the effect.</li>
 <li><demoref href="c9/diskworld-webgpu-demo.html"/> &mdash; from <localref href="webgpu.4"/>.
 Illustrates hierarchical 3D graphics in WebGPU.  The functionality and code are identical
-to the sample program <sourceref href="webgpu/diskworld_webgpu.html"/> expept for changes
+to the sample program <sourceref href="webgpu/diskworld_webgpu.html"/> except for changes
 made to turn it into a demo.</li>
+<li><demoref href="c9/diffusion-demo.html"/> &mdash;from <localref href="webgpu.6.3"/>.
+Uses WebGPU compute shaders to implement a simulation of diffusion.  White particles
+move by Brownian motion.  When a white particle hits a yellow or cyan particle, it 
+changes color to match and stops moving.  The result is to build up an interesting
+dendrite-like pattern.  This is a demo version of the sample program
+<sourceref href="webgpu/diffusion.html"/>.</li>
 </ul>
 
 

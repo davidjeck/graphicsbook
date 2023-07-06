@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<!--
+   Shows an animation of colored disks moving around in the canvas and
+   bouncing off the edges.  The user can turn the animation on and off.
+   
+   The real point of this program is to use a compute shader.  The
+   compute shader is used to update the positions of the disks.
+   The program is based loosely on instanced_draw.html, which updated
+   the positions on the JavaScript side, but adding the compute shader
+   involved lots of changes.
+   
+   The only comments on the code concern the compute shader and the
+   differences from instanced_draw.html.
+   
+-->
+<head>
+<title>WebGPU Example: First Compute Shader</title>
+<style>
+   body { 
+      background-color: white;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const renderShaderSource = `
+   
+   struct VertexOutput {
+       @builtin(position) position : vec4f,
+       @location(0) @interpolate(flat) color : vec4f
+         // (I've added @interpolate(flat) for efficiency, since the color is
+         // the same at all vertices of a disk, so no need for interpolation.)
+   }
+   
+   // In instanced_draw.html, the colors and offsets were instance
+   // attributes in vertex arrays.  They have been moved to
+   // storage buffers.  The offset buffer is also used in the
+   // compute shader.  The color data could still have been in
+   // a vertex buffer.
+   
+   @group(0) @binding(0) var<storage> diskColors : array<vec3f>;
+   @group(0) @binding(1) var<storage> diskOffsets : array<vec2f>;
+   
+   @vertex
+   fn vertexMain(
+             @builtin(instance_index) diskNum : u32,
+             @location(0) coords : vec2f ) -> VertexOutput {
+      let offset = diskOffsets[diskNum];
+      let color = diskColors[diskNum];
+      var output : VertexOutput;
+      output.position = vec4f( coords + offset, 0, 1 );
+      output.color = vec4f(color,1);
+      return output;
+   }
+   
+   @fragment
+   fn fragmentMain( @location(0) @interpolate(flat) color : vec4f) -> @location(0) vec4f{
+      return color;
+   }
+`;
+
+const computeShaderSource = `
+
+   // The compute shader is called for each frame of the animation.  It updates
+   // the positions of the disks, using the disk velocities and the change in time.
+   // In instanced_draw.html, the update was done on the JavaScript side, and
+   // the new values had to be copied from there to the GPU.
+
+   // The diskOffsets contains disk positions, two coordinates per disk, but
+   // here I'm treating it an array of floats because the x and y coords can
+   // be treated in the same way.  Each invocation of the shader updates
+   // either the x or y coordinate for one disk, by adding the corresponding
+   // velocity.  If that puts the value outside the range -1+radius to 1-radius,
+   // then the value is reflected in the opposit direction and the velocity is
+   // reversed.
+
+   @group(0) @binding(0) var<storage,read_write> diskOffsets : array<f32>;
+   @group(0) @binding(1) var<storage,read_write> diskVelocities : array<f32>;
+   
+   // The params buffer contains three numbers that are needed for the
+   // computation:  the number of disks, the disk radius, and the change
+   // in time from the previous update.
+   
+   @group(0) @binding(2) var<storage> params : array<f32,3>;
+
+   // The compute shader entry point must have a @workgroup_size annotation.
+   // Invocations of the shader are divided into workgroups and can work
+   // more closely together.  Here, there is no real reason to use a workgroup
+   // size greater than 1, but I do it to illustrate the concept.  In this
+   // program, there will actually be two workgroups, 128 invocations of the
+   // shader, but only 100 of them will have anything to do.  Note that this
+   // is a one-dimensional task.  There can also be two and three dimensional
+   // tasks, with a workgroup size for each dimension.
+   
+   @compute @workgroup_size(64)
+   fn main( @builtin(global_invocation_id) global_id : vec3u ) {
+      let index = global_id.x;  // Invocation number, to be used as an array index.
+      let diskCount = u32(params[0]);
+      if ( index >= 2*diskCount) { // Prevent extra invocations from doing any work.
+         return;
+      }
+      let radius = params[1];
+      let dt = params[2];
+      var position = diskOffsets[index];
+      position += diskVelocities[index] * dt;
+      if (position > 1-radius) {
+          diskVelocities[index] = -diskVelocities[index];
+          position = 2*(1-radius) - position;
+      }
+      else if (position < -1+radius) {
+          diskVelocities[index] = -diskVelocities[index];
+          position = 2*(-1+radius) - position;
+      }
+      diskOffsets[index] = position;
+   }
+`;
+
+const VERTEX_COUNT = 32;
+
+const INSTANCE_COUNT = 50; // Number of disks.
+
+let context;
+let device; 
+
+// GPU storage buffers
+let colorBuffer;      // The colors of the disks.
+let offsetBuffer;     // The offsets of the disks.
+let velocityBuffer;   // The velocities of the disks.
+let paramsBuffer;     // Contains the number of disks, the disk radius, and the time change.
+
+let renderShader;     // Resources for the render pass that draws the disk.
+let vertexBuffer;
+let renderPipeline;
+let renderBindGroup;  // (Contains colorBuffer and offsetBuffer.)
+
+let computeShader;    // Resources for the compute pass that updates the positions.
+let computePipeline;
+let computeBindGroup; // (Contains offsetBuffer, velocityBuffer, and paramsBuffer.)
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+   
+   device.pushErrorScope("validation");
+   renderShader = device.createShaderModule({
+      code: renderShaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in render shader; see Console for details.");
+   }   
+   device.pushErrorScope("validation");
+   computeShader = device.createShaderModule({
+      code: computeShaderSource
+   });
+   error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in compute shader; see Console for details.");
+   }   
+}
+
+
+/**
+ * This initialization function creates the four storage buffers and
+ * fills them with initial data.
+ */
+function createStorageBuffers() {
+   
+   /* Make arrays to be copied to the buffers. */
+   
+   let instanceColors = new Float32Array( 4*INSTANCE_COUNT );
+       // Note: The colorBuffer is an array<vec3f> in the render shader.
+       // The alignment rule for vec3f's requires an extra byte of
+       // padding after each vec3f, so we need four bytes per color.
+   let instanceOffsets = new Float32Array( 2*INSTANCE_COUNT );
+   let instanceVelocities = new Float32Array( 2*INSTANCE_COUNT );
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       instanceOffsets[2*i] = 1.8*Math.random() - 0.9; // allow for radius = 0.1
+       instanceOffsets[2*i+1] = 1.8*Math.random() - 0.9;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       instanceVelocities[2*i] = speed*Math.cos(theta);
+       instanceVelocities[2*i+1] = speed*Math.sin(theta);
+       instanceColors[4*i] = Math.random();
+       instanceColors[4*i+1] = Math.random();
+       instanceColors[4*i+2] = Math.random();
+   }
+   
+   /* Create storage buffers and write data to them. */
+   
+   colorBuffer = device.createBuffer({
+       size: instanceColors.byteLength, 
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+   });
+   device.queue.writeBuffer(colorBuffer,0,instanceColors);
+   offsetBuffer = device.createBuffer({
+       size: instanceOffsets.byteLength, 
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+   });
+   device.queue.writeBuffer(offsetBuffer,0,instanceOffsets);
+   velocityBuffer = device.createBuffer({
+       size: instanceVelocities.byteLength, 
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+   });
+   device.queue.writeBuffer(velocityBuffer,0,instanceVelocities);
+   paramsBuffer = device.createBuffer({
+       size: 12, 
+       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+   });
+      // (Note: parmamsBuffer contains three numbers.  The first two,
+      // representing the number of disks and disk radius, are set here.
+      // The third, which is the time chnange between frames, is written
+      // for each frame.)
+   device.queue.writeBuffer(paramsBuffer,0,new Float32Array([INSTANCE_COUNT,0.1]));   
+}
+
+
+/**
+ *  This initialization function creates the render pipeline that is used
+ *  to draw the disks, including the bind group and vertex buffer that
+ *  are used by that pipeline.
+ */
+function createRenderPipelineConfig() {
+   
+   let vertexBufferLayout = [
+      { 
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "vertex"
+      }
+   ];
+      
+   let pipelineDescriptor = {
+       vertex: {
+          module: renderShader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: renderShader,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       primitive: {
+          topology: "triangle-strip"
+       },
+       layout: "auto"
+   };
+    
+   renderPipeline = device.createRenderPipeline(pipelineDescriptor);  
+   
+   renderBindGroup = device.createBindGroup({  // contains colors and offsets
+      layout: renderPipeline.getBindGroupLayout(0),
+      entries: [
+         {
+            binding: 0,
+            resource: {buffer: colorBuffer, offset: 0, size: colorBuffer.byteLength} 
+         },
+         {
+            binding: 1,
+            resource: {buffer: offsetBuffer, offset: 0, size: offsetBuffer.byteLength} 
+         }
+      ]
+   });
+
+   // Create the array of vertex coords that are needed to
+   // draw a disk as a triang;e-strip primitive.
+   let vertexCoords = new Float32Array(2*INSTANCE_COUNT + 2);
+   vertexCoords[0] = 0.1;
+   vertexCoords[1] = 0;
+   for (let i = 1; i <= VERTEX_COUNT/2 - 1; i++) {
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[4*(i-1)+2] = 0.1 * Math.cos(angle);
+      vertexCoords[4*(i-1)+3] = -0.1 * Math.sin(angle);
+      vertexCoords[4*(i-1)+4] = 0.1 * Math.cos(angle);
+      vertexCoords[4*(i-1)+5] = 0.1 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT-2] = -0.1;
+   vertexCoords[2*VERTEX_COUNT-1] = 0;
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords); 
+}
+
+
+/**
+ *  This initialization function creates the compute pipeline that
+ *  is used to update the disk positions between frames, including
+ *  the bind group that is required by that pipeline.
+ */
+function createComputePipelineConfig() {
+   
+   let pipelineDescriptor = {
+       compute: {
+          module: computeShader,
+          entryPoint: "main"
+       },
+       layout: "auto"
+   };
+    
+   computePipeline = device.createComputePipeline(pipelineDescriptor);  
+   
+   computeBindGroup = device.createBindGroup({ // Contains offsets, velocities, and params
+      layout: computePipeline.getBindGroupLayout(0),
+      entries: [
+         {
+            binding: 0,
+            resource: {buffer: offsetBuffer} 
+         },
+         {
+            binding: 1,
+            resource: {buffer: velocityBuffer} 
+         },
+         {
+            binding: 2,
+            resource: {buffer: paramsBuffer} 
+         }
+      ]
+   });
+}
+
+
+/**
+ * Draw the disks, using a render pass.
+ */
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0.9, g: 0.9, b: 0.9, a: 1 }, 
+          loadOp: "clear", 
+          storeOp: "store",
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(renderPipeline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setBindGroup(0,renderBindGroup);
+   passEncoder.draw(VERTEX_COUNT,INSTANCE_COUNT);
+   passEncoder.end();
+   device.queue.submit([commandEncoder.finish()]);
+}
+
+
+/**
+ *  Use a compute pass to update the disk positions, based on their
+ *  velocities and the change in time since the previous animation frame.
+ *  The parameter is the change in time.
+ */
+function update(dt) {
+   
+   /* Write the change in time to the third position in the paramsBuffer */
+   
+   device.queue.writeBuffer(paramsBuffer,8,new Float32Array([dt]));
+   
+   /* Encode a compute pass that will do the work. */
+   
+   let commandEncoder = device.createCommandEncoder();
+   let passEncoder = commandEncoder.beginComputePass();
+   passEncoder.setPipeline(computePipeline);
+   passEncoder.setBindGroup(0, computeBindGroup);
+   let workGroupCount = Math.ceil( (2*INSTANCE_COUNT) / 64);
+   passEncoder.dispatchWorkgroups( workGroupCount );
+      // dispatchWorkgroups() is used to invoke the compute shader.
+      // For a one-dimensional task like this one, it takes one
+      // parameter, giving the number of workgroups.
+   passEncoder.end();
+   
+   /* Submit the work to the GPU device queue. */
+   
+   device.queue.submit([commandEncoder.finish()]);
+}
+
+//------------------------------------- Animation support -------------------------
+
+let running = false;
+let previousTime;
+
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000; 
+   previousTime = now;
+   update(dt);   // Update the disk positions.
+   draw();       // Draw the disks in their new positions.
+   requestAnimationFrame(doFrame); 
+}
+
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) {
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+}
+
+//---------------------------------------------------------------------------
+
+
+async function init() {
+   try {
+      await initWebGPU();
+      createStorageBuffers();
+      createRenderPipelineConfig();
+      createComputePipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+   draw();  // Draw the disks in their initial positions.
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU Compute Shader Example</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>
+
