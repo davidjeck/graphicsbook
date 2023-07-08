@@ -31,7 +31,7 @@ we can specify a line segment in the scene by giving the coordinates of its two 
 and we can specify a triangle by giving the coordinates of its three vertices.  The smallest building
 blocks that we have to work with, such as line segments and triangles, are called
 <newword term="geometric primitive">geometric primitives</newword>.  Different graphics
-systems make different sets of primitive available, but in many cases only very basic
+systems make different sets of primitives available, but in many cases only very basic
 shapes such as lines and triangles are considered primitive.  A complex scene can contain
 a large number of primitives, and it would be very difficult to create the scene by
 giving explicit coordinates for each individual primitive.  The solution, as any programmer
