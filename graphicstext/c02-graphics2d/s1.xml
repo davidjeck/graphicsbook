@@ -88,7 +88,7 @@ one-pixel line width:</p>
        tex="horizontal-lines-from-canvas.eps" texscale="0.8"/>
        
 <np>The top line was drawn from the point (100,100) to the point (120,100).  In
-canvas graphics, integer coordinates corresponding to the lines between pixels, 
+canvas graphics, integer coordinates correspond to the lines between pixels, 
 but when a one-pixel line is drawn, it
 extends one-half pixel on either side of the infinitely thin geometric line.  So for the top line,
 the line as it is drawn lies half
