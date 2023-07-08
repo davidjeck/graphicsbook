@@ -41,7 +41,7 @@ GPU can understand.</p>
 <p>OpenGL is not the only graphics API.  The best-known alternatives are probably
 the proprietary APIs used by Apple and Microsoft.  Apple's MacOS uses an API known
 as Metal, while Microsoft Windows uses Direct3D.  Nevertheless, OpenGL
-can currently still be used on MacOS and Windows.  Furthermore, a newer open API named
+can still be used on MacOS and Windows.  Furthermore, a newer open API named
 Vulkan has been defined as a replacement for OpenGL itself.
 Vulkan is a complex, low-level
 API designed more for speed and efficiency rather than ease-of-use, and it will likely
