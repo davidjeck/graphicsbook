@@ -14,7 +14,7 @@ you a bit of background about the history of OpenGL and about the graphics
 hardware that supports it.</p1>
 
 <p>In the first desktop computers, the contents of the screen were managed
-directly by the <word>CPU</word>.  For example, to draw a line segment on the screen, the CPU
+directly by the <newword>CPU</newword>.  For example, to draw a line segment on the screen, the CPU
 would run a loop to set the color of each pixel that lies along the line.
 Needless to say, graphics could take up a lot of the CPU's time.  And graphics
 performance was very slow, compared to what we expect today.  So what has changed?
@@ -32,7 +32,7 @@ stored in the computer's main memory.</p>
 send commands, along with any necessary data, to the GPU, which is responsible
 for actually carrying out those commands.  The CPU offloads most of the graphical
 work to the GPU, which is optimized to carry out that work very quickly.
-The set of commands that the GPU understands make up the <word>API</word>
+The set of commands that the GPU understands make up the <newword>API</newword>
 of the GPU.  OpenGL is an example of a graphics API, and most GPUs support
 OpenGL in the sense that they can understand OpenGL commands, or at least
 that OpenGL commands can efficiently be translated into commands that the
@@ -92,7 +92,7 @@ be transmitted to the GPU to draw a given image.</p>
 
 <p>OpenGL draws <word term="geometric primitive">primitives</word> such as triangles.
 Specifying a primitive means specifying <word term="coordinate system">coordinates</word>
-and <word term="attribute">attributes</word> for each of its <word term="vertex">vertices</word>.  In the
+and <word term="attribute">attributes</word> for each of its <newword term="vertex">vertices</newword>.  In the
 original OpenGL&nbsp;1.0, a separate command was used to specify the coordinates of each vertex,
 and a command was needed each time the value of an attribute changed.  To draw a single 
 triangle would require three or more commands.  Drawing a complex object made up of
