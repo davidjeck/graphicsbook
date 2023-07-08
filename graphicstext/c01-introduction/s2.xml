@@ -119,7 +119,7 @@ and the whole process of producing an image is referred to as <newword>rendering
 the scene.</p>
 
 <p>In many cases the ultimate goal is not to create a single image, but to create an
-<newword>animation</newword>, consisting a sequence of images that show the world
+<newword>animation</newword>, consisting of a sequence of images that show the world
 at different times.  In an animation, there are small changes from one image in the
 sequence to the next.  Almost any aspect of a scene can change during an animation,
 including coordinates of primitives, transformations, material properties, and the view.
