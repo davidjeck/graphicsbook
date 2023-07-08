@@ -185,7 +185,7 @@ they would like to use, it would be good to have a subroutine such as</p>
 
 <np>The graphics system would then be responsible for automatically
  <word term="geometric transform">transforming</word> the  
-coordinates from the specfiied coordinate system into pixel coordinates.
+coordinates from the specified coordinate system into pixel coordinates.
 Such a subroutine might not be available, so it's useful to see how the transformation
 is done by hand.  Let's consider the general case.  Given coordinates for a point in 
 one coordinate system, we want to find the coordinates for the same point in a second 
@@ -204,7 +204,7 @@ of the point in the second coordinate system</np>
 <pre>newX = newLeft + 
           ((oldX - oldLeft) / (oldRight - oldLeft)) * (newRight - newLeft))
 newY = newTop + 
-          ((oldY - oldTop) / (oldBottom - oldTop)) * (newBotom - newTop)</pre>
+          ((oldY - oldTop) / (oldBottom - oldTop)) * (newBottom - newTop)</pre>
 
 <np>The logic here is that <i>oldX</i> is located at a certain fraction of the distance from <i>oldLeft</i> to
 <i>oldRight</i>.  That fraction is given by</np>
