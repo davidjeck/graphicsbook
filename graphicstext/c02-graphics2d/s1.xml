@@ -95,7 +95,7 @@ the line as it is drawn lies half
 in one row of pixels and half in another row.  The graphics system, which uses
 antialiasing, <word term="rendering">rendered</word> the line by coloring both
 rows of pixels gray.  The bottom line was drawn from the point (100.5,100.5) to
-(120.5,120.5).  In this case, the line lies exactly along one line of pixels,
+(120.5,100.5).  In this case, the line lies exactly along one line of pixels,
 which gets colored black.  The gray pixels at the ends of the bottom line have to do with
 the fact that the line only extends halfway into the pixels at its endpoints.
 Other graphics systems might render the same lines differently.</np>
