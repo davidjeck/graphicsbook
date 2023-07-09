@@ -409,7 +409,7 @@ And when the cart is done, the original transform, the identity, is popped.  Whe
 goes onto the next object in the scene, it starts the whole process again, with the identity
 transform as the starting point.</p>
 
-<p>This might sound complicated, but I should emphasize that it something that the computer
+<p>This might sound complicated, but I should emphasize that it is something that the computer
 does for you.  Your responsibility is simply to design the individual objects, in their
 own natural coordinate system. As part of that, you specify the modeling transformations that are applied
 to the sub-objects of that object.  You construct the scene as a whole in a similar way.
