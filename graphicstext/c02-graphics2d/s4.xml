@@ -142,7 +142,7 @@ Here is pseudocode for a  subroutine that draws the cart in its own coordinate s
     saveTransform()       // save it again
     translate(1.5,-0.1)   // center of second wheel will be at (1.5,-0.1)
     scale(0.8,0.8)        // scale to reduce radius from 1 to 0.8
-    drawWheel(g2)         // draw the second wheel
+    drawWheel()           // draw the second wheel
     restoreTransform()    // restore the transform
     setDrawingColor(RED)  // use red color to draw the rectangles
     fillRectangle(-3, 0, 6, 2)      // draw the body of the cart
