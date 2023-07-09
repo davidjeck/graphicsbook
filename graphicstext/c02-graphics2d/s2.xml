@@ -325,7 +325,7 @@ one segment will merge smoothly into the next if control points are properly cho
 <demo src="c2/cubic-bezier.html" width="550" height="500"><p>This will all be easier to understand
 with some hands-on experience. <tex>The interactive demo <i>c2/cubic-bezier.html</i>
 lets you edit cubic Bezier curve segments by dragging their endpoints and control points.</tex>
-<web>This interative demo lets you edit cubic Bezier curve segments by dragging their endpoints 
+<web>This interactive demo lets you edit cubic Bezier curve segments by dragging their endpoints 
 and control points:</web>
 </p></demo>
 
