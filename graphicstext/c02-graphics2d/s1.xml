@@ -8,7 +8,7 @@ assigned a color.  A point in 2D can be identified by a pair of numerical
 coordinates.  Colors can also
 be specified numerically.  However, the assignment of numbers to points
 or colors is somewhat arbitrary.  So we need to spend some time
-studying <word term="coordinate system">coordinate systems</word>, which associate
+studying <newword term="coordinate system">coordinate systems</newword>, which associate
 numbers to points, and <newword term="color model">color models</newword>, which
 associate numbers to colors.</p1>
 
