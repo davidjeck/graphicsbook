@@ -42,7 +42,7 @@ that are patterns of dashes and dots.  This illustration shows some of the possi
 
 <np>On the left are three wide lines with no cap, a round cap, and a square cap.  The geometric line
 segment is shown as a dotted line.  (The no-cap style is called "butt.")  To the right are four lines
-with different patters of dots and dashes.  In the middle are three different styles of line joins:
+with different patterns of dots and dashes.  In the middle are three different styles of line joins:
 mitered, rounded, and beveled.</np>
 
 <break/>
