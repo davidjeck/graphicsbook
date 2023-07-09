@@ -261,7 +261,7 @@ or asking whether it is odd.  You can set the winding rule used by a <classname>
 <i>p</i> with</p>
 
 <pre>p.setWindingRule( Path2D.WIND_NON_ZERO );
-p.setWindingrule( Path2D.WIND_EVEN_ODD );</pre>
+p.setWindingRule( Path2D.WIND_EVEN_ODD );</pre>
 
 <np>The default is <code>WIND_NON_ZERO</code>.</np>
 
@@ -451,7 +451,7 @@ horizontal or vertical shear.)</li>
 
 
 <p>A transform in Java is represented as an object of the class <classname>AffineTransform</classname>.
-You can create a general <word>affine transform</word> with the contstructor
+You can create a general <word>affine transform</word> with the constructor
 </p>
 
 <pre>AffineTransform trns = new AffineTransform(a,b,c,d,e,f);</pre>
@@ -514,7 +514,7 @@ has a method for applying the affine transform to a point.  It works with object
 Point2D.Double originalPoint = new Point2D.Double(x,y);
 Point2D.Double transformedPoint = new Point2D.Double();
 trns.transform( originalPoint, transformedPoint );
-// transformedPoint nowcontains the pixel coords corresponding to (x,y)
+// transformedPoint now contains the pixel coords corresponding to (x,y)
 int pixelX = (int)transformedPoint.x;
 int pixelY = (int)transformedPoint.y;</pre>
 
@@ -593,7 +593,7 @@ into a single integer value.</np>
 the on-screen image, the <i>paintComponent</i> method generally has the form</p>
 
 <pre>protected void paintComponent(Graphics g) {
-    g.drawimage( OSC, 0, 0, null );
+    g.drawImage( OSC, 0, 0, null );
     Graphics2D g2 = (Graphics2D)g.create();
       .
       . // Draw extra stuff on top of the image.
