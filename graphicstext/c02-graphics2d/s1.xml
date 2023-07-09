@@ -307,7 +307,7 @@ blue light?  In fact, we can't quite do that.</p>
 <p>You might have heard that combinations of the three basic, or "primary," colors are sufficient
 to represent all colors, because the human eye has three kinds of color sensors that detect red,
 green, and blue light.  However, that is only an approximation.  The eye does contain three
-kinds of color sensor.  The sensors are called "cone cells."
+kinds of color sensors.  The sensors are called "cone cells."
 However, cone cells do not respond exclusively to red, green, and blue light.  Each kind
 of cone cell responds, to a varying degree, to wavelengths of light in a wide range.  A given
 mix of wavelengths will stimulate each type of cell to a certain degree, and the intensity of
@@ -327,7 +327,7 @@ surprisingly common.)</p>
 the <newword>color gamut</newword> of that device.  Different computer screens can have different
 color gamuts, and the same RGB values can produce somewhat different colors on different screens.
 The color gamut of a color printer is noticeably different&mdash;and probably
-smaller&mdash;than the color gamut of a screen, which explain why a printed image probably
+smaller&mdash;than the color gamut of a screen, which explains why a printed image probably
 doesn't look exactly the same as it did on the screen.  (Printers, by the way, make colors
 differently from the way a screen does it.  Whereas a screen combines light to make a color, 
 a printer combines inks or dyes.  Because of this difference, colors meant for printers are often
