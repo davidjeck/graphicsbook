@@ -212,7 +212,7 @@ device coordinates since they are actual physical coordinates on the device wher
 image is being displayed.</gitem>
 <gitem term="world coordinates">The coordinate system in which a scene is defined.  The image 
 that is produced of the scene will show the contents of the world coordinate system that
-lie within some some view volume (for 3D) or view window (for 2D).  Objects are defined
+lie within some view volume (for 3D) or view window (for 2D).  Objects are defined
 in their own object coordinate system. Modeling transformations are then applied to place 
 objects into the scene; that is, they transform object coordinates to world coordinates.</gitem>
 <gitem term="object coordinates">The coordinate system in which the coordinates for points in an 
