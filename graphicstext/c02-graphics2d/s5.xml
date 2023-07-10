@@ -639,7 +639,7 @@ region of pixels.</np>
 "Smudge" tool.  When the user drags with this tool, it's like smearing wet paint.  When
 the user first clicks the mouse, the color components from a small square of pixels surrounding
 the mouse position are copied into arrays.  As the user moves the mouse, color from the
-arrays is blended into the color of the pixels near the mouse position, while those colors
+arrays is blended into the color of the pixels near the mouse position while those colors
 are blended into the colors in the arrays.  Here is a
 small rectangle that has been "smudged":</p>
 
