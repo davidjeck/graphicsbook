@@ -31,7 +31,7 @@ we can specify a line segment in the scene by giving the coordinates of its two 
 and we can specify a triangle by giving the coordinates of its three vertices.  The smallest building
 blocks that we have to work with, such as line segments and triangles, are called
 <newword term="geometric primitive">geometric primitives</newword>.  Different graphics
-systems make different sets of primitive available, but in many cases only very basic
+systems make different sets of primitives available, but in many cases only very basic
 shapes such as lines and triangles are considered primitive.  A complex scene can contain
 a large number of primitives, and it would be very difficult to create the scene by
 giving explicit coordinates for each individual primitive.  The solution, as any programmer
@@ -119,7 +119,7 @@ and the whole process of producing an image is referred to as <newword>rendering
 the scene.</p>
 
 <p>In many cases the ultimate goal is not to create a single image, but to create an
-<newword>animation</newword>, consisting a sequence of images that show the world
+<newword>animation</newword>, consisting of a sequence of images that show the world
 at different times.  In an animation, there are small changes from one image in the
 sequence to the next.  Almost any aspect of a scene can change during an animation,
 including coordinates of primitives, transformations, material properties, and the view.
