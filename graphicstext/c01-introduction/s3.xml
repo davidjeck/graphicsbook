@@ -41,7 +41,7 @@ GPU can understand.</p>
 <p>OpenGL is not the only graphics API.  The best-known alternatives are probably
 the proprietary APIs used by Apple and Microsoft.  Apple's MacOS uses an API known
 as Metal, while Microsoft Windows uses Direct3D.  Nevertheless, OpenGL
-can currently still be used on MacOS and Windows.  Furthermore, a newer open API named
+can still be used on MacOS and Windows.  Furthermore, a newer open API named
 Vulkan has been defined as a replacement for OpenGL itself.
 Vulkan is a complex, low-level
 API designed more for speed and efficiency rather than ease-of-use, and it will likely
@@ -56,7 +56,7 @@ Web browsers. </p>
 been subject to repeated extension and revision.  The current version, in 2021,
 is 4.6, which was first released in 2017.  It is very different from the 1.0 version from 1992.
 Furthermore,
-there is a specialized version called OpengGL&nbsp;ES for "embedded systems" such
+there is a specialized version called OpenGL&nbsp;ES for "embedded systems" such
 as mobile phones and tablets.  And there is also WebGL, for use in Web browsers,
 which is basically a port of OpenGL ES.  It will be useful to know something
 about how and why OpenGL has changed.</p>
@@ -131,7 +131,7 @@ to the GPU for execution.</p>
 really describe what most of them actually do).  The first shaders to be introduced were
 <newword term="vertex shader">vertex shaders</newword> and <newword term="fragment shader">fragment shaders</newword>.
 When a <word term="geometric primitive">primitive</word> is drawn, some work has to be done at each vertex of the primitive,
-such as applying a <word>geometric transform</word> to the vertex coodinates or
+such as applying a <word>geometric transform</word> to the vertex coordinates or
 using the <word term="attribute">attributes</word> and global <word>lighting</word> environment
 to compute the color of that vertex.  A vertex shader is a program that can take over the
 job of doing such "per-vertex" computations.  Similarly, some work has to be done for each

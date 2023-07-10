@@ -86,7 +86,7 @@ of the image, you only need to store the coordinates of two thousand points, the
 endpoints of the lines.  This would take up only a few kilobytes of memory.  To store
 the image in a frame buffer for a raster display would require much more memory.  
 Similarly, a vector display could
-draw the lines on the screen more quickly than a raster display could copy the the same image from
+draw the lines on the screen more quickly than a raster display could copy the same image from
 the frame buffer to the screen.  (As soon as raster displays became fast and 
 inexpensive, however, they quickly displaced vector displays because of their
 ability to display all types of images reasonably well.)
