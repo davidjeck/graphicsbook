@@ -474,7 +474,7 @@ for the render pipeline.  From <localref href="webgpu.5.5"/>.</li>
 of Brownian motion.  White particles move randomly.  When they hit a yellow or cyan particle,
 they change color and stop moving.  Over time, an interesting dendrite-like pattern will forms.
 From <localref href="webgpu.6.3"/>.</li>
-<li><sourceref href="map_buffer_for_read.html"/> &mdash; Illustrates reading data from a GPU buffer
+<li><sourceref href="webgpu/map_buffer_for_read.html"/> &mdash; Illustrates reading data from a GPU buffer
 into the JavaScript side of the program.  The application (which is really not the point or the exercise)
 is to use the trapezoid rule to approximate a definite integral.  From <localref href="webgpu.6.4"/>.</li>
 </ul>

@@ -2,14 +2,14 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="56.190903mm"
+   width="107.91868mm"
    height="42.119812mm"
-   viewBox="0 0 56.190903 42.119812"
+   viewBox="0 0 107.91868 42.119812"
    version="1.1"
    id="svg5"
    inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
    sodipodi:docname="gpu-workgroups.svg"
-   inkscape:export-filename="/home/eck/gpu-workgroups.png"
+   inkscape:export-filename="/home/eck/Desktop/gpu-workgroups.png"
    inkscape:export-xdpi="90"
    inkscape:export-ydpi="90"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
@@ -32,7 +32,7 @@
      fit-margin-right="0"
      fit-margin-bottom="0"
      inkscape:zoom="1"
-     inkscape:cx="173"
+     inkscape:cx="166"
      inkscape:cy="93"
      inkscape:window-width="1920"
      inkscape:window-height="1012"
@@ -41,7 +41,22 @@
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1" />
   <defs
-     id="defs2" />
+     id="defs2">
+    <marker
+       style="overflow:visible"
+       id="Arrow2Mend"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow2Mend"
+       inkscape:isstock="true">
+      <path
+         transform="scale(-0.6)"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:0.625;stroke-linejoin:round"
+         id="path1672" />
+    </marker>
+  </defs>
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
@@ -3612,5 +3627,26 @@
         </g>
       </g>
     </g>
+    <path
+       style="fill:none;stroke:#0000ff;stroke-width:0.529167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow2Mend)"
+       d="m 116.17332,67.959079 c -6.61345,-5.216982 -13.6046,-0.805802 -25.80568,2.853055"
+       id="path1450"
+       sodipodi:nodetypes="cc" />
+    <text
+       xml:space="preserve"
+       style="font-size:3.52778px;line-height:1.45;font-family:sans-serif;-inkscape-font-specification:sans-serif;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+       x="115.40207"
+       y="71.371277"
+       id="text9695"><tspan
+         sodipodi:role="line"
+         style="font-size:3.52778px;stroke-width:0.264583"
+         x="115.40207"
+         y="71.371277"
+         id="tspan32669">Glocal invocation ID = (9,6)</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:3.52778px;stroke-width:0.264583"
+         x="115.40207"
+         y="76.486557"
+         id="tspan32671">Local invocation ID = (2,1)</tspan></text>
   </g>
 </svg>

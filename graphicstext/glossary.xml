@@ -916,7 +916,7 @@ OpenGL, WebGL, and Vulkan.</gitem>
 <gitem term="VAO">Vertex Array Object.  In WebGL 2.0, a region of memory, typically on the graphics card,
 that holds a collection of attribute settings such as enabled state and values of vertex attribute pointers.
 All of the settings can then be selected simply by binding the VAO.</gitem>
-<gitem term="instanced drawing">In WebGL 2.0, the ability to draw multiple versions of a primitive
+<gitem term="instanced drawing">The ability to render multiple versions of a primitive
 with a single function call.  Each copy can have its own values for certain attributes, such as
 color or transformation.</gitem>
 

@@ -79,7 +79,7 @@ const computeShaderSource = `
    // be treated in the same way.  Each invocation of the shader updates
    // either the x or y coordinate for one disk, by adding the corresponding
    // velocity.  If that puts the value outside the range -1+radius to 1-radius,
-   // then the value is reflected in the opposit direction and the velocity is
+   // then the value is reflected in the opposite direction and the velocity is
    // reversed.
 
    @group(0) @binding(0) var<storage,read_write> diskOffsets : array<f32>;
@@ -102,30 +102,30 @@ const computeShaderSource = `
    
    @compute @workgroup_size(64)
    fn main( @builtin(global_invocation_id) global_id : vec3u ) {
-      let index = global_id.x;  // Invocation number, to be used as an array index.
-      let diskCount = u32(params[0]);
-      if ( index >= 2*diskCount) { // Prevent extra invocations from doing any work.
-         return;
-      }
-      let radius = params[1];
-      let dt = params[2];
-      var position = diskOffsets[index];
-      position += diskVelocities[index] * dt;
-      if (position > 1-radius) {
-          diskVelocities[index] = -diskVelocities[index];
-          position = 2*(1-radius) - position;
-      }
-      else if (position < -1+radius) {
-          diskVelocities[index] = -diskVelocities[index];
-          position = 2*(-1+radius) - position;
-      }
-      diskOffsets[index] = position;
+       let index = global_id.x; // Invocation number, to be used as an array index.
+       let diskCount = u32(params[0]); // params[0] is the number of disks.
+       if ( index >= 2*diskCount) { // Prevent extra invocations from doing work.
+          return;
+       }
+       let radius = params[1];  // params[i] is the radius of the disks.
+       let dt = params[2];  // params[2] is the time change since previous update.
+       var position = diskOffsets[index];
+       position += diskVelocities[index] * dt;
+       if (position > 1-radius) { // position puts part of disk outside board.
+           diskVelocities[index] = -diskVelocities[index]; // reverse direction.
+           position = 2*(1-radius) - position; // new position after bounce.
+       }
+       else if (position < -1+radius) {
+           diskVelocities[index] = -diskVelocities[index];
+           position = 2*(-1+radius) - position;
+       }
+       diskOffsets[index] = position;  
    }
 `;
 
 const VERTEX_COUNT = 32;
 
-const INSTANCE_COUNT = 50; // Number of disks.
+const DISK_COUNT = 50; // Number of disks.
 
 let context;
 let device; 
@@ -193,13 +193,13 @@ function createStorageBuffers() {
    
    /* Make arrays to be copied to the buffers. */
    
-   let instanceColors = new Float32Array( 4*INSTANCE_COUNT );
+   let instanceColors = new Float32Array( 4*DISK_COUNT );
        // Note: The colorBuffer is an array<vec3f> in the render shader.
        // The alignment rule for vec3f's requires an extra byte of
        // padding after each vec3f, so we need four bytes per color.
-   let instanceOffsets = new Float32Array( 2*INSTANCE_COUNT );
-   let instanceVelocities = new Float32Array( 2*INSTANCE_COUNT );
-   for (let i = 0; i < INSTANCE_COUNT; i++) {
+   let instanceOffsets = new Float32Array( 2*DISK_COUNT );
+   let instanceVelocities = new Float32Array( 2*DISK_COUNT );
+   for (let i = 0; i < DISK_COUNT; i++) {
        instanceOffsets[2*i] = 1.8*Math.random() - 0.9; // allow for radius = 0.1
        instanceOffsets[2*i+1] = 1.8*Math.random() - 0.9;
        let speed = 0.1 + 0.5*Math.random();
@@ -236,7 +236,7 @@ function createStorageBuffers() {
       // representing the number of disks and disk radius, are set here.
       // The third, which is the time chnange between frames, is written
       // for each frame.)
-   device.queue.writeBuffer(paramsBuffer,0,new Float32Array([INSTANCE_COUNT,0.1]));   
+   device.queue.writeBuffer(paramsBuffer,0,new Float32Array([DISK_COUNT,0.1]));   
 }
 
 
@@ -292,7 +292,7 @@ function createRenderPipelineConfig() {
 
    // Create the array of vertex coords that are needed to
    // draw a disk as a triang;e-strip primitive.
-   let vertexCoords = new Float32Array(2*INSTANCE_COUNT + 2);
+   let vertexCoords = new Float32Array(2*DISK_COUNT + 2);
    vertexCoords[0] = 0.1;
    vertexCoords[1] = 0;
    for (let i = 1; i <= VERTEX_COUNT/2 - 1; i++) {
@@ -367,7 +367,7 @@ function draw() {
    passEncoder.setPipeline(renderPipeline);
    passEncoder.setVertexBuffer(0,vertexBuffer);
    passEncoder.setBindGroup(0,renderBindGroup);
-   passEncoder.draw(VERTEX_COUNT,INSTANCE_COUNT);
+   passEncoder.draw(VERTEX_COUNT,DISK_COUNT);
    passEncoder.end();
    device.queue.submit([commandEncoder.finish()]);
 }
@@ -390,7 +390,7 @@ function update(dt) {
    let passEncoder = commandEncoder.beginComputePass();
    passEncoder.setPipeline(computePipeline);
    passEncoder.setBindGroup(0, computeBindGroup);
-   let workGroupCount = Math.ceil( (2*INSTANCE_COUNT) / 64);
+   let workGroupCount = Math.ceil( (2*DISK_COUNT) / 64);
    passEncoder.dispatchWorkgroups( workGroupCount );
       // dispatchWorkgroups() is used to invoke the compute shader.
       // For a one-dimensional task like this one, it takes one
