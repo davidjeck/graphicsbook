@@ -389,7 +389,7 @@ pixel.</p>
 <p>To create a <classname>TexturePaint</classname>, you need a <classname>BufferedImage</classname>
 object to specify the image that it will use as a pattern.  You also
 have to say how coordinates in the image will map
-to drawing coordinates in the display.  You do this by specifying a rectangle in
+to drawing coordinates in the display.  You do this by specifying a rectangle
 that will hold one copy of the image.  So the constructor takes the form:</p>
 
 <pre>new TexturePaint( image, rect );</pre>
