@@ -33,7 +33,7 @@ public class GraphicsStarter extends JPanel {
 	
 	private float pixelSize;  // This is the measure of a pixel in the coordinate system
 	                          // set up by calling the applyWindowToViewportTransformation method.
-							  // It can be used for setting line widths, for example.
+	                          // It can be used for setting line widths, for example.
 	
 	/**
 	 * This constructor sets up a GraphicsStarter when it is created.  Here, it
