@@ -32,8 +32,8 @@ public class GraphicsStarter extends JPanel {
 	}
 	
 	private float pixelSize;  // This is the measure of a pixel in the coordinate system
-	                          // set up by calling the applyLimits method.  It can be used
-	                          // for setting line widths, for example.
+	                          // set up by calling the applyWindowToViewportTransformation method.
+							  // It can be used for setting line widths, for example.
 	
 	/**
 	 * This constructor sets up a GraphicsStarter when it is created.  Here, it
@@ -69,13 +69,13 @@ public class GraphicsStarter extends JPanel {
 		g2.fillRect(0,0,getWidth(),getHeight()); // From the old graphics API!
 		
 		/* Here, I set up a new coordinate system on the drawing area, by calling
-		 * the applyLimits() method that is defined below.  Without this call, I
-		 * would be using regular pixel coordinates.  This function sets the global
-		 * variable pixelSize, which I need for stroke widths in the transformed
-		 * coordinate system.
+		 * the applyWindowToViewportTransformation() method that is defined below.
+		 * Without this call, I would be using regular pixel coordinates.  This
+		 * function sets the global variable pixelSize, which I need for stroke
+		 * widths in the transformed coordinate system.
 		 */
 		
-		applyapplyWindowToViewportTransformation(g2, -5, 5, -5, 5, true);
+		applyWindowToViewportTransformation(g2, -5, 5, -5, 5, true);
 		
 		/* Finish by drawing a few shapes as an example.  You can erase the rest of 
 		 * this subroutine and substitute your own drawing.
@@ -126,7 +126,7 @@ public class GraphicsStarter extends JPanel {
      *     Note that when preserveAspect is false, the units of measure in the horizontal 
      *     and vertical directions will be different.
      */
-	private void applyapplyWindowToViewportTransformation(Graphics2D g2,
+	private void applyWindowToViewportTransformation(Graphics2D g2,
 			double left, double right, double bottom, double top, 
 			boolean preserveAspect) {
 		int width = getWidth();   // The width of this drawing area, in pixels.
