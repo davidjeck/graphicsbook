@@ -378,7 +378,7 @@ g2.setPaint( Color.BLACK );
 g2.draw( square );
 </pre>
 
-<p>Beyond solid colors, Java has the class <classname>GradientPaint</classname>, to represent
+<p>Beyond solid colors, Java has the class <classname>GradientPaint</classname> to represent
 simple <word term="linear gradient">linear gradients</word>, and <classname>TexturePaint</classname>
 to represent to represent <word term="pattern fill">pattern fills</word>.  (Image patterns
 used in a similar way in 3D graphics are called <word term="texture">textures</word>.)
