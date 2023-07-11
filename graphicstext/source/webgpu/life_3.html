@@ -339,8 +339,8 @@ function draw() {
 
 
 /**
- *  Compute the next generation and copy it to the currentGeneration texture
- *  that is used in the render pipeline.
+ *  Compute the next generation and copy it to the currentGeneration texture.
+ *  (Only currentGenertion is used in the render shader.)
  */
 function computeNextGeneration() {
    let commandEncoder = device.createCommandEncoder();

@@ -223,7 +223,6 @@ function makeBuffers() {
  *  Called from getDataAndCompute() when the user had clicked the "Compute" button.
  *  Runs the compute shader that computes all the trapezoid areas, then maps those
  *  areas into a typed array so that they can be added up on the JavaScript side.
- *  
  */
 async function compute() {
 
@@ -246,7 +245,7 @@ async function compute() {
    // is a promise that resolves when stagingBuffer is ready.  Here,
    // we use "await" to wait for that to happen.
    
-   await stagingBuffer.mapAsync(GPUMapMode.READ,0,intervals*4);
+   await stagingBuffer.mapAsync(GPUMapMode.READ, 0, intervals*4);
    
    // To access the data in the staging buffer, we need to call
    // stagingBuffer.getMappedRange().  This views the contents of the
@@ -258,7 +257,9 @@ async function compute() {
    // Add up the values in the array.
    
    let sum = 0;
-   data.forEach( x => sum = sum+x );
+   for (let i = 0; i < data.length; i++) {
+       sum = sum + data[i];
+   }
    
    // unmap the staging buffer.  The buffer must be unmapped before it can be
    // used again by the GPU.  In general, you want to unmap the buffer quickly.
@@ -268,8 +269,7 @@ async function compute() {
    
    stagingBuffer.unmap();
    
-   document.getElementById("output").innerHTML =
-         "The computed approximate value for the integral is: " + sum.toPrecision(6);
+   return sum;
 }
 
 
@@ -332,8 +332,8 @@ async function computeAndReduce() {
    // Unmap the staging buffer.
    
    stagingBuffer.unmap();
-   document.getElementById("output").innerHTML =
-          "The computed approximate value for the integral is: " + sum.toPrecision(6);
+   
+   return sum;
 }
 
 
@@ -428,12 +428,15 @@ async function getDataAndCompute(reduce) {
       }
       makePipeline();
    }
+   let sum;
    if (reduce) {
-      computeAndReduce();
+      sum = await computeAndReduce();
    }
    else {
-      compute();
+      sum = await compute();
    }
+   document.getElementById("output").innerHTML =
+          "The computed approximate value for the integral is: " + sum.toPrecision(6);
 }
 
 
