@@ -11,7 +11,7 @@ than a programming language.  Where a programming language creates
 a scene by generating its contents procedurally, a scene description
 language specifies a scene "declaratively," by listing its content.
 Since SVG is a <word>vector graphics</word> language, the content of
-of a scene includes shapes, attributes such as color and line width,
+a scene includes shapes, attributes such as color and line width,
 and geometric transforms.  Most of this should be familiar to you,
 but it should be interesting to see it in a new context.</p1>
 
