@@ -202,7 +202,7 @@ common style attributes:</p>
 
 <ul>
 <li><codedef>fill</codedef> &mdash; specifies how to fill the shape.  The value can be
-"none" to indicate that the shape is not filled.  It can be be a color, in the same format
+"none" to indicate that the shape is not filled.  It can be a color, in the same format
 as the <word>CSS</word> colors that are used in the <word>HTML canvas</word> API.  For example,
 it can be a common color name such as "black" or "red", or an <word>RGB color</word>
 such as "rgb(255,200,180)".  There are also gradient and pattern fills, though I will not
