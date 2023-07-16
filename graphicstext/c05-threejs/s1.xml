@@ -356,13 +356,13 @@ parameter.  This creates a typed array that holds the same numbers.  For example
 numbers from the JavaScript array.</np>
 
 <p>Specifying the vertices for a <classname>BufferGeometry</classname> is a multistep
-process.  You need to create a typed array containing the coordinates of the vetices.
+process.  You need to create a typed array containing the coordinates of the vertices.
 Then you need to wrap that array inside an object of type
 <classname>THREE.BufferAttribute</classname>.  Finally, you can add the attribute
 to the geometry.  Here is an example:</p>
 
 <pre>let vertexCoords = new Float32Array([ 0,0,0, 1,0,0, 0,1,0 ]);
-let vetexAttrib = new THREE.BufferAttribute(vertexCoords, 3);
+let vertexAttrib = new THREE.BufferAttribute(vertexCoords, 3);
 let geometry = new THREE.BufferGeometry();
 geometry.setAttribute( "position", vertexAttrib );</pre>
 
@@ -700,7 +700,7 @@ tube.
 <classname>THREE.DodecahedronGeometry</classname>, and
 <classname>THREE.IcosahedronGeometry</classname>.  (For a cube use a
 <classname>BoxGeometry</classname>.)  The constructors for these four classes
-take two parameters.  The first specifies the size of the polyedron, with a default
+take two parameters.  The first specifies the size of the polyhedron, with a default
 of 1.  The size is given as the radius of the sphere that contains the polyhedron.
 The second parameter is an integer called <i>detail</i>.  The default value, 0, gives
 the actual regular polyhedron.  Larger values add detail by adding additional faces.

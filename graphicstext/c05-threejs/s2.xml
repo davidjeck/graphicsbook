@@ -423,7 +423,7 @@ is shown on the left in this picture:</np>
 
 <p>The other two objects in the picture were created by <newword term="extrusion">extruding</newword>
 the shape.  In extrusion, a filled 2D shape is moved along a path in 3D.  The points that the shape
-passes through make up a 3D solid.  In this case, the shape was extruded along a line segement
+passes through make up a 3D solid.  In this case, the shape was extruded along a line segment
 perpendicular to the shape, which is the most common case.  The basic extruded shape is
 shown on the right in the illustration.  The middle object is the same shape with "beveled"
 edges.  For more details on extrusion, see the documentation for <classname>THREE.ExtrudeGeometry</classname>
@@ -656,7 +656,7 @@ is actually represented by the property <i>obj.quaternion</i>, not by the proper
 <i>obj.rotation</i>.  <newword term="quaternion">Quaternions</newword> are mathematical objects
 that are often used in computer graphics as an alternative to <word>Euler angles</word>,
 to represent rotations.  However, when you change one of the properties
-<i>obj.rotation</i> or <i>obj.quaterion</i>, the other is automatically updated
+<i>obj.rotation</i> or <i>obj.quaternion</i>, the other is automatically updated
 to make sure that both properties represent the same rotation.  So, we don't need
 to work directly with the quaternions.)</p>
 
