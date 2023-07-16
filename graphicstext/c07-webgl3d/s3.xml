@@ -16,7 +16,7 @@ scaling, rotation, and translation to texture coordinates
 before they are used to sample a texture.  It is easy to program
 the same operations in WebGL.  We need to compute the texture
 transform matrix on the JavaScript side.  The transform matrix
-is then sent to a uniform matrix variable in the the shader program, 
+is then sent to a uniform matrix variable in the shader program, 
 where it can be applied to the texture coordinates.  Note that as
 long as the texture transformation is <word term="affine transform">affine</word>,
 it can be applied in the vertex shader, even though the texture is

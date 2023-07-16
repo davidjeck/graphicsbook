@@ -208,7 +208,7 @@ if (dot(R,V) &gt; 0.0) {
 
 <p>The sample program <sourceref href="webgl/basic-specular-lighting.html"/> implements lighting
 with diffuse and specular reflection.  For this program, which draws curved surfaces, 
-normal vectors are given as a vertex attribute rather rather than a uniform variable.
+normal vectors are given as a vertex attribute rather than a uniform variable.
 To add some flexibility to the lighting, the light position is specified as a uniform variable rather than a constant.
 Following the OpenGL convention, <i>lightPosition</i> is a <i>vec4</i>.  For a directional light,
 the <i>w</i>-coordinate is 0, and the eye coordinates of the light are <i>lightPosition.xyz</i>.
@@ -270,7 +270,7 @@ We saw in <localref href="threejs.1.4"/> that it can give very bad results for <
 It also tends to produce bad specular highlights, unless the primitives are very small.</p>
 
 <p>If a light source is close to a primitive, compared to the size of the primitive,
-the the angles that the light makes with the primitive at the vertices can have very
+the angles that the light makes with the primitive at the vertices can have very
 little relationship to the angle of the light at an interior point of the primitive:</p>
 
 <img src="close-light.png" width="446" height="82" tex="close-light.eps" texscale="0.75"/>
@@ -395,7 +395,7 @@ program instead.)</p>
     }
     vec3 reflection = dot(L,N) * light.color * material.diffuseColor;
     R = -reflect(L,N);
-    if (dot(R,V) > 0.0) { // ray is reflected toward the the viewer
+    if (dot(R,V) > 0.0) { // ray is reflected toward the viewer
         float factor = pow(dot(R,V),material.specularExponent);
         reflection += factor * material.specularColor * light.color;
     }

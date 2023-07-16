@@ -142,7 +142,7 @@ void main() {
 vertices (0,0) and (1,1) covers the entire drawing area.  In that coordinate system, the
 square with vertices at (0,0) and (0.5,0.5) covers the lower left quarter of the drawing area.
 The first sample in the fragment shader comes from that quarter of the texture image, 
-and the other three samples come from corresponding points in the other three quarters of the the image.</np>
+and the other three samples come from corresponding points in the other three quarters of the image.</np>
 
 <p>In a second pass, the roles of the two framebuffers are swapped, and a square with vertices
 at (0,0) and (0.25,0.25) is drawn, using the same fragment shader with <i>offset</i> equal
