@@ -536,7 +536,7 @@ in the rendered scene as the point of view changes.</p>
 <p>Lighting calculations are done in eye coordinates.  When the position of a light
 is given in object coordinates or in world coordinates, the position must be
 transformed to eye coordinates, by applying the appropriate modelview transformation.
-The transformation can't be done in the shader program, because the modleview matrix
+The transformation can't be done in the shader program, because the modelview matrix
 in the shader program represents the transformation for the object that
 is being rendered, and that is almost never the same as the transformation for the
 light.  The solution is to store the light position in eye coordinates.  That is,

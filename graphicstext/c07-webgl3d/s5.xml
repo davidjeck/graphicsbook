@@ -195,8 +195,8 @@ if (!EXTcbf || !EXTtf) {
 }</pre>
 
 <np>The program requires the extensions, so an exception is thrown if they can't be activated.
-The extension objects, <i>EXTcbf</i> and <i>EXTtf</i>, dont't have any properties that are needed
-in this program; however, it is still necessary to call <i>gl.getExension</i> to activate
+The extension objects, <i>EXTcbf</i> and <i>EXTtf</i>, don't have any properties that are needed
+in this program; however, it is still necessary to call <i>gl.getExtension</i> to activate
 the extensions.</np>
 
 <p>The program creates two floating-point textures that are attached to framebuffers for use as

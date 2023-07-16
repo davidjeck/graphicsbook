@@ -363,7 +363,7 @@ to be used as one of the buffers in a framebuffer.  It takes the form</p>
 
 <np>The framebuffer must be bound by calling <i>gl.bindFramebuffer</i> before
 this function is called.  The first and third parameters to <i>gl.framebufferRenderbuffer</i>
-must be as shown.  The last parameter is the renderbuffer.  The second paramter
+must be as shown.  The last parameter is the renderbuffer.  The second parameter
 specifies how the renderbuffer will be used.  It can be, for example,
 <i>gl.COLOR_ATTACHMENT0</i>, <i>gl.DEPTH_ATTACHMENT</i>, or
 <i>gl.STENCIL_ATTACHMENT</i>.</np>
@@ -473,7 +473,7 @@ to show how those sides attach to the negative z side.  The images that we make 
 the cubemap must fit together in the same way as the sides in this layout.  However,
 the sides in the layout are viewed from the <b>outside</b> of the cube, while
 the camera will be taking a picture from the <b>inside</b> of the cube.  To get the
-correct view, we need to filp the picture from the camera horizontally.  After some
+correct view, we need to flip the picture from the camera horizontally.  After some
 experimentation, I found that I also need to flip it vertically, perhaps because
 web images are stored upside down with respect to the OpenGL convention.  We can
 do both flips with a <word>scaling</word> transformation by (&minus;1,&minus;1,1).
