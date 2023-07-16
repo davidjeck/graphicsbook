@@ -142,7 +142,7 @@ If you then call</np>
 <pre>gl.bindTexture( gl.TEXTURE_2D, textureObj );</pre>
 
 <np>to bind a texture object, while texture unit 2 is active, then
-the the texture object <i>textureObj</i> is bound to texture unit number&nbsp;2 for
+the texture object <i>textureObj</i> is bound to texture unit number&nbsp;2 for
 <i>gl.TEXTURE_2D</i> operations.  The binding
 just tells the texture unit which texture object to use.  That is, when texture unit&nbsp;2 does
 <i>TEXTURE_2D</i> lookups, it will do so using the image and the settings that are stored in <i>textureObj</i>.

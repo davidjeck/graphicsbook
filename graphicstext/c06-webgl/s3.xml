@@ -321,7 +321,7 @@ to use a typed array rather than a normal JavaScript array for the value of a un
 <p>A varying variable should be declared with the same name and type in both the
 vertex shader and fragment shader.  In version 1.00, the storage qualifier for
 declaring varying variables is <i>varying</i>, and it can only be used
-for for the built-in floating
+for the built-in floating
 point types (<i><ptype>float</ptype>, <i>vec2</i>, <i>vec3</i>, <i>vec4</i>, 
 <i>mat2</i>, <i>mat3</i>, and <i>mat4</i></i>) and for arrays of those types.</p>
 
