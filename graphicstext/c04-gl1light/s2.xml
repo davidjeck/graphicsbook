@@ -117,7 +117,7 @@ glMaterialfv( GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, bgcolor );</pre>
 <pre>let bgcolor = [ 0.0, 0.7, 0.5, 1.0 ];
 glMaterialfv( GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, bgcolor );</pre>
 
-<np>And in the <word>JOGL</word> API for Java, where where methods with array
+<np>And in the <word>JOGL</word> API for Java, where methods with array
 parameters have an additional parameter to give the starting index of the data
 in the array, it becomes</np>
 
