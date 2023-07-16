@@ -88,7 +88,7 @@ vector.</np>
 <p>Multiplication is more complicated.  The obvious definition of the product of two vectors,
 similar to the definition of the sum, does not have geometric meaning and is rarely used.
 However, there are three kinds of vector multiplication that are used: the scalar
-product, the dot produt, and the cross product.</p>
+product, the dot product, and the cross product.</p>
 
 <p>If <i>v</i> = (<i>x,y,z</i>) is a vector and <i>a</i> is a number, then the <newword>scalar product</newword>
 of <i>a</i> and <i>v</i> is defined as</p>
@@ -208,7 +208,7 @@ the properties that for two vectors <i>v</i> and <i>w</i>, <i>L(v+w)&nbsp;=&nbsp
 and for a number <i>s</i>, <i>L(sv)&nbsp;=&nbsp;sL(v)</i>.</p>
 
 <p>Rotation and scaling are linear transformations, but translation is <b>not</b>
-a linear transformaton.
+a linear transformation.
 To include translations, we have to widen our view of transformation to include
 <word term="affine transform">affine transformations</word>.
 An affine transformation can be defined, roughly, as a linear transformation followed by a 

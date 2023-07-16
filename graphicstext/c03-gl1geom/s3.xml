@@ -219,7 +219,7 @@ you must first call</p>
 
 <np>If you want to go back to working on the modelview matrix, you must call</np>
 
-<pre>glMartrixMode(GL_MODELVIEW);</pre>
+<pre>glMatrixMode(GL_MODELVIEW);</pre>
 
 <np>In my programs, I generally set the matrix mode to <i>GL_PROJECTION</i>, set up
 the projection transformation, and then immediately set the matrix mode
