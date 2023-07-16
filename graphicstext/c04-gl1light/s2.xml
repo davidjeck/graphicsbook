@@ -125,7 +125,7 @@ in the array, it becomes</np>
 gl.glMaterialfv(GL2.GL_FRONT_AND_BACK, GL2.GL_AMBIENT_AND_DIFFUSE, bgcolor, 0);</pre>
 
 <p>In C, the third parameter is actually a pointer to <ptype>float</ptype>, which allows
-the flexabilty of storing the values for several material properties in one array.
+the flexibility of storing the values for several material properties in one array.
 Suppose, for example, that we have a C array</p>
 
 <pre>float gold[13] = { 0.24725, 0.1995, 0.0745, 1.0,      /* ambient */

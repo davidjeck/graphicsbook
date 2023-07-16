@@ -522,7 +522,7 @@ A texture object is identified by an integer ID number.  To use a texture object
 you need to obtain an ID number from OpenGL.  This is done with the <i>glGenTextures</i>
 function:</p>
 
-<pre>void glGenTexures( int textureCount, int* array )</pre>
+<pre>void glGenTextures( int textureCount, int* array )</pre>
 
 <np>This function can generate multiple texture IDs with a single call.  The first parameter
 specifies how many IDs you want.  The second parameter says where the generated IDs will be stored.
