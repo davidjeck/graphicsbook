@@ -342,8 +342,8 @@ be the positive integers from 0 to 255. A&nbsp;color is then specified as a trip
 (r,g,b) in that range.</p>
 
 <p>This representation works well because 256 shades of red, green, and
-blue are about as many as the eye can distinguish.  In applications where images are processed,
-by computing with color components, it is common to use additional bits per color component
+blue are about as many as the eye can distinguish.  In applications where images are processed
+by computing with color components, it is common to use additional bits per color component,
 to avoid visual effects that might occur due to rounding errors in the computations.
 Such applications might use a 16-bit integer or even a 32-bit floating point value for
 each color component.  On the other hand, sometimes fewer bits are used.  For example, one
