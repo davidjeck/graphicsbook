@@ -337,7 +337,7 @@ in shadow.  (This is ignoring the possibility of transparency and indirect, refl
 light, which cannot be handled by shadow mapping.)  To implement this idea, place a camera at the light source and take a picture.
 In fact, you don't need the picture itself.  What you need is the <word>depth buffer</word>.  After the
 picture has been rendered, the value stored in the depth buffer for a given pixel
-contains, essentially, the distance from the light to the object that is visible from the
+contains, essentially, the distance from the light to the object that is visible from
 the light at that point.  That object is illuminated by the light. If an object
 is at greater depth than the value stored in the depth buffer, then that object is
 in shadow.  The depth buffer is the shadow map.  Now, go back to the point of view of the camera,
