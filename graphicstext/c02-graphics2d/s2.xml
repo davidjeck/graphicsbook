@@ -239,7 +239,7 @@ need commands such as</p>
 <ul>
 <li><codedef>createPath()</codedef> &mdash; start a new, empty path</li>
 <li><codedef>moveTo(x,y)</codedef> &mdash; move the pen to the point (x,y), without adding a segment
-to the the path; that is, without drawing anything</li>
+to the path; that is, without drawing anything</li>
 <li><codedef>lineTo(x,y)</codedef> &mdash; add a line segment to the path that starts at the current pen location
 and ends at the point (x,y), and move the pen to (x,y)</li>
 <li><codedef>closePath()</codedef> &mdash; add a line segment from the current pen location back to
