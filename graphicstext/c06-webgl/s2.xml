@@ -676,7 +676,7 @@ details of the example.</np>
 
 <p>It is a sad fact that OpenGL programmers often find themselves looking at a blank
 screen, with no clear indication of what went wrong.  In many cases, this is due to
-a programming logic error, such as accidently drawing a region of 3D space that contains
+a programming logic error, such as accidentally drawing a region of 3D space that contains
 no geometry.  However, sometimes it's due to an error in the use of the API. In WebGL,
 and in OpenGL more generally, an error such as an illegal parameter value will not in general crash 
 the program or produce any automatic notification of the error.  Instead, when WebGL

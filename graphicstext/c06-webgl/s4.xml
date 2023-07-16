@@ -955,7 +955,7 @@ using</p>
 
 <np>where <i>coords</i> is a <ptype>vec2</ptype> holding the texture coordinates.
 But in fact, you might want to access texel values more directly.  There is
-a new <i>texelFecth</i>() function that fetches texel values from a texture,
+a new <i>texelFetch</i>() function that fetches texel values from a texture,
 treating the texture as an array of texels.  Texels are accessed using integer
 coordinates that range from 0 up to the size of the texture.  Applied to
 <i>datatexture</i>, this could look like
