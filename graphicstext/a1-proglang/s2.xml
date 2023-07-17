@@ -141,7 +141,7 @@ directory.  You could also use a full path name to the command.</np>
 
 <p>C has most of the same basic types as Java:  <ptype>char</ptype>, 
 <ptype>short</ptype>, <ptype>int</ptype>, <ptype>long</ptype>, <ptype>float</ptype>, <ptype>double</ptype>.
-There is no <ptype>boolean</ptype> type, but
+There is no <ptype>boolean</ptype> type,
 but integers can be used as booleans, with 0 representing <i>false</i> and any
 non-zero value representing <i>true</i>.
 There is no "byte" data type, but <ptype>char</ptype> is essentially an 8-bit integer type

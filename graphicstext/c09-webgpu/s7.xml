@@ -159,7 +159,7 @@ the device is created:</p>
 
 <np>Again, this will throw an exception if the feature is not available, 
 and a feature request will limit the devices on which your program can run.
-The boolean-valued function <code>adapter.hasFeature(name)</code> can be
+The boolean-valued function <code>adapter.hasFeature(name)</code> 
 can be used to test whether the adapter supports the feature wih the
 given <code>name</code>.  For a list of possible features, see the
 WebGPU documentation.</np>

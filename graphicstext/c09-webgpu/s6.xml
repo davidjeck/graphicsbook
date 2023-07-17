@@ -351,12 +351,12 @@ from the parallelism of a GPU.  The sample program <sourceref href="webgpu/diffu
 a fairly simple example of what can be done.  The program shows a large number of white dots
 moving randomly. Each dot is a pixel. The motion is a "random walk": In each time step, the
 particle chooses a random direction&mdash;up, down, left, or right&mdash;and moves one pixel
-in that that direction.  There are also yellow and cyan particles, which don't move.  Initially,
+in that direction.  There are also yellow and cyan particles, which don't move.  Initially,
 there is a line of yellow particles on the left and a line of cyan particles on the right.
 When a white particle hits a yellow or cyan particle, it changes color to match and stops
 moving.  The result is a buildup of colored particles in an interesting, branching pattern.
 The process is interesting to watch. <web>Here is a demo version of the program:</web>
-<tex>Here is Here is an example of
+<tex>Here is an example of
 what the program can produce after it has run for a while:</tex></p>
 
 <webdiv>

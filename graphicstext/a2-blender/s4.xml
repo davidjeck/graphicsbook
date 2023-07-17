@@ -60,7 +60,7 @@ Render Properties.</p>
 by a texture.  Usually, you want to use an image texture that wraps nicely
 around a sphere like the <sourceref href="webgl/textures/Earth-1024x512.jpg">Earth image</sourceref>
 that I have used in several examples in this textbook.  You will want a fairly
-large image for a nicely detailed background.  To use such an
+large image for a nicely detailed background.  To use such
 an image as a background, go to the World Properties, and set the
 "Color" to be an Environment Texture.  (Click the yellow dot to the left
 of the color input, and select "Environment Texture" from the "Texture" section

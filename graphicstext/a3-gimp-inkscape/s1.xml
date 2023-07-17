@@ -130,7 +130,7 @@ set the "Affected Area" in its Tool Options dialog
 to "Fill whole selection".  With that setting, clicking inside
 the selected area will fill that area with color.  Another useful option is
 the "Fill Type" which allows you to fill regions with either the foreground
-color, the background color, or a a pattern.  To change the pattern
+color, the background color, or a pattern.  To change the pattern
 that is used, click on the image of the pattern, just below the
 "Pattern fill" option.</p>
 

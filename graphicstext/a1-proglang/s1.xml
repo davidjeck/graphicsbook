@@ -255,7 +255,7 @@ variable is <i>null</i>, the variable does not refer to any object.  If the valu
 and an attempt to use them is an error.  
 The error is called a <classname>NullPointerException</classname>.</p>
 
-<p><classname>Strings</classname>, by the way, are special objects.  They are not not created
+<p><classname>Strings</classname>, by the way, are special objects.  They are not created
 with the <i>new</i> operator.  Instead, a string is created as a literal value, enclosed
 in double quotes. For example</p>
 

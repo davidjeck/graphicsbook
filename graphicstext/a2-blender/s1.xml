@@ -423,7 +423,7 @@ Here is an example, using settings as shown:</p>
 <p>The 3D window shows positions, sizes, and colors of your objects.  To see a fully
 rendered scene from the point of view of the camera, hit the F12 key.
 To return to the main window, hit Escape or F11 (or just close the render window).  
-There are are also commands in
+There are also commands in
 the "Render" menu, at the top of the Blender menu, that do the same things. Remember that
 you need to render an image to see some aspects of the scene.</p>
 

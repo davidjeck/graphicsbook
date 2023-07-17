@@ -311,7 +311,7 @@ advanced ways of arranging the duplicates, but I won't cover them here.)</p>
 
 <p>In the picture shown below, I started with a single "Monkey" mesh
 object, with a material that uses the "Noise" texture for its base color.
-I applied applied <b>three</b> Array modifiers to it. 
+I applied <b>three</b> Array modifiers to it. 
 The first modifier turned the monkey into a line of four monkeys in
 the X direction, with an X-offset of 1.1 and Y- and Z-offsets of&nbsp;0.
 Setting the X-offset to 1.1 rather than 1.0 adds a little space

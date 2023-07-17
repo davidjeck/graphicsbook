@@ -280,7 +280,7 @@ when the primitive is drawn.</p>
 When drawing a primitive, the JavaScript program specifies values for any attributes
 and uniforms in the shader program.  For each attribute, it will specify an array of values,
 one for each vertex.  For each uniform, it will specify a single value.  It must
-send these values to the to the <word>GPU</word> before drawing the primitive. 
+send these values to the <word>GPU</word> before drawing the primitive. 
 The primitive can then be drawn by calling a single JavaScript function.  At that
 point, the GPU takes over, and executes the shader programs. When drawing the primitive,
 the GPU calls the vertex shader once for each vertex.  The attribute values for the vertex
