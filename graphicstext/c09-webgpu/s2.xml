@@ -469,7 +469,7 @@ WebGL for the <demoref href="c6/textured-points.html">demo</demoref> in <localre
 <subsection title="Multisampling" id="webgpu.2.5">
 
 <p>The final example for this section is <sourceref href="webgpu/multisampling.html"/>,
-which adds multisampling to the basic basic moving disks example.  Ordinarily, the
+which adds multisampling to the basic moving disks example.  Ordinarily, the
 fragment shader entry point function is evaluated once per pixel, at the center point of the pixel.
 With multisampling, it is evaluated at several points within each pixel, and the
 color for that pixel is obtained by averaging the colors from each of those samples.

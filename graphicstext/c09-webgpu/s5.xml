@@ -795,7 +795,7 @@ to <code>inputBoard</code> in the shader and <code>texture2</code> to
    ]
 });</pre>
 
-<np>A second bind group, <code>bindGroupB</code>, reverses the roles of the the
+<np>A second bind group, <code>bindGroupB</code>, reverses the roles of the
 textures.  The program uses <code>bindGroupA</code> the first time <code>draw()</code>
 is called, <code>bindGroupB</code> the second time, <code>bindGroupA</code> the
 third time, and so on.</np>

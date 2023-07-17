@@ -248,7 +248,7 @@ as inputs the the fragment shader, which will be called once for each pixel in t
 primitive with appropriate values for its parameters.</p>
    
 <p>Vertex buffers are special because of the way that they are used to supply
-vertex shader parameters.  Other kinds of of input are stored in the data structures 
+vertex shader parameters.  Other kinds of input are stored in the data structures 
 called bind groups.  Values from bind groups are made available to vertex and
 fragment shaders as global variables in the shader programs.</p>
 
@@ -628,7 +628,7 @@ has to be passed as a parameter to the vertex shader entry point.  In the new ex
 that function has two
 parameters, the 2D vertex coordinates and the vertex RGB color.  Interpolated
 versions of these two values are used by the fragment shader, so the 
-the vertex shader also needs two outputs.  Since a function can have only one
+vertex shader also needs two outputs.  Since a function can have only one
 return value, the two outputs have to be combined into a single data structure.
 In WGSL, as in <word>GLSL</word>, that data structure is a <code>struct</code>
 (see <localref href="webgl.3.2"/>).  Here is the shader source code that is used
