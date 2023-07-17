@@ -124,7 +124,7 @@ as a cross-section of the situation in 3D:</p>
 the viewer will see a reflection of point <i>B</i> at&nbsp;<i>A</i>.  (Remember that in ray tracing,
 we follow the path of light rays <i>backwards</i> from the viewer, to find out where they came from.)</np>
 
-<p>To find out what the reflection of <i>B</i> looks like, we need to know the color of the the
+<p>To find out what the reflection of <i>B</i> looks like, we need to know the color of the
 ray that arrives at <i>A</i> from&nbsp;<i>B</i>.  But finding a color for <i>B</i> is the same sort
 of problem as finding a color for <i>A</i>, and we should solve it in the same way: by applying the ray-tracing
 algorithm to&nbsp;<i>B</i>!  That is, we use the material properties of the surface at <i>B</i>, we
