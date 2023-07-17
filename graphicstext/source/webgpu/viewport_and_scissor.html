@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<head>
+<!--
+    Shows an animation of moving disks.
+    
+    This program is small modification of depth_test.html to demonstrate
+    viewport and scissor rect. The only comments on the code concern
+    those two features of the render pass encoder; all comments can
+    be found in the draw function.  (I also increased the disk radius,
+    but that change is not commented.)
+-->   
+<title>WebGPU: Viewport and Scissor Rect</title>
+<style>
+   body { 
+      background-color: #EEEEEE;
+   }
+   #canvasholder {
+      border: 2px solid black;
+      display: inline-block;
+   }
+   canvas {
+      display: block;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSourceForDisk = `
+
+   struct VertexOutput {
+       @builtin(position) position : vec4f,
+       @location(0) color : vec4f
+   }
+   
+   @vertex
+   fn vertexMain( 
+          @location(0) coords : vec2f,
+          @location(1) offset : vec2f,
+          @location(2) color : vec3f,
+          @builtin(instance_index) instance : u32
+        ) -> VertexOutput {
+      let depth = 1 - f32(instance)/100;
+      var output : VertexOutput;
+      output.position = vec4f( coords + offset, depth , 1 );
+      output.color = vec4f(color,1);
+      return output;
+   }
+   
+   @fragment
+   fn fragmentMain( @location(0) color : vec4f ) -> @location(0) vec4f{
+      return color;
+   }
+`;
+
+
+const shaderSourceForOutline = `
+
+   @vertex
+   fn vertexMain(
+          @location(0) coords : vec2f,
+          @location(1) offset : vec2f,
+          @builtin(instance_index) instance : u32
+        ) -> @builtin(position) vec4f {
+      let depth = (1 - f32(instance)/100) - 0.005;
+      return vec4f( coords + offset, 1 - f32(instance)/100 - 0.005, 1 );
+   }
+      
+   @fragment
+   fn fragmentMain() -> @location(0) vec4f {
+      return vec4f( 0, 0, 0, 1 );
+   }
+`;
+
+const VERTEX_COUNT = 32; 
+const INSTANCE_COUNT = 30;
+
+let diskIndices = new Uint16Array(3*VERTEX_COUNT);
+
+let context;
+let device;
+
+let shaderForDisks;
+let shaderForOutlines;
+
+let pipelineForDisk; 
+let pipelineForOutline; 
+
+let vertexCoords = new Float32Array(2*(VERTEX_COUNT + 2));
+let vertexBuffer;
+let indexBuffer; 
+
+let instanceOffsets = new Float32Array(2*INSTANCE_COUNT);
+let instanceColors = new Float32Array(3*INSTANCE_COUNT);
+let velocities = new Float32Array(2*INSTANCE_COUNT);
+let instanceOffsetBuffer;
+let instanceColorBuffer; 
+
+let textureForMultisampling;
+let textureViewForMultisampling;
+
+let depthTexture;
+
+
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied" 
+   });
+   
+   shaderForDisks = device.createShaderModule({ 
+      code: shaderSourceForDisk
+   });
+   shaderForOutlines = device.createShaderModule({ 
+      code: shaderSourceForOutline
+   });
+}
+
+
+function createPipelineConfig() {
+   
+   
+   let vertexBufferLayout = [ 
+      {
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8, 
+         stepMode: "vertex"
+      },
+      {
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "instance" 
+      },
+      {
+         attributes: [ { shaderLocation:2, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "instance" 
+      }
+   ];
+   
+   let pipelineDescriptor = {
+       vertex: { 
+          module: shaderForDisks,
+          entryPoint: "vertexMain", 
+          buffers: vertexBufferLayout 
+       },
+       fragment: {
+          module: shaderForDisks,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       multisample: {
+         count: 4, 
+       },
+       depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: { 
+          topology: "triangle-list"
+       },
+       layout: "auto" 
+    };
+    
+   pipelineForDisk = device.createRenderPipeline(pipelineDescriptor);
+   
+
+   let vertexBufferLayoutForOutlines = [ 
+      { 
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x2" } ],
+         arrayStride: 8, 
+         stepMode: "vertex"
+      },
+      { 
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x2" } ],
+         arrayStride: 8,
+         stepMode: "instance" 
+      }
+   ];
+   
+   let pipelineDescriptorForOutlines = {
+       vertex: { 
+          module: shaderForOutlines,
+          entryPoint: "vertexMain", 
+          buffers: vertexBufferLayoutForOutlines
+       },
+       fragment: {
+          module: shaderForOutlines,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       multisample: {
+         count: 4, 
+       },
+       depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+       },       
+       primitive: { 
+          topology: "line-strip"
+       },
+       layout: "auto" 
+    };
+
+   pipelineForOutline = device.createRenderPipeline(pipelineDescriptorForOutlines);
+   
+   
+   vertexBuffer = device.createBuffer({ 
+       size: vertexCoords.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);
+    
+   indexBuffer = device.createBuffer({ 
+       size: diskIndices.byteLength, 
+       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(indexBuffer, 0, diskIndices);
+      
+   instanceOffsetBuffer =  device.createBuffer({ 
+       size: instanceOffsets.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(instanceOffsetBuffer, 0, instanceOffsets); 
+   
+   instanceColorBuffer =  device.createBuffer({ 
+       size: instanceColors.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });   
+   device.queue.writeBuffer(instanceColorBuffer, 0, instanceColors); 
+
+   textureForMultisampling = device.createTexture({
+      size: [context.canvas.width, context.canvas.height],
+      sampleCount: 4,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    textureViewForMultisampling = textureForMultisampling.createView();
+
+   depthTexture = device.createTexture({
+       size: [context.canvas.width, context.canvas.height],
+       format: "depth24plus",
+       sampleCount: 4,
+       usage: GPUTextureUsage.RENDER_ATTACHMENT,
+   });
+}
+
+
+function initializeDataArrays() {
+   
+   for (let i = 0; i <= VERTEX_COUNT; i++) {
+      let angle = 2*Math.PI/VERTEX_COUNT * i
+      vertexCoords[2*i] = 0.2 * Math.cos(angle);
+      vertexCoords[2*i+1] = 0.2 * Math.sin(angle);
+   }
+   vertexCoords[2*VERTEX_COUNT+2] = 0; 
+   vertexCoords[2*VERTEX_COUNT+3] = 0;
+   
+   for (let i = 0; i < VERTEX_COUNT; i++) {
+      diskIndices[3*i] = VERTEX_COUNT+1; 
+      diskIndices[3*i+1] = i; 
+      diskIndices[3*i+2] = i+1; 
+   }
+      
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       instanceOffsets[2*i] = 1.6*Math.random() - 0.8;
+       instanceOffsets[2*i+1] = 1.6*Math.random() - 0.8;
+       let speed = 0.1 + 0.5*Math.random();
+       let theta = 2*Math.PI*Math.random();
+       velocities[2*i] = speed*Math.cos(theta);
+       velocities[2*i+1] = speed*Math.sin(theta);
+       instanceColors[3*i] = Math.random();
+       instanceColors[3*i+1] = Math.random();
+       instanceColors[3*i+2] = Math.random();
+   }   
+   
+}
+
+
+function draw() {
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 1, g: 1, b: 1, a: 1 },
+          loadOp: "clear", 
+          storeOp: "store",
+          view: textureViewForMultisampling,
+          resolveTarget: context.getCurrentTexture().createView()
+      }],
+      depthStencilAttachment: {
+        view: depthTexture.createView(),
+        depthClearValue: 1.0,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+      }
+   };
+   
+   /* This function will draw the same scene four times, in the four quadrants
+    * of the canvas, using different viewports.  The function passEncoder.setViewport()
+    * takes six parameters giving the top-left corner of the viewport, the
+    * viewport size, and the minimum and maximum depth values.  The viewports
+    * array holds four arrays, each containing one set of parameters for
+    * passEncoder.setViewport(). */
+   
+   const viewports = [
+       [ 0, 0, 300, 300, 0, 1 ],     // upper left quadrant of the canvas
+       [ 0, 300, 300, 300, 0, 1 ],   // lower left quadrant
+       [ 300, 0, 300, 300, 0, 1 ],   // upper right quadrant
+       [ 300, 300, 300, 300, 0, 1 ]  // lower right quadrant
+   ];
+   
+   let passEncoder;
+   
+   for ( let i = 0; i < 4; i++ ) {
+      
+      let vp = viewports[i]; // Get viewport limits for this pass.
+      
+      passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor); // Draws disk interiors.
+      passEncoder.setPipeline(pipelineForDisk);
+      passEncoder.setViewport( vp[0], vp[1], vp[2], vp[3], vp[4], vp[5] ); // Set the viewport.
+         
+         /* For the upper left and lower right corner, also set a scissor rect,
+          * but only for the interiors of the disks.  The parameters to passEncoder.setScissorRect()
+          * are the upper left corner of the rect and its size.  Note that the xy coordinates
+          * are given in canvas coordinates, not affected by the viewport.
+          */
+      if ( i === 0 ) {
+         passEncoder.setScissorRect(50,50,200,200);
+      }
+      else if (i === 3) {
+         passEncoder.setScissorRect(350,350,200,200);
+      }
+      
+      passEncoder.setVertexBuffer(0,vertexBuffer);
+      passEncoder.setVertexBuffer(1,instanceOffsetBuffer);
+      passEncoder.setVertexBuffer(2,instanceColorBuffer);
+      passEncoder.setIndexBuffer(indexBuffer, "uint16"); 
+      passEncoder.drawIndexed( 3*VERTEX_COUNT, INSTANCE_COUNT );
+      passEncoder.end();
+         
+      if ( i === 0) { // Change load ops to "load" for all remaining passes.
+         renderPassDescriptor.depthStencilAttachment.depthLoadOp = "load";
+         renderPassDescriptor.colorAttachments[0].loadOp = "load";
+      }
+      
+      passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);  // Draws disk outlines.
+      passEncoder.setPipeline(pipelineForOutline);
+      passEncoder.setViewport( vp[0], vp[1], vp[2], vp[3], vp[4], vp[5] ); // Set the viewport.
+      passEncoder.setVertexBuffer(0,vertexBuffer);
+      passEncoder.setVertexBuffer(1,instanceOffsetBuffer);
+      passEncoder.draw(VERTEX_COUNT+1, INSTANCE_COUNT);
+      passEncoder.end();
+   }
+   
+   let commandBuffer = commandEncoder.finish(); 
+   device.queue.submit([commandBuffer]);
+}
+
+
+let running = false; 
+let previousTime; 
+
+function doFrame() {
+   if (!running)
+      return;
+   let now = performance.now();
+   let dt = (now - previousTime)/1000;
+   previousTime = now;
+   for (let i = 0; i < INSTANCE_COUNT; i++) {
+       let x = 2*i;
+       let y = 2*i+1;
+       instanceOffsets[x] += velocities[x] * dt;
+       instanceOffsets[y] += velocities[y] * dt;
+       if (instanceOffsets[x] > 0.8) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = 1.6 - instanceOffsets[x];
+       }
+       else if (instanceOffsets[x] < -0.8) {
+           velocities[x] = -velocities[x];
+           instanceOffsets[x] = -1.6 - instanceOffsets[x];
+       }
+       if (instanceOffsets[y] > 0.8) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = 1.6 - instanceOffsets[y];
+       }
+       else if (instanceOffsets[y] < -0.8) {
+           velocities[y] = -velocities[y];
+           instanceOffsets[y] = -1.6 - instanceOffsets[y];
+       }
+   }
+   device.queue.writeBuffer(instanceOffsetBuffer,0,instanceOffsets);
+   draw();
+   requestAnimationFrame(doFrame);
+}
+
+
+function doAnimateCheckbox() {
+   let anim = document.getElementById("anim").checked;
+   if (anim == running)
+      return;
+   running = anim;
+   if (running) { 
+      previousTime = performance.now();
+      requestAnimationFrame(doFrame);
+   }
+}
+
+async function init() {
+   try {
+      await initWebGPU();
+      initializeDataArrays(); 
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   draw();
+   document.getElementById("anim").checked = false;
+   document.getElementById("anim").onchange = doAnimateCheckbox;
+}
+
+window.onload = init; 
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU: Viewport and Scissor Rect Test</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p><label><input type=checkbox id="anim"> <b>Animate</b></label>
+
+<div id="canvasholder">
+<canvas width=600 height=600 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>

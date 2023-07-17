@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<!--
+   Let's the user view several polyhedra.  Polygon faces are shown in white,
+   with very simple lighting.  Polygon edges are drawn in black.
+   
+   The main point of this example is to demonstrate several render pipeline options:
+   depthBias, frontFace, and cullMode. Depth bias is used to make sure that the
+   edges are fully visible.  Cull mode is used to avoid drawing back faces, since
+   all polyhedra are closes and all back faces are hidden.  The vertex ordering for
+   front-facing triangles in the polyhedra is clockwise, rather than the more usual
+   counterclockwise; the frontFace property is used to specify the ordering.
+   These properties are used in the object pipelineDescriptorForFaces, below.  See
+   the comments on that object.  Aside from that, there are very few comments.
+-->
+<head>
+<title>WebGPU: Polyhdron Viewer</title>
+
+<script src="wgpu-matrix.min.js"></script>  <!-- matrix and vector algebra from Gregg Tavares -->
+<script src="trackball-rotator.js"></script>
+<script src="polyhedra.js"></script>
+
+<script>
+
+"use strict";
+    
+const shaderSourceForFaces = `
+    struct VertexOut {
+        @builtin(position) position : vec4f,
+        @location(0) @interpolate(flat) color : vec3f
+    }
+    
+    @group(0) @binding(0) var<uniform> transformationMatrix: mat4x4f;
+    @group(0) @binding(1) var<uniform> normalMatrix: mat3x3f;
+    
+    @vertex
+    fn vmain( @location(0) vertexCoords : vec3f,
+              @location(1) vertexNormal : vec3f ) -> VertexOut {
+        let position = transformationMatrix * vec4f(vertexCoords, 1.0);
+        let normal = normalize( normalMatrix * vertexNormal);
+        let color =  vec3f(-normal.z);
+           // Implements lighting with white surface color and a directional light
+           // shining in direction (0,0,-1).
+        return VertexOut( position, color );
+    }
+    
+    @fragment
+    fn fmain( @location(0) @interpolate(flat) color : vec3f ) -> @location(0) vec4f {
+        return vec4f(color,1.0);
+    }
+`;
+
+const shaderSourceForEdges = `
+    @group(0) @binding(0) var<uniform> transformationMatrix: mat4x4f;
+    
+    @vertex
+    fn vmain( @location(0) vertexCoords : vec3f ) -> @builtin(position) vec4f {
+        return transformationMatrix * vec4f(vertexCoords,1.0);
+    }
+    
+    @fragment
+    fn fmain() -> @location(0) vec4f {
+        return vec4f(0,0,0,1);
+    }
+`;
+
+let context;
+let device;
+
+let depthTexture;
+let textureForMultisampling; 
+
+let pipelineForFaces;
+let pipelineForEdges;
+
+let bindGroupForFaces;
+let bindGroupForEdges;
+
+let transformationBuffer;
+let normalMatrixBuffer;
+    
+let polyhedronModels = [];
+let currentModel;
+const defaultModel = 7;
+
+let trackballRotator;
+
+const projectionMatrix = wgpuMatrix.mat4.perspective( Math.PI/4, 1, 1, 10 );
+
+    
+async function initWebGPU() {  // initialize and create pipelines and resources
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   let faceShader = device.createShaderModule({
+      code: shaderSourceForFaces
+   });
+
+   let edgeShader = device.createShaderModule({
+      code: shaderSourceForEdges
+   });
+   
+   transformationBuffer = device.createBuffer({
+       size: 64,
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+   });
+   
+   normalMatrixBuffer = device.createBuffer({
+       size: 48,
+       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+   });
+
+   depthTexture = device.createTexture({ 
+      size: [canvas.width, canvas.height],
+      format: 'depth24plus',
+      sampleCount: 4,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT
+   });
+ 
+   textureForMultisampling = device.createTexture({
+      size: [context.canvas.width, context.canvas.height],
+      sampleCount: 4,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+   let vertexBufferLayout = [
+      { // vertex coordinates
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      },
+      { // normals
+         attributes: [ { shaderLocation:1, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      }
+   ];
+
+   let pipelineDescriptorForFaces = {
+       vertex: {
+          module: faceShader,
+          entryPoint: "vmain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: faceShader,
+          entryPoint: "fmain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       depthStencil: {  
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus",
+          depthBias: 1,
+          depthBiasSlopeScale: 1.0
+             /* depthBias and depthBiasSlopeScale are used to modify the depth, or z, component
+              * in normalized device coordinates.  The default values, zero, leave the depth 
+              * unchanged.  Using positive values moves the fragment a bit away from the user.
+              * In this case, we want to make sure that edge fragments are not drawn at 
+              * the same depth as face fragments, since then parts of the edges might be
+              * hidden.  Depth bias seems to work only for faces, not for lines, so we apply
+              * the bias here, to the faces, and not to the edges.
+              */
+       },       
+       primitive: {
+          topology: "triangle-list",
+          cullMode: "back",  // Alternative values are "front" and "none"; "none" is the default.
+          frontFace: "cw"    // Alternative value is "ccw" (counterclockwise), which is the default.
+             /* In this program, the objects that are drawn are "closed" -- all the back faces
+              * point towards the inside of the object, and they will be hidden by front faces
+              * when the object is drawn.  So, there is no reason to render the back faces.
+              * Setting cullMode to "back" means that back faces are discarded.  What counts
+              * as a front or back face is determined by the order in which the vertices of
+              * the triangle are given.  The usual ordering is counterclockwise when viewed
+              * from the front.  But the polyhedra use clockewise order.  The frontFace property
+              * says which order is used for front faces.  (Note that I could have just
+              * set cullMode to "front" and left frontFrace with its default counterclockwise
+              * value.)
+              */
+       },
+       multisample: { 
+         count: 4,    
+       },
+       layout: "auto"
+    };
+    
+    pipelineForFaces = device.createRenderPipeline(pipelineDescriptorForFaces);
+    
+    bindGroupForFaces = device.createBindGroup({
+       layout: pipelineForFaces.getBindGroupLayout(0),
+       entries: [
+         { // transformation matrix
+            binding: 0,
+            resource: {buffer: transformationBuffer, offset: 0, size: 64}
+         },
+         { // normal matrix
+            binding: 1,
+            resource: {buffer: normalMatrixBuffer, offset: 0, size: 48}
+         }
+       ]
+    });
+    
+    let vertexBufferLayoutForEdges = [
+      { // coords
+         attributes: [ { shaderLocation:0, offset:0, format: "float32x3" } ],
+         arrayStride: 12,
+         stepMode: "vertex" 
+      }
+   ];
+
+   let pipelineDescriptorForEdges = {
+       vertex: {
+          module: edgeShader,
+          entryPoint: "vmain",
+          buffers: vertexBufferLayoutForEdges
+       },
+       fragment: {
+          module: edgeShader,
+          entryPoint: "fmain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat()
+          }]
+       },
+       depthStencil: {  
+          depthWriteEnabled: true,
+          depthCompare: "less",
+          format: "depth24plus"
+       },       
+       primitive: {
+          topology: "line-list"
+       },
+       multisample: { 
+         count: 4,    
+       },
+       layout: "auto"
+    };
+    
+    pipelineForEdges = device.createRenderPipeline(pipelineDescriptorForEdges);
+    
+    bindGroupForEdges = device.createBindGroup({
+       layout: pipelineForEdges.getBindGroupLayout(0),
+       entries: [
+         { // transformation matrix
+            binding: 0,
+            resource: {buffer: transformationBuffer, offset: 0, size: 64}
+         }
+       ]
+    });    
+}
+
+
+function draw() {
+   let viewMatrix = new Float32Array(trackballRotator.getViewMatrix());
+   let transform = wgpuMatrix.mat4.multiply(projectionMatrix,viewMatrix);
+   device.queue.writeBuffer(transformationBuffer, 0, transform);
+   let normalMatrix = wgpuMatrix.mat3.fromMat4(viewMatrix);
+   device.queue.writeBuffer(normalMatrixBuffer, 0, normalMatrix);
+
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: 0, g: 0, b: 0.4, a: 1 },
+          loadOp: "clear",
+          storeOp: "store",
+          view: textureForMultisampling.createView(), 
+          resolveTarget: context.getCurrentTexture().createView()
+      }],
+      depthStencilAttachment: {
+        view: depthTexture.createView(),
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      }
+   };
+   
+   let commandEncoder = device.createCommandEncoder();
+   
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipelineForFaces);
+   passEncoder.setBindGroup(0,bindGroupForFaces);
+   passEncoder.setVertexBuffer(0,currentModel.faceVertices);
+   passEncoder.setVertexBuffer(1,currentModel.faceNormals);
+   passEncoder.draw(currentModel.drawFacesCount);
+   passEncoder.end();
+   
+   renderPassDescriptor.colorAttachments[0].loadOp = "load";
+   renderPassDescriptor.depthStencilAttachment.depthLoadOp = "load";
+   passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipelineForEdges);
+   passEncoder.setBindGroup(0,bindGroupForEdges);
+   passEncoder.setVertexBuffer(0,currentModel.edgeVertices);
+   passEncoder.draw(currentModel.drawEdgesCount);
+   passEncoder.end();
+   
+   device.queue.submit([commandEncoder.finish()]);       
+}
+    
+    
+function getPolyhedron(index) { // Sets currentModel, creating it if necessary.
+    if ( ! polyhedronModels[index] ) {
+        let data;
+        switch(index) { // polyhedra data is from polyhedra.js
+            case 0: data = houseIFS; break;
+            case 1: data = cubeIFS; break;
+            case 2: data = dodecahedronIFS; break;
+            case 3: data = icosahedronIFS; break;
+            case 4: data = octahedronIFS; break;
+            case 5: data = rhombicDodecahedronIFS; break;
+            case 6: data = socerBallIFS; break;
+            case 7: data = stellatedDodecahedronIFS; break;
+            case 8: data = stellatedIcosahedronIFS; break;
+            case 9: data = stellatedOctahedronIFS; break;
+            case 10: data = tetrahedronIFS; break;
+            case 11: data = truncatedIcosahedronIFS; break;
+            default: data = truncatedRhombicDodecahedronIFS; break;
+        }
+        let vertices = []; // Convert polyhedron data to formats appropriate for triangle-list and line-list.
+        let normals = [];
+        let edges = [];
+        for (let f = 0; f < data.faces.length; f++) {
+            let face = data.faces[f];
+            let normal = data.faceNormals[f];
+            for (let i = 1; i < face.length-1; i++) { // data for drawing faces
+                  // (For the faces, I use the vertex ordering from polyhedra.js,
+                  // which turned out to be clockwise.  I could have changed the
+                  // order to counterclockwise here, but I decided to take the
+                  // opportunity to use the cullMode and frontFace properties
+                  // in the render pipeline for the faces.) 
+                let vertex = data.vertices[face[0]];
+                vertices.push(vertex[0],vertex[1],vertex[2]);
+                normals.push(normal[0],normal[1],normal[2]);
+                vertex = data.vertices[face[i]];
+                vertices.push(vertex[0],vertex[1],vertex[2]);
+                normals.push(normal[0],normal[1],normal[2]);
+                vertex = data.vertices[face[i+1]];
+                vertices.push(vertex[0],vertex[1],vertex[2]);
+                normals.push(normal[0],normal[1],normal[2]);
+            }
+            for (let i = 0; i < face.length; i++) { // data for drawing edges
+                let vertex = data.vertices[face[i]];
+                edges.push(vertex[0],vertex[1],vertex[2]);
+                vertex = data.vertices[face[ i == face.length-1 ? 0 : i+1]];
+                edges.push(vertex[0],vertex[1],vertex[2]);
+            }
+        }
+        let model = {};
+        model.faceVertices = device.createBuffer({
+           size: vertices.length * 4,
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        device.queue.writeBuffer(model.faceVertices, 0, new Float32Array(vertices));
+        model.faceNormals = device.createBuffer({
+           size: normals.length * 4,
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        device.queue.writeBuffer(model.faceNormals, 0, new Float32Array(normals));
+        model.edgeVertices = device.createBuffer({
+           size: edges.length * 4,
+           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        });
+        device.queue.writeBuffer(model.edgeVertices, 0, new Float32Array(edges));            
+        model.drawFacesCount = vertices.length/3;
+        model.drawEdgesCount = edges.length/3;
+        polyhedronModels[index] = model;
+    }
+    currentModel = polyhedronModels[index];
+}
+
+function installModel() {
+    let modelNum = Number(document.getElementById("modelSelect").value);
+    getPolyhedron(modelNum);
+    draw();
+}
+
+
+async function init() {
+   try {
+      await initWebGPU();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       return;
+   }
+   trackballRotator = new TrackballRotator(context.canvas, draw, 4.8, [4,5,10]);
+   document.getElementById("modelSelect").value = "" + defaultModel;
+   document.getElementById("modelSelect").onchange = installModel;
+   getPolyhedron(defaultModel);
+   draw();
+}
+
+window.onload = init;
+</script>
+
+</head>
+<body>
+<h2>WebGPU: Polyhedron Viewer (with depth bias)</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"><b>You can drag on the object to rotate it.</b></p>
+
+
+<p><label><b>Select Polyhedron:</b>
+    <select id="modelSelect" style="margin-top:3px">
+        <option value="1">Cube</option>
+        <option value="2">Dodecahedron</option>
+        <option value="3">Icosahedron</option>
+        <option value="4">Octahedron</option>
+        <option value="5">Rhombic Dodecahedron</option>
+        <option value="6">Socer Ball</option>
+        <option value="7">Stellated Dodecahedron</option>
+        <option value="8">Stellated Icosahedron</option>
+        <option value="9">Stellated Octahedron</option>
+        <option value="10">Tetrahedron</option>
+        <option value="11">Truncated Icosahedron</option>
+        <option value="12">Truncated Rhombic Dodecahedron</option>
+    </select>
+</label></p>
+
+
+<div id="canvasholder">
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+</div>
+
+</body>
+</html>

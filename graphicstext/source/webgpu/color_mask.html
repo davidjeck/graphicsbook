@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<!--
+    Demonstrates the writeMask property of a render pipeline target, by letting
+    the user view selected color channels of textures.  The user can also
+    select the texture and select whether the background should be black or gray.
+    
+    Some of the code is taken from first_texture.html and textured_objects.html;
+    that code is only minimally commented. 
+-->
+<head>
+<title>Basic WebGPU Example: Write Mask</title>
+<style>
+   body { 
+      background-color: white;
+   }
+</style>
+<script>
+
+"use strict";
+
+const shaderSource = `
+
+   // A simple shader to take the color of each fragment from a texture.
+
+   struct VertexOutput {
+      @builtin(position) position: vec4f,
+      @location(0) texcoords : vec2f  
+   }
+   
+   @vertex
+   fn vertexMain(
+            @location(0) coords : vec2f, 
+            @location(1) texcoords : vec2f 
+         ) -> VertexOutput {  
+      var output: VertexOutput;  
+      output.position = vec4f( coords, 0, 1 );
+      output.texcoords = texcoords; 
+      return output;
+   }
+
+   @group(0) @binding(0) var tex : texture_2d<f32>;
+   @group(0) @binding(1) var samp : sampler;
+   
+   @fragment
+   fn fragmentMain(@location(0) texcoords : vec2f) -> @location(0) vec4f{
+      return textureSample( tex, samp, texcoords );
+   }
+`;
+
+const vertexData = new Float32Array([  // The program just draws a square that displays the texture.
+   /* coords */     /* texcoords */
+    -0.9, -0.9,       0, 1, 
+     0.9, -0.9,       1, 1, 
+    -0.9,  0.9,       0, 0, 
+     0.9,  0.9,       1, 0, 
+]);
+
+let context; 
+let device;
+
+let shader;
+let pipelineDescriptor;
+let pipeline; 
+
+let vertexBuffer;
+let bindGroupDescriptor;
+let bindGroups = [];  // The elements are bind groups for the available textures.
+let bindGroup; // Bind group containing the currently selected texture.
+
+
+const textureURL = [  // URLs for texture images, selected by "Texture Image" popup menu
+        "textures/Earth-1024x512.jpg",
+        "textures/NightEarth-512x256.jpg",
+        "textures/mona-lisa.jpg",
+        "textures/brick001.jpg",
+        "cubemap-textures/park/posx.jpg"
+    ];
+let waitingForFirstImage = true;
+    
+    
+async function initWebGPU() {
+
+   if (!navigator.gpu) {
+      throw Error("WebGPU not supported in this browser.");
+   }
+   let adapter = await navigator.gpu.requestAdapter();
+   if (!adapter) {
+      throw Error("WebGPU is supported, but couldn't get WebGPU adapter.");
+   }
+
+   device = await adapter.requestDevice();
+   
+   let canvas = document.getElementById("webgpuCanvas");
+   context = canvas.getContext("webgpu");
+   context.configure({
+      device: device,
+      format: navigator.gpu.getPreferredCanvasFormat(),
+      alphaMode: "premultiplied"
+   });
+
+   device.pushErrorScope("validation");
+   shader = device.createShaderModule({
+      code: shaderSource
+   });
+   let error = await device.popErrorScope();
+   if (error) {
+      throw Error("Compilation error in shader; see Console for details.");
+   }   
+}
+
+
+function createPipelineConfig() {
+
+   let vertexBufferLayout = [
+      { 
+         attributes: [
+             { shaderLocation:0, offset:0, format: "float32x2" },
+             { shaderLocation:1, offset:8, format: "float32x2" }
+           ],
+         arrayStride: 16, 
+         stepMode: "vertex" 
+      }
+   ];
+   
+   let bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+         {  
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {}
+         },
+         {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: { }
+         }
+      ]
+   });
+   
+   bindGroupDescriptor = { 
+      layout: bindGroupLayout,
+      entries: [
+        {   // For the texture, to be supplied when texture image has been loaded.
+            binding: 0
+        },
+        {  // the sampler
+           binding: 1,
+           resource: device.createSampler({magFilter: "linear", minFilter: "linear"})
+        }
+      ]
+   };
+
+   pipelineDescriptor = {
+       vertex: {
+          module: shader,
+          entryPoint: "vertexMain",
+          buffers: vertexBufferLayout
+       },
+       fragment: {
+          module: shader,
+          entryPoint: "fragmentMain",
+          targets: [{
+            format: navigator.gpu.getPreferredCanvasFormat(),
+            writeMask: GPUColorWrite.ALL
+               // The writeMask determines which color channels are written to the target.
+               // Values are GPUColorWrite.RED, GPUColorWrite.GREEN, GPUColorWrite.BLUE, 
+               // GPUColorWrite.ALPHA, or any combination of those values combined with
+               // logical or operators, |.  GPUColorWrite.ALL contains all four constants
+               // and is the default.  Color channels that are not written are left 
+               // unchanged.  
+          }]
+       },
+       primitive: {
+          topology: "triangle-strip"
+       },
+       layout: device.createPipelineLayout({
+          bindGroupLayouts: [bindGroupLayout]
+       })
+    };
+    
+   pipeline = device.createRenderPipeline(pipelineDescriptor);  
+      
+   vertexBuffer = device.createBuffer({
+       size: vertexData.byteLength, 
+       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+   });
+   
+   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+
+}
+
+
+function draw() {
+   if (waitingForFirstImage) {
+      return; // Make sure not to try this before first image has loaded.
+   }
+   let bg = document.getElementById("grayBackground").checked ? 0.6 : 0;
+   let commandEncoder = device.createCommandEncoder();
+   let renderPassDescriptor = {
+      colorAttachments: [{
+          clearValue: { r: bg, g: bg, b: bg, a: 1 }, 
+          loadOp: "clear",
+          storeOp: "store", 
+          view: context.getCurrentTexture().createView()
+      }]
+   };
+   let passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+   passEncoder.setPipeline(pipeline);
+   passEncoder.setVertexBuffer(0,vertexBuffer);
+   passEncoder.setBindGroup(0,bindGroup); 
+   passEncoder.draw(4);
+   passEncoder.end();
+   let commandBuffer = commandEncoder.finish();
+   device.queue.submit([commandBuffer]);
+}
+
+
+/**
+ *  Called when one of the Red/Green/Blue checkboxes has been checked or unchecked.
+ *  Construct a new writeMask for pipelineDescriptor by or-ing together the
+ *  constants (GPUCGPUColorWrite.RED, GPUColorWrite.GREEN, GPUColorWrite.BLUE) for
+ *  the selected color channels.  Create a new pipeline and call draw() to show
+ *  the change.
+ */
+function installPipelineForColorMask() {
+   document.getElementById("message2").innerHTML = "&nbsp;";
+   let mask = 0;
+   if (document.getElementById("red").checked)
+      mask = mask | GPUColorWrite.RED;
+   if (document.getElementById("green").checked)
+      mask = mask | GPUColorWrite.GREEN;
+   if (document.getElementById("blue").checked)
+      mask = mask | GPUColorWrite.BLUE;
+   if (mask === 0)
+      document.getElementById("message2").innerHTML = "Warning: no color channels are written!";
+   pipelineDescriptor.fragment.targets[0].writeMask = mask;
+   pipeline = device.createRenderPipeline(pipelineDescriptor);
+   draw();
+}
+
+
+/**
+ *  Called during initialization and when selected texture in popup menu has changed.
+ */
+async function installTexture() {
+    let imageNum = Number(document.getElementById("imageSelect").value);
+    let URL = textureURL[imageNum];
+    if ( ! bindGroups[imageNum]) {
+       document.getElementById("message2").innerHTML = "Loading image from " + URL;
+       let texture;
+       try {
+          texture = await loadTexture(URL);
+       }
+       catch (e) {
+           if (waitingForFirstImage)
+               document.getElementById("message2").innerHTML = "CAN'T LOAD IMAGE, PROGRAM CAN'T CONTINUE.";
+           else
+               document.getElementById("message2").innerHTML = "IMAGE LOAD FAILED FROM URL " + URL;
+           console.log("Error loading image from " + URL + ": " + e);
+           return;
+       }
+       bindGroupDescriptor.entries[0].resource = texture.createView();
+       bindGroups[imageNum] = device.createBindGroup(bindGroupDescriptor);
+       document.getElementById("message2").innerHTML = "&nbsp;";
+    }
+    bindGroup = bindGroups[imageNum];
+    if (waitingForFirstImage) {
+         waitingForFirstImage = false; 
+         document.getElementById("red").disabled = false;
+         document.getElementById("green").disabled = false;
+         document.getElementById("blue").disabled = false;
+         document.getElementById("grayBackground").disabled = false;
+         document.getElementById("imageSelect").disabled = false;
+    }
+    draw();
+}
+async function loadTexture(URL) {
+       // Standard method using the fetch API to get a texture from a ULR.
+    let response = await fetch(URL);
+    let blob = await response.blob();  // Get image data as a "blob".
+    let imageBitmap = await createImageBitmap(blob);
+    let texture = device.createTexture({
+        size: [imageBitmap.width, imageBitmap.height],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
+                    GPUTextureUsage.RENDER_ATTACHMENT
+    });
+    device.queue.copyExternalImageToTexture(
+       { source: imageBitmap },
+       { texture: texture },
+       [imageBitmap.width, imageBitmap.height]
+    );
+    return texture;
+}
+
+
+async function init() {
+   document.getElementById("red").disabled = true;  // Disable until first image has loaded.
+   document.getElementById("green").disabled = true;
+   document.getElementById("blue").disabled = true;
+   document.getElementById("grayBackground").disabled = true;
+   document.getElementById("imageSelect").disabled = true;
+   try {
+      await initWebGPU();
+      createPipelineConfig();
+   }
+   catch (e) {
+       document.getElementById("message").innerHTML =
+          "<span style='color:#AA0000; font-size:110%'><b>Error: Could not initialize WebGPU: </b>" + 
+                    e.message + "</span>";
+       console.log(e);
+       return;
+   }
+   document.getElementById("imageSelect").value = "4";
+   document.getElementById("imageSelect").onchange = installTexture;
+   document.getElementById("red").checked = true;
+   document.getElementById("green").checked = true;
+   document.getElementById("blue").checked = true;
+   document.getElementById("grayBackground").checked = false;
+   document.getElementById("red").onchange = installPipelineForColorMask;
+   document.getElementById("green").onchange = installPipelineForColorMask;
+   document.getElementById("blue").onchange = installPipelineForColorMask;
+   document.getElementById("grayBackground").onchange = draw;
+   installTexture();
+}
+
+window.onload = init;
+
+</script>
+</head>
+
+<body>
+
+<h2>WebGPU Write Mask Example</h2>
+
+<noscript><h3>Error: This page requires JavaScript and a web browser that supports WebGPU!</h3><hr></noscript>
+
+<p id="message"></p>
+
+<p>
+<label><b>Texture Image:</b> <select id="imageSelect">
+    <option value="0">Earth</option>
+    <option value="1">Earth at night</option>
+    <option value="2">Mona Lisa</option>
+    <option value="3">Brick</option>
+    <option value="4">Park</option>
+</select></label>
+</p>
+<p><b>Color Channels:</b>
+   <label><input type="checkbox" id="red"> Red</label>
+   <label><input type="checkbox" id="green"> Green</label>
+   <label><input type="checkbox" id="blue"> Blue</label>
+<label style="margin-left:50px"><input type="checkbox" id="grayBackground"> <b>Use Gray Background</b></label>
+</p>
+
+<p style="color:red"><b id="message2">&nbsp;</b></p>
+
+
+<canvas width=500 height=500 id="webgpuCanvas"></canvas>
+
+</body>
+</html>
+

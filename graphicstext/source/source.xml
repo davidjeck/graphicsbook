@@ -477,6 +477,16 @@ From <localref href="webgpu.6.3"/>.</li>
 <li><sourceref href="webgpu/map_buffer_for_read.html"/> &mdash; Illustrates reading data from a GPU buffer
 into the JavaScript side of the program.  The application (which is really not the point or the exercise)
 is to use the trapezoid rule to approximate a definite integral.  From <localref href="webgpu.6.4"/>.</li>
+<li><sourceref href="webgpu/viewport_and_scissor.html"/> &mdash; Another moving disk animation, showing
+four copies of the scene in different viewports.  A scissor rect is also applied in two of the viewports.
+From <localref href="webgpu.7.4"/>.</li>
+<li><sourceref href="webgpu/alpha_blend.html"/> &mdash; Uses alpha blending to draw translucent colors.  Demonstrates
+the <code>blend</code> property of the target in a render pipeline.  From <localref href="webgpu.7.5"/>.</li>
+<li><sourceref href="webgpu/color_mask.html"/> &mdash; Demonstrates the <code>writeMask</code> property of the target
+in a render pipeline by letting the user select which color channels to write. From <localref href="webgpu.7.5"/>.</li>
+<li><sourceref href="webgpu/polyhedra.html"/> &mdash; Lets the user view several polyhedra.  Demonstrates depth bias in 
+a render pipeline by drawing the faces of the polyhedra with a depth bias, to make sure that parts of the edges
+are not hidden by the faces.  From <localref href="webgpu.7.5"/>.</li>
 </ul>
 </subsection>
 
