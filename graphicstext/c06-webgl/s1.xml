@@ -439,7 +439,7 @@ is <i>null</i>. The return value can also be <i>null</i> if the uniform variable
 the shader source code but is not "active" in the program. A variable that is declared but not
 actually used is not active, and it does not get a location in the compiled program.
 This has occasionally caused problems for me, when I commented out part of 
-a shader program for debugging purposes, and accidently made a variable inactive
+a shader program for debugging purposes, and accidentally made a variable inactive
 by doing so.</p>
 
 </subsection>
@@ -624,7 +624,7 @@ such as <i>gl.TRIANGLES</i>, <i>gl.LINE_LOOP</i>, and <i>gl_POINTS</i>.  The sec
 and third parameters are integers that determine which subset of available vertices is used for the primitive.
 Before calling <i>gl.drawArrays</i>, you will have placed attribute values for some number of vertices
 into one or more VBOs.  When the primitive is rendered, the attribute values for enabled attributes are pulled from the
-VBOs.  The <i>startVetex</i> is the starting vertex number of the data within the VBOs,
+VBOs.  The <i>startVertex</i> is the starting vertex number of the data within the VBOs,
 and <i>vertexCount</i> is the number of vertices in the primitive.  Often, <i>startVertex</i>
 is zero, and <i>vertexCount</i> is the total number of vertices for which data is available.
 For example, the command for drawing a single triangle might be</np>
@@ -648,7 +648,7 @@ the data is accessed.</p>
 <p>To use <i>gl.drawElements</i>, an extra VBO is required to hold the list of indices.
 When used for this purpose, the VBO must be bound to the target <i>gl.ELEMENT_ARRAY_BUFFER</i>
 rather than <i>gl.ARRAY_BUFFER</i>.   The VBO will hold integer values, which can be of type 
-<i>gl.UNSIGNED_BYTE</i> or <i>gl.UNSIGNED_SHORT</i> (or, for WebGL&nbsp;2.0, <i>gl.USIGNED_INT</i>).  
+<i>gl.UNSIGNED_BYTE</i> or <i>gl.UNSIGNED_SHORT</i> (or, for WebGL&nbsp;2.0, <i>gl.UNSIGNED_INT</i>).  
 The values can be loaded from
 a JavaScript typed array of type <classname>Uint8Array</classname>, for <i>gl.UNSIGNED_BYTE</i>,
 or <classname>Uint16Array</classname>, for <i>gl.UNSIGNED_SHORT</i>.
