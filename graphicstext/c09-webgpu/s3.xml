@@ -443,7 +443,7 @@ This can be useful, for example, when doing two-sided lighting in
 <subsection title="Expressions and Built-in Functions" id="webgpu.3.4">
 
 <p>WGSL has all the familiar arithmetic, logical, bitwise, and comparison operators:
-<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilde;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
+<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilda;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
 It does not have the conditional <code>?:</code>&nbsp;operator, but it has an equivalent built-in
 function, <code>select(false_case,true_case,boolean)</code>.  Note that assignment (<code>=</code>,
 <code>+=</code>, etc.) is not an operator; that is, <code>A&nbsp;=&nbsp;B</code> is a statement,
