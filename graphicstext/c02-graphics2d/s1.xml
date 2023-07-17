@@ -88,14 +88,14 @@ one-pixel line width:</p>
        tex="horizontal-lines-from-canvas.eps" texscale="0.8"/>
        
 <np>The top line was drawn from the point (100,100) to the point (120,100).  In
-canvas graphics, integer coordinates corresponding to the lines between pixels, 
+canvas graphics, integer coordinates correspond to the lines between pixels, 
 but when a one-pixel line is drawn, it
 extends one-half pixel on either side of the infinitely thin geometric line.  So for the top line,
 the line as it is drawn lies half
 in one row of pixels and half in another row.  The graphics system, which uses
 antialiasing, <word term="rendering">rendered</word> the line by coloring both
 rows of pixels gray.  The bottom line was drawn from the point (100.5,100.5) to
-(120.5,120.5).  In this case, the line lies exactly along one line of pixels,
+(120.5,100.5).  In this case, the line lies exactly along one line of pixels,
 which gets colored black.  The gray pixels at the ends of the bottom line have to do with
 the fact that the line only extends halfway into the pixels at its endpoints.
 Other graphics systems might render the same lines differently.</np>
@@ -185,7 +185,7 @@ they would like to use, it would be good to have a subroutine such as</p>
 
 <np>The graphics system would then be responsible for automatically
  <word term="geometric transform">transforming</word> the  
-coordinates from the specfiied coordinate system into pixel coordinates.
+coordinates from the specified coordinate system into pixel coordinates.
 Such a subroutine might not be available, so it's useful to see how the transformation
 is done by hand.  Let's consider the general case.  Given coordinates for a point in 
 one coordinate system, we want to find the coordinates for the same point in a second 
@@ -204,7 +204,7 @@ of the point in the second coordinate system</np>
 <pre>newX = newLeft + 
           ((oldX - oldLeft) / (oldRight - oldLeft)) * (newRight - newLeft))
 newY = newTop + 
-          ((oldY - oldTop) / (oldBottom - oldTop)) * (newBotom - newTop)</pre>
+          ((oldY - oldTop) / (oldBottom - oldTop)) * (newBottom - newTop)</pre>
 
 <np>The logic here is that <i>oldX</i> is located at a certain fraction of the distance from <i>oldLeft</i> to
 <i>oldRight</i>.  That fraction is given by</np>
@@ -307,7 +307,7 @@ blue light?  In fact, we can't quite do that.</p>
 <p>You might have heard that combinations of the three basic, or "primary," colors are sufficient
 to represent all colors, because the human eye has three kinds of color sensors that detect red,
 green, and blue light.  However, that is only an approximation.  The eye does contain three
-kinds of color sensor.  The sensors are called "cone cells."
+kinds of color sensors.  The sensors are called "cone cells."
 However, cone cells do not respond exclusively to red, green, and blue light.  Each kind
 of cone cell responds, to a varying degree, to wavelengths of light in a wide range.  A given
 mix of wavelengths will stimulate each type of cell to a certain degree, and the intensity of
@@ -327,7 +327,7 @@ surprisingly common.)</p>
 the <newword>color gamut</newword> of that device.  Different computer screens can have different
 color gamuts, and the same RGB values can produce somewhat different colors on different screens.
 The color gamut of a color printer is noticeably different&mdash;and probably
-smaller&mdash;than the color gamut of a screen, which explain why a printed image probably
+smaller&mdash;than the color gamut of a screen, which explains why a printed image probably
 doesn't look exactly the same as it did on the screen.  (Printers, by the way, make colors
 differently from the way a screen does it.  Whereas a screen combines light to make a color, 
 a printer combines inks or dyes.  Because of this difference, colors meant for printers are often

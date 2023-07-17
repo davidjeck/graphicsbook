@@ -212,7 +212,7 @@ device coordinates since they are actual physical coordinates on the device wher
 image is being displayed.</gitem>
 <gitem term="world coordinates">The coordinate system in which a scene is defined.  The image 
 that is produced of the scene will show the contents of the world coordinate system that
-lie within some some view volume (for 3D) or view window (for 2D).  Objects are defined
+lie within some view volume (for 3D) or view window (for 2D).  Objects are defined
 in their own object coordinate system. Modeling transformations are then applied to place 
 objects into the scene; that is, they transform object coordinates to world coordinates.</gitem>
 <gitem term="object coordinates">The coordinate system in which the coordinates for points in an 
@@ -510,7 +510,7 @@ the user can observe the process of drawing the image.</gitem>
 <gitem term="wireframe">A style of drawing a polyhedron or polygonal mesh in which only the
 edges are drawn, resulting in an image made up of line segments.</gitem>
 <gitem term="regular polyhedron">A polyhedron in which each face is a regular polygon, and all the
-faces and angles are identical.  There are only five regular polyhedra: the tetarhedron with 4 triangular
+faces and angles are identical.  There are only five regular polyhedra: the tetrahedron with 4 triangular
 faces, the cube with 6 square faces, the octahedron with 8 triangular faces, the dodecahedron with
 12 pentagonal faces, and the icosahedron, with 20 triangular faces.</gitem>
 <gitem term="torus">A 3D geometric object having the shape of a doughnut (or bagel).</gitem>
@@ -560,7 +560,7 @@ The color of an object is determined by its reflectivities at all wavelengths.</
 The intensity of a light at a given wavelength is the amount of energy in the light
 at that wavelength.  The total intensity of the light is its total energy at all wavelengths.
 The color of a light is determined by its intensities at all wavelengths.</gitem>
-<gitem term="point light">A light source whose light rays eminate from a single point.  Also
+<gitem term="point light">A light source whose light rays emanate from a single point.  Also
 called a "lamp," since a lamp approximates a point source of light. Also called a positional
 light.</gitem>
 <gitem term="directional light">A light source whose light rays are parallel, all arriving from
@@ -602,7 +602,7 @@ when the texture has to be stretched to fit the object.  For an image texture, a
 is applied to compute the color of a pixel when that pixel covers just a fraction of a pixel in the image.</gitem>
 <gitem term="mipmap">One of a series of reduced-size copies of a texture image, of decreasing width and height.
 Starting from the original image, each mipmap is obtained by dividing the width and height of
-the previous image by two (unless it is already 1).  The final mimpap is a single pixel.  Mipmaps
+the previous image by two (unless it is already 1).  The final mipmap is a single pixel.  Mipmaps
 are used for more efficient mapping of the texture image to a surface, when the image has to be
 shrunk to fit the surface.</gitem>
 <gitem term="power-of-two texture">A texture image whose width and height are powers of two.  In some
