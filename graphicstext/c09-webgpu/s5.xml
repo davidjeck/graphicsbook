@@ -186,7 +186,7 @@ fn fragmentMain(@location(0) texcoords : vec2f) -> @location(0) vec4f {
            // Use texcoords as red/green color components.
       return vec4f( texcoords, 0, 1);
    }
-   else if (textureSelect == 2) { // For the checkboard texture.
+   else if (textureSelect == 2) { // For the checkerboard texture.
           // Apply texture transform: multiply texcoords by 5.
       return textureSample( tex, samp, 5 * texcoords );
    }
@@ -406,7 +406,7 @@ with a full set of mipmaps from an <classname>ImageBitmap</classname>.
 The program also serves as an example of rendering to
 a texture and using texture views.</p>
 
-<p>When createing a texture, the number of mipmaps must be specified.
+<p>When creating a texture, the number of mipmaps must be specified.
 It is easy to count the number of mipmaps needed for a full set,
 given the image bitmap that will be used for level&nbsp;0:</p>
 
@@ -499,7 +499,7 @@ cover array textures in this textbook, but you need to know a little about
 them since, for some purposes, a cubemap texture is treated as
 an array with six layers.  The images at indices 0 through 5 are the
 +X, -X, +Y, -Y, +Z, and -Z sides of the cube, in that order.
-In particular, a cubmap texture is treated as an array when 
+In particular, a cubemap texture is treated as an array when 
 creating the texture and loading the images for the six sides.  Here is 
 some (edited) code from the sample program for loading the texture:</p>
 
@@ -795,7 +795,7 @@ to <code>inputBoard</code> in the shader and <code>texture2</code> to
    ]
 });</pre>
 
-<np>A second bind group, <code>bindGroupB</code>, reverses the roles of the the
+<np>A second bind group, <code>bindGroupB</code>, reverses the roles of the
 textures.  The program uses <code>bindGroupA</code> the first time <code>draw()</code>
 is called, <code>bindGroupB</code> the second time, <code>bindGroupA</code> the
 third time, and so on.</np>

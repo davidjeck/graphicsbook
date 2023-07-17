@@ -56,7 +56,7 @@ function calls in the same invocation of the shader.</li>
 variables that are shared by all GPU processors.  Uniform variables are read-only.  A variable
 declaration using <code>var&lt;uniform&gt;</code> cannot include an initial value for the
 variable, and a shader cannot assign a new value to the variable.  The values in a uniform
-variable are "resources" that come from a bind group, and every every uniform variable declaration
+variable are "resources" that come from a bind group, and every uniform variable declaration
 must have  <code>@group</code> and <code>@binding</code> annotations that are used to
 specify the source of the resource.</li>
 
@@ -365,7 +365,7 @@ value.  The value cannot be changed after initialization.  The declaration
 can optionally include a type, but it is usually not necessary.  
 An address space cannot be specified.
 Using <code>let</code> makes it clear that you do not expect the
-value to change and makes it impossible to change the value accidently.</p>
+value to change and makes it impossible to change the value accidentally.</p>
 
 <p>Named values can also be declared using <code>const</code>, but the
 initial value in a <code>const</code> declaration must be a constant that
@@ -443,7 +443,7 @@ This can be useful, for example, when doing two-sided lighting in
 <subsection title="Expressions and Built-in Functions" id="webgpu.3.4">
 
 <p>WGSL has all the familiar arithmetic, logical, bitwise, and comparison operators:
-<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilda;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
+<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilde;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
 It does not have the conditional <code>?:</code>&nbsp;operator, but it has an equivalent built-in
 function, <code>select(false_case,true_case,boolean)</code>.  Note that assignment (<code>=</code>,
 <code>+=</code>, etc.) is not an operator; that is, <code>A&nbsp;=&nbsp;B</code> is a statement,
@@ -566,9 +566,9 @@ be of the same type, or be abstract integers.  For an example, see the
 <p>We have seen examples of function definitions in <localref href="webgpu.1"/> and <localref href="webgpu.2"/>.
 All of the examples in those sections were shader entry point functions, annotated with 
 <code>@vertex</code> or <code>@fragment</code>.  It is possible to define additional functions
-in a shader, and those functions can then be called in the usual way.  Note however that is
+in a shader, and those functions can then be called in the usual way.  Note however that it
 is <b>not</b> legal to call an entry point function; they can only be called by the system
-as part of a a pipeline.</p>
+as part of a pipeline.</p>
 
 <p>I will remark that the vertex shader and the fragment shader for a pipeline can be
 defined in different shader modules.  Also, a shader module can contain any number of
