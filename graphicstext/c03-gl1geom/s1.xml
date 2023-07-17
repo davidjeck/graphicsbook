@@ -511,7 +511,7 @@ section</tex> lets you experiment with the depth test.  It also lets
 you see what happens when part of your geometry extends outside the visible range
 of <i>z</i>-values.</p></demo>
 
-<p>Here are are a few details about the implementation of the depth test:
+<p>Here are a few details about the implementation of the depth test:
 For each pixel, the depth buffer stores a
 representation of the distance from the viewer to the point that is currently
 visible at that pixel.  This value is essentially the <i>z</i>-coordinate

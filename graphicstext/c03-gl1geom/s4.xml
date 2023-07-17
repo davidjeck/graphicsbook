@@ -67,7 +67,7 @@ can specify a vertex by giving its index in the list.  For example,
 we can say that one of the triangular faces of the pyramid is the polygon
 formed by vertex #3, vertex #2, and vertex #4.  So, we can complete our
 data for the mesh by giving a list of vertex indices for each face.
-Here is the face data for the house.  Remember that the numbers in parenthese
+Here is the face data for the house.  Remember that the numbers in parentheses
 are indices into the vertex list:</p>
 
 <pre>Face #0:  (0, 1, 2, 3)

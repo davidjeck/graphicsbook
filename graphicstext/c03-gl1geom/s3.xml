@@ -219,7 +219,7 @@ you must first call</p>
 
 <np>If you want to go back to working on the modelview matrix, you must call</np>
 
-<pre>glMartrixMode(GL_MODELVIEW);</pre>
+<pre>glMatrixMode(GL_MODELVIEW);</pre>
 
 <np>In my programs, I generally set the matrix mode to <i>GL_PROJECTION</i>, set up
 the projection transformation, and then immediately set the matrix mode
@@ -623,7 +623,7 @@ when it is compiled.  To use the camera, you should call</p>
 
 <np>to set up the projection and viewing transform before drawing the scene.
 Calling this function replaces the usual code
-code for setting up the projection and viewing transformations. It leaves the
+for setting up the projection and viewing transformations. It leaves the
 matrix mode set to <i>GL_MODELVIEW</i>.</np>
 
 <p>The remaining functions in the API are used to configure the camera.  This would usually
