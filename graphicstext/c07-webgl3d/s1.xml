@@ -277,7 +277,7 @@ be multiplied together to get a matrix that represents the combined transformati
 object coordinates can then be multiplied by that matrix to transform them
 directly into clip coordinates.</p>
 
-<p>In the shader program, coordinate transforms are ususally represented as
+<p>In the shader program, coordinate transforms are usually represented as
 GLSL <word term="uniform variable">uniform variables</word> of type <classname>mat4</classname>.
 The shader program can use either separate projection and modelview matrices or
 a combined matrix (or both).  Sometimes, a separate modelview transform matrix is
@@ -330,7 +330,7 @@ else {
 
 mat4.lookAt(modelview, [2,2,6], [0,0,0], [0,1,0]);
 
-/* Apply the modeling tranformation to modelview. */
+/* Apply the modeling transformation to modelview. */
 
 mat4.rotateX(modelview, modelview, rotateX);
 mat4.rotateY(modelview, modelview, rotateY);
@@ -367,7 +367,7 @@ is transformed in some way, it seems that the normal vectors to that
 surface will also change.  However, that is not true if the transformation is a translation.
 A normal vector tells what direction a surface is facing.  Translating
 the surface does not change the direction in which the surface is facing, so
-the nomal vector remains the same.
+the normal vector remains the same.
 Remember that a vector doesn't have a position, just a length and
 a direction.  So it doesn't even make sense to talk about moving or
 translating a vector.</p>

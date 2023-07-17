@@ -16,7 +16,7 @@ scaling, rotation, and translation to texture coordinates
 before they are used to sample a texture.  It is easy to program
 the same operations in WebGL.  We need to compute the texture
 transform matrix on the JavaScript side.  The transform matrix
-is then sent to a uniform matrix variable in the the shader program, 
+is then sent to a uniform matrix variable in the shader program, 
 where it can be applied to the texture coordinates.  Note that as
 long as the texture transformation is <word term="affine transform">affine</word>,
 it can be applied in the vertex shader, even though the texture is
@@ -395,7 +395,7 @@ height map grayscale value is decreasing.</p>
 Literally tilting the surface would change the direction of the normal vector.  We can get
 the same change in the normal vector by adding some multiple of the vector from the height map
 to the original normal vector, as shown on the right above.  Changing the number that is multiplied
-by the height map vector changes the degree of tilting of the surface.  Increasing the mulitplier
+by the height map vector changes the degree of tilting of the surface.  Increasing the multiplier
 gives a stronger bump effect.  Using a negative multiple will tilt the surface in the opposite
 direction, which will transform "bumps" into "dimples," and vice versa.  I will refer to the
 multiplier as the <i>bump strength</i>.</p>
@@ -677,7 +677,7 @@ mat3.invert(inverseViewTransform,inverseViewTransform);</pre>
 
 <np>We need a <classname>mat3</classname> to transform a vector.  The first line discards 
 the translation part of the modelview matrix, putting the result in
-<i>inverseViewTransorm</i>.  Translation doesn't affect vectors, but the
+<i>inverseViewTransform</i>.  Translation doesn't affect vectors, but the
 translation part is zero in any case since the viewing transformation in this program
 is just a rotation.  The second line converts <i>inverseViewTransform</i> into its inverse.</np>
 
