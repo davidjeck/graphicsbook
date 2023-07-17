@@ -356,13 +356,13 @@ parameter.  This creates a typed array that holds the same numbers.  For example
 numbers from the JavaScript array.</np>
 
 <p>Specifying the vertices for a <classname>BufferGeometry</classname> is a multistep
-process.  You need to create a typed array containing the coordinates of the vetices.
+process.  You need to create a typed array containing the coordinates of the vertices.
 Then you need to wrap that array inside an object of type
 <classname>THREE.BufferAttribute</classname>.  Finally, you can add the attribute
 to the geometry.  Here is an example:</p>
 
 <pre>let vertexCoords = new Float32Array([ 0,0,0, 1,0,0, 0,1,0 ]);
-let vetexAttrib = new THREE.BufferAttribute(vertexCoords, 3);
+let vertexAttrib = new THREE.BufferAttribute(vertexCoords, 3);
 let geometry = new THREE.BufferGeometry();
 geometry.setAttribute( "position", vertexAttrib );</pre>
 
@@ -520,7 +520,7 @@ renderer.setClearColor( 0x99BBEE );</pre>
 
 <break/>
 
-<p>Turning next to lines, an object of type <classname>THREE.Line</classname> represents a
+<p>Turning next to lines, an object of type <classname>THREE.Line</classname> represents
 a line strip&mdash;what would be a primitive of the type
 called <i>GL_LINE_STRIP</i> in OpenGL.  To get the same strip of connected line segments,
 plus a line back to the starting vertex, we can use an object of type <classname>THREE.LineLoop</classname>.  
@@ -601,7 +601,7 @@ represents the geometry for a cylinder, and its constructor takes the form</p>
            radiusSegments, heightSegments, openEnded, thetaStart, thetaLength)</pre>
 
 <np>The geometry created by this constructor represents an approximation for a cylinder
-that has its axis lying along the <i>y</i>-axis.  It extends from
+that has its axis lying along the <i>y</i>-axis.  It extends
 from &minus;<i>height</i>/2 to <i>height</i>/2 along that axis.
 The radius of its circular top is <i>radiusTop</i> and of its
 bottom is <i>radiusBottom</i>.  The two radii
@@ -700,7 +700,7 @@ tube.
 <classname>THREE.DodecahedronGeometry</classname>, and
 <classname>THREE.IcosahedronGeometry</classname>.  (For a cube use a
 <classname>BoxGeometry</classname>.)  The constructors for these four classes
-take two parameters.  The first specifies the size of the polyedron, with a default
+take two parameters.  The first specifies the size of the polyhedron, with a default
 of 1.  The size is given as the radius of the sphere that contains the polyhedron.
 The second parameter is an integer called <i>detail</i>.  The default value, 0, gives
 the actual regular polyhedron.  Larger values add detail by adding additional faces.
@@ -966,7 +966,7 @@ triangular faces.  The square at the far left, which uses Phong shading, shows t
 effect. The spotlight is pointed at the center of the square.  Note how the illumination
 falls off with distance from the center.  When I used the same square and spotlight
 with Lambert shading in the second picture, I got no illumination at all!
-The vertices of the the square lie outside the cone of light from the spotlight.
+The vertices of the square lie outside the cone of light from the spotlight.
 When the lighting equation is applied, the vertices are black, and the black color
 of the vertices is then applied to all the pixels in the square.</np>
 
