@@ -42,7 +42,7 @@ that are patterns of dashes and dots.  This illustration shows some of the possi
 
 <np>On the left are three wide lines with no cap, a round cap, and a square cap.  The geometric line
 segment is shown as a dotted line.  (The no-cap style is called "butt.")  To the right are four lines
-with different patters of dots and dashes.  In the middle are three different styles of line joins:
+with different patterns of dots and dashes.  In the middle are three different styles of line joins:
 mitered, rounded, and beveled.</np>
 
 <break/>
@@ -239,7 +239,7 @@ need commands such as</p>
 <ul>
 <li><codedef>createPath()</codedef> &mdash; start a new, empty path</li>
 <li><codedef>moveTo(x,y)</codedef> &mdash; move the pen to the point (x,y), without adding a segment
-to the the path; that is, without drawing anything</li>
+to the path; that is, without drawing anything</li>
 <li><codedef>lineTo(x,y)</codedef> &mdash; add a line segment to the path that starts at the current pen location
 and ends at the point (x,y), and move the pen to (x,y)</li>
 <li><codedef>closePath()</codedef> &mdash; add a line segment from the current pen location back to
@@ -325,7 +325,7 @@ one segment will merge smoothly into the next if control points are properly cho
 <demo src="c2/cubic-bezier.html" width="550" height="500"><p>This will all be easier to understand
 with some hands-on experience. <tex>The interactive demo <i>c2/cubic-bezier.html</i>
 lets you edit cubic Bezier curve segments by dragging their endpoints and control points.</tex>
-<web>This interative demo lets you edit cubic Bezier curve segments by dragging their endpoints 
+<web>This interactive demo lets you edit cubic Bezier curve segments by dragging their endpoints 
 and control points:</web>
 </p></demo>
 
