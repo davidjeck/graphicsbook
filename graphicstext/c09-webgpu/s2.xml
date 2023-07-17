@@ -183,7 +183,7 @@ vertices&mdash;three vertices for each triangle. The data for the index
 buffer is loaded into a JavaScript <classname>Uint16Array</classname> of
 length <code>3*VERTEX_COUNT</code>:</p>
 
-<pre>/* Fill diskIndices with the vertex indicies for the VERTEX_COUNT
+<pre>/* Fill diskIndices with the vertex indices for the VERTEX_COUNT
  * triangles that make up the disk.  Each triangle uses the center
  * of the disk and two consecutive vertices on the outline. */
 
@@ -215,7 +215,7 @@ the alternative is "uint32" for 32-bit integers.</np>
 
 <p>It will be worthwhile to look at the full code for rendering the
 disk interior and outline.  The interior and the outline use different
-primitive toplogies.  Since the primitive topology is a property
+primitive topologies.  Since the primitive topology is a property
 of the render pipeline, we need to use separate pipelines for the
 interior and for the outline.  Since the pipeline is an aspect of
 a rendering pass, we need to encode two render passes:</p>

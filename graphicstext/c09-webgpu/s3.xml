@@ -365,7 +365,7 @@ value.  The value cannot be changed after initialization.  The declaration
 can optionally include a type, but it is usually not necessary.  
 An address space cannot be specified.
 Using <code>let</code> makes it clear that you do not expect the
-value to change and makes it impossible to change the value accidently.</p>
+value to change and makes it impossible to change the value accidentally.</p>
 
 <p>Named values can also be declared using <code>const</code>, but the
 initial value in a <code>const</code> declaration must be a constant that
@@ -443,7 +443,7 @@ This can be useful, for example, when doing two-sided lighting in
 <subsection title="Expressions and Built-in Functions" id="webgpu.3.4">
 
 <p>WGSL has all the familiar arithmetic, logical, bitwise, and comparison operators:
-<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilda;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
+<code>+,&nbsp;-,&nbsp;*, /, %, &amp;&amp;, ||, !, &amp;, |, &tilde;, ^, &lt;&lt;, >>, ==, !=, &lt;, >,&nbsp;&lt;=,&nbsp;>=</code>.
 It does not have the conditional <code>?:</code>&nbsp;operator, but it has an equivalent built-in
 function, <code>select(false_case,true_case,boolean)</code>.  Note that assignment (<code>=</code>,
 <code>+=</code>, etc.) is not an operator; that is, <code>A&nbsp;=&nbsp;B</code> is a statement,

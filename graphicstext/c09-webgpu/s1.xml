@@ -244,7 +244,7 @@ the coordinates of the vertices are used to determine which pixels lie in the pr
 Coordinates for the pixels are computed by <word term="interpolation">interpolating</word>
 the vertex coordinates.  Values like color and texture coordinates are also generally 
 interpolated to get different values for each pixel.  All these values are available
-as inputs the the fragment shader, which will be called once for each pixel in the
+as inputs to the fragment shader, which will be called once for each pixel in the
 primitive with appropriate values for its parameters.</p>
    
 <p>Vertex buffers are special because of the way that they are used to supply
@@ -613,7 +613,7 @@ GPU side of the application.</p>
 <subsection title="Multiple Vertex Inputs" id="webgpu.1.6">
 
 <webdiv>
-<img src="rgb-triangle.png" width="100" height="83" align="right" alt="The standarad RGB triangle example"/>
+<img src="rgb-triangle.png" width="100" height="83" align="right" alt="The standard RGB triangle example"/>
 </webdiv>
 
 <p>Before ending this section, we look at two variations on our basic example:
@@ -670,7 +670,7 @@ side, and it specifies where the values for that parameter come from.)</np>
 <p>I will note again that even though the <code>position</code> output
 from the vertex shader is not used explicitly in the fragment shader 
 function in this example, it is used implicitly.  A vertex shader
-function is always required to have a <code>@bulitin(position)</code>
+function is always required to have a <code>@builtin(position)</code>
 output.</p>
 
 <break/>
@@ -743,7 +743,7 @@ of each program are commented.</p>
 group: what kind of resource the binding refers to and which shader stage it is used in.  In general,
 that information can be deduced from the shader program.  The full shader program is assembled when
 the pipeline is created, and the pipeline can automatically construct the bind group layouts that
-it uses.  You can ask the pipeine to create the bind group layouts by setting the <code>layout</code>
+it uses.  You can ask the pipeline to create the bind group layouts by setting the <code>layout</code>
 property of the pipeline descriptor to <code>"auto"</code>:</p>
 
 <pre>pipelineDescriptor = {
