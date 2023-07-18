@@ -352,7 +352,7 @@ add a new texture (or select an existing texture using the popup menu to the
 left of "New").  Then go the "Texture Properties" tab of the Properties Editor.  (The button
 for the Texture Properties is the one at the very bottom.)  Here you
 can select the "Type" of texture.  For example, a "Clouds" procedural texture
-often works well.  You can also use an "Image" texture, and Open an
+often works well.  You can also use an "Image" texture, and open an
 image to be used as a "<word>height map</word>" for the displacement.
 (Height maps are often used to make natural-looking terrain.)
 You can sometimes get an interesting effect by using an image both

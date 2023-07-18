@@ -172,8 +172,9 @@ always added to the world at the position of the 3D cursor.  (You might prefer t
 just leave the 3D cursor at the origin and move objects into position after you
 add them.)</p>
 
-<p>You must position the 3D cursor <b>before</b> adding the object.
-The 3D cursor is positioned by clicking on the 3D&nbsp;View window with the left mouse button.
+<p>You must position the 3D cursor <b>before</b> adding the object.  You can do that
+by shift-right-clicking in the 3D View.  Or, select the Cursor Tool in the toolbar on the
+left edge of the 3D View, and use left-click to position the 3D cursor.
 The 3D cursor exists in three-dimensional
 space.  You can't tell where it is by looking at the world from just one
 point of view.  Typically, you would check the position of the 3D

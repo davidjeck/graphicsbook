@@ -102,7 +102,7 @@ but it makes the file size more reasonable.)</p>
 <p>The above image was rendered by the Cycles renderer, one of two realistic
 renderers available in Blender.  (You can select the renderer in the
 Render Properties tab of the Properties Editor.)  Blender's default 
-editor, Eevee, can produce similar, but not identical, images.
+renderer, Eevee, can produce similar, but not identical, images.
 And with the default settings, the Eevee image will lack certain essential
 features: the lens won't refract light, and objects in the scene won't
 show reflections of other objects. </p>

@@ -13,7 +13,8 @@ at just a small subset of its features.</p1>
 <p>Blender can be downloaded from <a href="https://www.blender.org">blender.org</a>.
 The site includes a great deal of information about what it can do
 (<a href="https://www.blender.org/features/">blender.org/features</a>)
-and how to use it (<a href="https://www.blender.org/support/">blender.org/support</a>).</p>
+and how to use it (<a href="https://www.blender.org/support/">blender.org/support</a>).
+including a detailed user manual at <a href="https://docs.blender.org/">docs.blender.org</a>.</p>
 
 <p>I have included some work with Blender as part of my computer graphics courses since 2001,
 as a supplement to the graphics programming that is the main topic of the course.
@@ -28,9 +29,9 @@ relevant to this textbook. Many of my students have enjoyed using it and have go
 enough about it to use it in a final project.
 </p>
 
-<p>Blender went through some significant changes between versions 2.79 and 2.8.
-This appendix is based on Blender&nbsp;2.93, which is the current version as of
-July, 2021.  However, most of the appendix should apply to any version between 
-2.8 and 2.93.</p>
+<p>This appendix was written for Blender 2.93.  However, it is still valid for Blender 3.6,
+the current version in July, 2023.  Blender 3.6 adds new features and improved performance,
+but the user interface and basic features that are discussed in this appendix have not changed.</p>
+
 
 </intro>

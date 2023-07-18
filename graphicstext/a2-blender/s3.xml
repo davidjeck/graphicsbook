@@ -380,7 +380,7 @@ the 3D&nbsp;View and hitting Control-Numpad-0.</p>
 properties of a camera in the Object Data Properties for the camera.
 Like OpenGL, Blender will only render objects that are within a certain
 range of distances from the camera.  The limits are given by "Clip Start" and "End"
-in the camera properties, with defaults of 0.1 and 1000.
+in the camera properties, with defaults of 0.1 and 100.
 If an object is farther from the camera than the camera's
 "End" clipping value, or closer than the "Start" clipping value,
 then the object is not seen by the camera.
