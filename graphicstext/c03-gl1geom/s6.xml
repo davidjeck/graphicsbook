@@ -435,10 +435,8 @@ sample program <sourceref href="glut/color-cube-of-spheres.c"/>.</p>
 
 <p>JOGL is a framework for using OpenGL in Java programs.  It is a large and complex API that
 supports all versions of OpenGL, but it is fairly easy to use for basic applications.
-You should use JOGL&nbsp;2.4 or later.  Version 2.4.0 is still under development, but I have
-used it to run the sample programs from this textbook without any problems.  The previous
-version, Jogl&nbsp;2.3.2, has some problems with modern versions of Java, but it might work
-for you.</p>
+You should use JOGL&nbsp;2.4 or later.  The programs in this book were tested with 
+version 2.4.0.</p>
 
 <p>The sample program <sourceref href="jogl/JoglStarter.java"/> can be used as a starting
 point for writing OpenGL programs using JOGL. While it doesn't do anything except open a
@@ -461,13 +459,13 @@ more than one version; JOGL will figure out which one to use.</p>
 
 <p>JOGL software can be found at <a href="https://jogamp.org/">https://jogamp.org/</a>.
 You can download the jar files from the most recent release, which
-can be found at the very end of the list at</p>
+can be found near the end of the list at</p>
 
 <p align="center">
 <a href="https://jogamp.org/deployment/archive/rc/">https://jogamp.org/deployment/archive/rc/</a>
 </p>
 
-<np>I downloaded the files from the release <i>v2.4.0-rc-20210111</i>.  Click on the
+<np>Click on the
 release name, then click on the <i>jar/</i> link to see the full list of jar files.
 Find and download <i>jogl-all.jar</i> and <i>gluegen-rt.jar</i> and the corresponding
 native library files.  I have also made jogl-all.jar and gluegen-rt.jar available on
@@ -525,7 +523,7 @@ list of libraries, then click the "Add External Jars" button.  In the file selec
 navigate to the directory that contains the JOGL jar files, and select the two jar files that
 are needed for JOGL, <i>jogl-all.jar</i> and <i>gluegen-rt.jar</i>.  
 (Again, you do not need to add the native libraries; they just need to be in the same directory
-as the JOGL jar files.)  Click "Open."  The selected
+as the JOGL jar files.)  Click "Open".  The selected
 jars will be added to the user library. (You could also add them one at a time, if you don't
 know how to select multiple files.)  It should
 look something like this:</p>
