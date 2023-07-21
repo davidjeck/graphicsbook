@@ -234,12 +234,13 @@ using <word>WebGL</word> and
 the <word>HTML canvas</word>.  It is discussed in <localref href="threejs"/>.  The examples
 can be found in the folder named <sourceref href="threejs"/>, inside the <i>source</i> folder
 of the web site download.  All of the examples use the JavaScript file
-<sourceref href="threejs/three.min.js"/>, which is a "minified" version of the library, not
-meant for human readers.  A&nbsp;human-readable version, <sourceref href="threejs/three.js"/> is
-also available.  The version is <i>three.js</i> Release 129.  Note that although <i>three.js</i>
-is written using JavaScript modules, the examples in this book only use the non-modular form
-of the library.  <i>Three.js</i> is an open-source project.  It can be downloaded from 
-<a href="http://threejs.org">threejs.org</a>.</p>
+<sourceref href="threejs/script/three.module.min.js">three.module.min.js</sourceref>, 
+which is a "minified" version of the library, not meant for human readers.  
+A&nbsp;human-readable version, <sourceref href="threejs/script/three.module.js">three.module.js</sourceref>
+is also available.  The examples also use other three.js scripts, which can be found in the
+<sourceref href="threejs/script/">script</sourceref> inside the <i>threejs</i> folder.
+The version is <i>three.js</i> Release 154.  <i>Three.js</i> is an open-source project.
+It can be downloaded from <a href="http://threejs.org">threejs.org</a>.</p>
 
 <ul>
 <li><sourceref href="threejs/full-window.html"/> &mdash; <i>Three.js</i> is typically used to

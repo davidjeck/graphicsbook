@@ -8,10 +8,18 @@
     }
 </style>
 <title>Three.js Reflection Demo</title>
-<script src="three.min.js"></script>
-<script src="GLTFLoader.js"></script>
-<script src="OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js",
+        "addons/": "./script/"
+     }
+  }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "addons/controls/OrbitControls.js";
+import {GLTFLoader} from "addons/loaders/GLTFLoader.js";
 
 /*  This page shows a reflecting object inside a skybox. An environment
  *  map is used on the object to make it refract the skybox.  No lighting
@@ -25,9 +33,9 @@ let canvas, renderer, scene, camera;
 let skyboxTexture;  // The cubemap texture.
 
 let reflectiveObject;  // The Object3D in the scene
-                       // ( = model for standard objects, = model.children[0] for GTLF models )
+                       // ( = model for standard objects, = model.children[0] for GLTF models )
 let model;  // Content of the scene, either the reflectiveObject or a container for it.
-            // For GTLF models, a container Object3D is used to apply the correct transformation.
+            // For GLTF models, a container Object3D is used to apply the correct transformation.
 
 let rotateX = 0;   // rotation of object about its x-axis
 let rotateY = 0;   // rotation of object about its y-axis
@@ -85,7 +93,7 @@ function createSkybox(textureNumber) {
        scene.background = skyboxTexture;
        if (reflectiveObject) {
            reflectiveObject.material.envMap = skyboxTexture;
-           reflectiveObject.material.needsUpdate = true;
+           // reflectiveObject.material.needsUpdate = true; // No longer needed in r154.
        }
        render();
     }
@@ -226,7 +234,7 @@ function installGLTFModel(modelNum) {
         scene.remove(model);
         reflectiveObject = null;
     }
-    let loader = new THREE.GLTFLoader();
+    let loader = new GLTFLoader();
     loader.load(gltfModelURL[modelNum], modelLoadedCallback, undefined, errorCallback);
     render();
 }
@@ -297,19 +305,29 @@ function init() {
     scene.add(camera); 
     createSkybox(0);
     installGLTFModel(0);
-    controls = new THREE.OrbitControls(camera,canvas);
+    controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change",render);
     document.addEventListener("keydown", doKey, false);
-    document.getElementById("s1").checked = true;
-    document.getElementById("m1").checked = true;
-    document.getElementById("c1").checked = true;
+    document.getElementById("s0").checked = true;
+    document.getElementById("g0").checked = true;
+    document.getElementById("c0").checked = true;
+    document.getElementById("s0").checked = true;
+    for (let i = 0; i < 4; i++)
+       document.getElementById("s"+i).onchange = function() { createSkybox(i) };
+    for (let i = 0; i < 3; i++)
+       document.getElementById("g"+i).onchange = function() { installGLTFModel(i) };
+    for (let i = 0; i < 4; i++)
+       document.getElementById("m"+i).onchange = function() { installModel(i) };
+    for (let i = 0; i < 4; i++)
+       document.getElementById("c"+i).onchange = function() { setObjectColor(i) };
+    document.getElementById("bttn").onclick = resetRotation;
     render();
 }
 
 
-window.onload = init;  // Arranges for init() to be called when the document has loaded.
+window.onload = init; 
 
 </script>
 </head>
@@ -334,28 +352,28 @@ Return key or HOME key sets both rotations to zero.</p>
 </div>
 
 <div style="float:left; margin-left:30px">
-<p><b>Skybox Texuremap:</b><br>
-    <input type=radio name="pickskybox" id=s1 onchange="createSkybox(0)"> <label for="s1">Park</label><br>
-    <input type=radio name="pickskybox" id=s2 onchange="createSkybox(1)"> <label for="s2">Pond</label><br>
-    <input type=radio name="pickskybox" id=s3 onchange="createSkybox(2)"> <label for="s3">Yokahama At Night</label><br>
-    <input type=radio name="pickskybox" id=s4 onchange="createSkybox(3)"> <label for="s4">The Colosseum</label>
+<p style="margin-top:0"><b>Skybox:</b><br>
+    <label><input type=radio name="pickskybox" id=s0>Park</label><br>
+    <label><input type=radio name="pickskybox" id=s1>Pond</label><br>
+    <label><input type=radio name="pickskybox" id=s2>Yokahama At Night</label><br>
+    <label><input type=radio name="pickskybox" id=s3>The Colosseum</label>
 </p>
-<p style="margin-top:30px"><b>Object:</b><br>
-    <input type=radio name="pickmodel" id=m1 onchange="installGLTFModel(0)"> <label for="m1">Arrowhead</label><br>
-    <input type=radio name="pickmodel" id=m2 onchange="installGLTFModel(1)"> <label for="m2">Horse</label><br>
-    <input type=radio name="pickmodel" id=m3 onchange="installGLTFModel(2)"> <label for="m3">Blender Monkey</label><br>
-    <input type=radio name="pickmodel" id=m4 onchange="installModel(0)"> <label for="m4">Cube</label><br>
-    <input type=radio name="pickmodel" id=m5 onchange="installModel(1)"> <label for="m5">Cylinder</label><br>
-    <input type=radio name="pickmodel" id=m6 onchange="installModel(2)"> <label for="m6">Torus</label><br>
-    <input type=radio name="pickmodel" id=m7 onchange="installModel(3)"> <label for="m7">Sphere</label>
+<p style="margin-top:20px"><b>Object:</b><br>
+    <label><input type=radio name="pickmodel" id=g0>Arrowhead</label><br>
+    <label><input type=radio name="pickmodel" id=g1>Horse</label><br>
+    <label><input type=radio name="pickmodel" id=g2>Blender Monkey</label><br>
+    <label><input type=radio name="pickmodel" id=m0>Cube</label><br>
+    <label><input type=radio name="pickmodel" id=m1>Cylinder</label><br>
+    <label><input type=radio name="pickmodel" id=m2>Torus</label><br>
+    <label><input type=radio name="pickmodel" id=m3>Sphere</label>
 </p>
-<p style="margin-top:30px"><b>Object Base Color:</b><br>
-    <input type=radio name="pickcolor" id=c1 onchange="setObjectColor(0)"> <label for="c1">White</label><br>
-    <input type=radio name="pickcolor" id=c2 onchange="setObjectColor(1)"> <label for="c2">Blue</label><br>
-    <input type=radio name="pickcolor" id=c3 onchange="setObjectColor(2)"> <label for="c3">Pink</label><br>
-    <input type=radio name="pickcolor" id=c4 onchange="setObjectColor(3)"> <label for="c4">Green</label>
+<p style="margin-top:20px; margin-bottom:0"><b>Base Color:</b><br>
+    <label><input type=radio name="pickcolor" id=c0>White</label><br>
+    <label><input type=radio name="pickcolor" id=c1>Blue</label><br>
+    <label><input type=radio name="pickcolor" id=c2>Pink</label><br>
+    <label><input type=radio name="pickcolor" id=c3>Green</label>
 </p>
-<p style="margin-top:30px"><button id=bttn onclick="resetRotation()">Reset Rotateion</button>
+<p style="margin-top:30px"><button id="bttn">Reset Rotation</button>
 </p>
 </div>
 

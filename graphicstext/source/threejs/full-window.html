@@ -8,12 +8,19 @@
 		      overflow: hidden;  /* Make sure we don't get scroll bars. */
     }
     canvas {
-        display: block; /* The default display, inline, would add small margin below the canvas */
+        display: block; /* The default display, inline, would add a small margin below the canvas */
     }
 </style>
-<script src="three.min.js"></script>
-<script src="TrackballControls.js"></script>
-<script>
+<script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js"
+     }
+  }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {TrackballControls} from "./script/controls/TrackballControls.js";
 
 /* This program shows an animation of a number of small, randomly
  * colored balls bouncing around inside a cube.  The cube is shown
@@ -213,7 +220,7 @@ function init() {
          document.body.appendChild(canvas);  // The canvas must be added to the body of the page.
          clock = new THREE.Clock(); // For keeping time during the animation.
          createWorld();
-         controls = new THREE.TrackballControls(camera, canvas);  // note: TrackballControls require animation.
+         controls = new TrackballControls(camera, canvas);  // note: TrackballControls require animation.
          controls.noPan = true;   // Don't do panning with the right mouse button.
          controls.noZoom = true;  // Don't do zooming with middle mouse button.
          requestAnimationFrame(doFrame);  // Start the animation.

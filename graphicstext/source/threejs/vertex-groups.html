@@ -4,8 +4,8 @@
 <title>Three.js Using different materials on different faces</title>
 <style>
 </style>
-<script src="three.min.js"></script>
-<script>
+<script type="module">
+import * as THREE from "./script/three.module.min.js";
 
 /* Shows a pyramid and a cube.  The pyramid is constructed
  * as a polygonal mesh.  Both objects can be displayed with
@@ -198,10 +198,7 @@ function doKey(event) {
 function init() {
     try {
         canvas = document.getElementById("glcanvas");
-        renderer = new THREE.WebGL1Renderer( {
-              // (I am using a WebGL1Render here because somehow, on my
-              // computer, it respects the linewidth setting, while a
-              // WebGLRendered does not!)
+        renderer = new THREE.WebGLRenderer( {
             canvas: canvas,
             antialias: true
         } );

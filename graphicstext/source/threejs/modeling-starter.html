@@ -4,8 +4,9 @@
 <title>Three.js Modeling</title>
 <style>
 </style>
-<script src="three.min.js"></script>
-<script>
+</script>
+<script type="module">
+import * as THREE from "./script/three.module.min.js";
 
 /* This is a starter file for experimenting with 3D animated models
  * in three.js.  The user can rotate the model using the keyboard, and
@@ -20,7 +21,6 @@
  * see diskworld-1.html.
  */
 
-"use strict";
 
 let scene, camera, renderer;  // Three.js rendering basics.
 
@@ -69,7 +69,7 @@ function createWorld() {
 	    new THREE.SphereGeometry(1,32,16),
 		new THREE.MeshPhongMaterial({
 		    color: "green",
-			specular: 0x101010,
+			specular: 0x404040,
 			shininess: 32
 		})
 	);

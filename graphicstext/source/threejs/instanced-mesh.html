@@ -4,9 +4,16 @@
 <title>Three.js InstancedMesh</title>
 <style>
 </style>
-<script src="three.min.js"></script>
-<script src="OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js"
+     }
+  }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 /* Demonstrates the use of THREE.InstancedMesh to drow
  * large numbers of copies of an object.  The basic object
@@ -102,7 +109,7 @@ function init() {
       return;
    }
    createWorld();
-   let controls = new THREE.OrbitControls(camera,canvas);
+   let controls = new OrbitControls(camera,canvas);
    controls.enablePan = false;
    controls.enableZoom = false;
    controls.addEventListener("change", render);

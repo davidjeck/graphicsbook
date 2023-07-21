@@ -9,9 +9,12 @@
    p#detailPar { display: none; }
 </style>
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script src="../script/threejs/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  { "imports": { "three" : "./script/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 var canvas, scene, renderer, camera;
 
@@ -32,7 +35,7 @@ function createWorld() {
     renderer.setClearColor(0);
     camera = new THREE.PerspectiveCamera(40,canvas.width/canvas.height,1,30);
     camera.position.z = 15;
-    light = new THREE.DirectionalLight(0xffffff,0.8);
+    let light = new THREE.DirectionalLight(0xffffff,0.8);
     camera.add(light);
     scene.add(camera);
     scene.add(new THREE.AmbientLight(0x202020));
@@ -78,7 +81,7 @@ function getCurrentObject() {
                 polygonOffsetUnits: 1,
                 polygonOffsetFactor: 1,
                 color: "yellow",
-                specular: 0x101010,
+                specular: 0x505050,
                 shininess: 32,
                 side: THREE.DoubleSide
             });
@@ -180,7 +183,7 @@ function changeMaterial() {
         scene.remove(currentObject);
         currentObject = getCurrentObject();
         scene.add(currentObject);
-        if (currentMaterialNum > 4) {
+        if (currentMaterialNum > 2) {
             document.getElementById("shadingPar").style.display = "block";
         }
         else {
@@ -242,7 +245,7 @@ function changeShading() {
  function installOrbitControls() {
        //(I would prefer to use TrackballControls, but there seems to be
        // no way to get TrackballControls to work without an animation.)
-    var controls = new THREE.OrbitControls(camera,canvas);
+    var controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change", render);
@@ -280,9 +283,11 @@ function init() {
     installOrbitControls();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 
@@ -355,7 +360,7 @@ with a surface, there are actually two objects, one to represent the wireframe
 and one to represent the surface.  The two objects use the same geometry
 but different material.</p>
 <p>The shading radio buttons, which can be set to Flat or to Smooth, control a
-property of Phong materials.  This option appears only when a Phong material
+property of Phong and Lambert materials.  This option does not appear when a Basic material
 is selected.
 For Flat shading, a normal vector is computed for each triangular face and is
 used for all vertices of that face.  This makes the face appear flat.  For
@@ -368,6 +373,8 @@ detail."  When the level of detail is greater than zero, you no longer get
 a regular polyhedron.  Instead, you get an approximation for the
 sphere that circumscribes the regular polyhedron.  As the level of detail increases,
 the number of faces increases, and you get a better approximation for the sphere.</p>
+<p>Note: Smooth shading does not work for the regular polyhedra with level of detail 
+set to zero.  It does work for higher levels of detail.</p>
 </div>
 
 

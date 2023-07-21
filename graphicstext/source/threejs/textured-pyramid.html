@@ -4,13 +4,12 @@
 <title>Three.js Texture</title>
 <style>
 </style>
-<script src="three.min.js"></script>
-<script>
+<script type="module">
+import * as THREE from "./script/three.module.min.js";
 
 /* Shows a pyramid with an optional texture. The pyramid geometry
    is constructed by hand. */
 
-"use strict";
 
 let scene, camera, renderer;  // Three.js rendering basics.
 
@@ -59,26 +58,25 @@ function createWorld() {
                 new THREE.BufferAttribute(pyramidVertices,3) );
    
    pyramidGeom.computeVertexNormals(); // Normals are needed for Lambert materials.
-	
+   
     /* Add the UV Texture Coordinates to the pyramid geometry.*/
 
-	let pyramidUVs = new Float32Array([
-	     0,0,  0,1,  1,1,
-	     0,0,  1,1,  1,0,
-	     0,0,  1,0,  0.5,1,
-	     1,0,  0,0,  0.5,1,
-	     0,0,  1,0,  0.5,1,
-	     1,0,  0,0,  0.5,1
-	]);
-	pyramidGeom.setAttribute("uv",
+   let pyramidUVs = new Float32Array([
+         0,0,  0,1,  1,1,
+         0,0,  1,1,  1,0,
+         0,0,  1,0,  0.5,1,
+         1,0,  0,0,  0.5,1,
+         0,0,  1,0,  0.5,1,
+         1,0,  0,0,  0.5,1
+   ]);
+   pyramidGeom.setAttribute("uv",
                             new THREE.BufferAttribute(pyramidUVs,2) );
  
- 	material = new THREE.MeshLambertMaterial({ color: "white" });
-	
-	pyramid = new THREE.Mesh( pyramidGeom, material );
+   material = new THREE.MeshLambertMaterial({ color: "white" });
+   
+   pyramid = new THREE.Mesh( pyramidGeom, material );
    pyramid.rotation.set(0.2,-0.4,0);  // Rotate object for a better view.
    scene.add(pyramid);
-    
 }
 
 
@@ -96,11 +94,11 @@ function render() {
 function doChangeMaterial() {
     if (document.getElementById("textured").checked) {  
         material.map = texture;
-	}
+      }
     else {
         material.map = null;
     }
-	material.needsUpdate = true;
+    material.needsUpdate = true; // Essential because material.texture property has changed.
     render();   
 }
 
@@ -110,13 +108,13 @@ function doChangeMaterial() {
  * horizontal directions.
  */
 function doChangeScale() {
-	if (document.getElementById("scaled").checked) {
-		texture.repeat.set(2,2);
-	}
-	else {
-		texture.repeat.set(1,1);
-	}
-	render();
+     if (document.getElementById("scaled").checked) {
+         texture.repeat.set(2,2);
+     }
+     else {
+         texture.repeat.set(1,1);
+     }
+     render();
 }
 
 
@@ -132,11 +130,16 @@ function applyTexture(textureURL, material) {
                              // In this case, just call render() to redraw the picture.
    const error = function() { // Function to be called if there is an error loading texture
          document.getElementById("message").innerHTML =
-         "<b>Error!  Failed to load texture!</b>";
+             "<b>Error!  Failed to load texture!</b>";
       };
    
    let loader = new THREE.TextureLoader();
    texture = loader.load(textureURL, callback, undefined, error);
+   texture.colorSpace = THREE.SRGBColorSpace; // required for proper color
+       // The color looks washed out without this.
+       // three.js documentation says "PNG or JPEG Textures containing color information
+       // (like .map or .emissiveMap) use the closed domain sRGB color space,
+       // and must be annotated with texture.colorSpace = SRGBColorSpace."
    
    texture.wrapS = THREE.RepeatWrapping;
    texture.wrapT = THREE.RepeatWrapping;
@@ -145,7 +148,7 @@ function applyTexture(textureURL, material) {
        texture.repeat.set(2,2);
    }
    material.map = texture; // Applies this texture to the material and hence to the object.
-   material.needsUpdate = true;  // Essential to tell three.js that material properties have changed!!
+   material.needsUpdate = true;  // Essential to tell three.js that material texture property has changed!!
 }
 
 
@@ -202,9 +205,11 @@ function init() {
     applyTexture("textures/brick001.jpg", material);
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <h2>Three.js:  Texture on an IndexedFaceSet</h2>
 

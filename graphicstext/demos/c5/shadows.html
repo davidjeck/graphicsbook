@@ -5,9 +5,12 @@
 <title>Three.js Demo</title>
 <link rel="stylesheet" href="../demo.css">
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script src="../script/threejs/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  { "imports": { "three" : "./script/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 var canvas, scene, renderer, camera;
 
@@ -139,8 +142,8 @@ function doFirstLightCheckbox() {
         scene.add(firstLight);
     else
         scene.remove(firstLight);
-    base.material.needsUpdate = true;  // If omitted, the shawdow from a light might remain after light is removed.
-    cyl.material.needsUpdate = true;   // Cyl can also have stray shadows if this is omitted.
+   // base.material.needsUpdate = true;  // No longer needed in r154.
+   // cyl.material.needsUpdate = true;   // No longer needed in r154.
     if (!animating)
         render();
 }
@@ -155,8 +158,8 @@ function doSecondLightCheckbox() {
         scene.add(secondLight);
     else
         scene.remove(secondLight);
-    base.material.needsUpdate = true; 
-    cyl.material.needsUpdate = true;
+   // base.material.needsUpdate = true; // No longer needed in r154.
+   //  cyl.material.needsUpdate = true; // No longer needed in r154.
     if (!animating)
         render();
 }
@@ -215,7 +218,7 @@ function doAnimationCheckbox() {
 }
 
 function installOrbitControls() {
-    var controls = new THREE.OrbitControls(camera,canvas);
+    var controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change",render);
@@ -237,25 +240,30 @@ function init() {
     document.getElementById("animationCheckbox").checked = false;
     document.getElementById("firstLightCheckbox").checked = true;
     document.getElementById("secondLightCheckbox").checked = true;
+    document.getElementById("animationCheckbox").onchange = doAnimationCheckbox;
+    document.getElementById("firstLightCheckbox").onchange = doFirstLightCheckbox;
+    document.getElementById("secondLightCheckbox").onchange = doSecondLightCheckbox;
     createWorld();
     installOrbitControls();
     updateForFrame();
     render();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 
 <h3 id="headline">Three.js Shadow Demo</h3>
 
-<p><input type="checkbox" id="animationCheckbox" onchange="doAnimationCheckbox()"> 
+<p><input type="checkbox" id="animationCheckbox"> 
     <label for="animationCheckbox">Animate</label>
-   <input type="checkbox" id="firstLightCheckbox" onchange="doFirstLightCheckbox()" style="margin-left:20px"> 
+   <input type="checkbox" id="firstLightCheckbox" style="margin-left:20px"> 
     <label for="firstLightCheckbox">Light 1 (Directional)</label>
-   <input type="checkbox" id="secondLightCheckbox" onchange="doSecondLightCheckbox()" style="margin-left:20px"> 
+   <input type="checkbox" id="secondLightCheckbox" style="margin-left:20px"> 
     <label for="secondLightCheckbox">Light 2 (Spot) </label>
 </p>
 

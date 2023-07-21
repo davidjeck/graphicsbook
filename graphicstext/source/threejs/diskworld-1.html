@@ -4,8 +4,16 @@
 <title>Three.js Diskworld 1</title>
 <style>
 </style>
-<script src="three.min.js"></script>
-<script>
+<script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js",
+        "addons/": "./script/"
+     }
+  }
+</script>
+<script type="module">
+import * as THREE from "three";
 
 /* This program uses basic hierarchical modeling in three.js.  It shows
  * a car with rotating wheels driving aroud a circular track.  There are
@@ -53,8 +61,8 @@ function createWorld() {
 	camera.position.z = 15;
 	
 	// create some lights and add them to the scene.
-	scene.add( new THREE.DirectionalLight( 0xffffff, 0.4 ) ); // dim light shining from above
-	let viewpointLight = new THREE.DirectionalLight( 0xffffff, 0.8 );  // a light to shine in the direction the camera faces
+	scene.add( new THREE.DirectionalLight( 0xffffff, 0.3 ) ); // dim light shining from above
+	let viewpointLight = new THREE.DirectionalLight( 0xffffff, 0.6 );  // a light to shine in the direction the camera faces
 	viewpointLight.position.set(0,0,1);  // shines down the z-axis
 	scene.add(viewpointLight);
 	
@@ -65,7 +73,7 @@ function createWorld() {
 	);
 	let yellow = new THREE.MeshPhongMaterial({
 		    color: 0xffff00,
-			specular: 0x101010,
+			specular: 0x303030,
 			shininess: 16
 		});
 	let cylinder = new THREE.Mesh(  // a yellow cylinder with height 1 and diameter 1
@@ -93,7 +101,7 @@ function createWorld() {
 	carModel = new THREE.Object3D();
 	let red = new THREE.MeshPhongMaterial({
 	    color: "red",
-		specular: 0x080808,
+		specular: 0x404040,
 		shininess: 8,
 		flatShading: true
 	});
@@ -154,8 +162,8 @@ function createWorld() {
 	let leaves = new THREE.Mesh(
         new THREE.ConeGeometry(.7,2,16,3),
 		new THREE.MeshPhongMaterial({
-		    color: 0x00BB00,
-			specular: 0x002000,
+		    color: 0x00DD00,
+			specular: 0x006000,
 			shininess: 5
 		})
 	);

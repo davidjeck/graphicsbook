@@ -73,8 +73,8 @@ of course, the program can get user input using HTML widgets such as buttons and
 But direct mouse interaction with a 3D world is more natural in many programs.</p>
 
 <p>The most basic example is using the mouse to rotate the scene.  In <i>three.js</i>,
-rotation can be implemented using the class <classname>THREE.TrackballControls</classname> or the
-class <classname>THREE.OrbitControls</classname>. Note that both classes support touchscreen
+rotation can be implemented using the class <classname>TrackballControls</classname> or the
+class <classname>OrbitControls</classname>. Note that both classes support touchscreen
 as well as mouse interaction.  The main difference between the classes
 is that with <i>OrbitControls</i>,
 the rotation is constrained so that the positive <i>y</i>-axis is always the up direction
@@ -86,9 +86,10 @@ most of my sample programs and demos.  <i>TrackballControls</i> is used only in
 
 
 <p>The two control classes are not part of the main <i>three.js</i> JavaScript file.
-To use one of them, you need the JavaScript file <sourceref href="threejs/OrbitControls.js">OrbitControls.js</sourceref>
-or <sourceref href="threejs/TrackballControls.js">TrackballControls.js</sourceref>, which can be
-found in the folder <i>examples/js/controls</i> in the <i>three.js</i> download.</p>
+They can be imported from the modules "OrbitControls.js" and "TrackballControls.js",
+which can be found
+in the <sourceref href="threejs/script/controls"/> folder in the <i>source</i> folder for this textbook,
+or in the <code>examples/jsm/loaders</code> folder in the <i>three.js</i> download.</p>
 
 <p>The two classes are used in a similar way.  I will discuss <classname>OrbitControls</classname> first.
 In my examples, I create a camera and move it away from the origin. I usually add a light object
@@ -106,7 +107,7 @@ let light = new THREE.PointLight(0xffffff, 0.6);
 camera.add(light);  // viewpoint light moves with camera
 scene.add(camera);
 
-controls = new THREE.OrbitControls( camera, canvas );</pre>
+controls = new OrbitControls( camera, canvas );</pre>
 
 <np>The constructor installs listeners on the <i>canvas</i> so that the controls can respond
 to mouse events.  If an animation is running, the only other thing that you need to

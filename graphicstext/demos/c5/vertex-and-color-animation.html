@@ -5,9 +5,12 @@
 <title>Three.js Demo</title>
 <link rel="stylesheet" href="../demo.css">
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script src="../script/threejs/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  { "imports": { "three" : "./script/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 /*  This program shows an "icosphere" made by subdividing the faces
  *  of an icosahedron once.  Colors can be assigned either to 
@@ -303,7 +306,7 @@ function init() {
         return;
     }
     createWorld();
-    controls = new THREE.OrbitControls(camera,canvas);
+    let controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change", render);
@@ -311,13 +314,20 @@ function init() {
     document.getElementById("colorAnimationCheckbox").disabled = false; 
     document.getElementById("vertexAnimationCheckbox").checked = false;
     document.getElementById("showWireframeCheckbox").checked = true;
-    document.getElementById("colorCheckbox").checked = true;    
+    document.getElementById("colorCheckbox").checked = true;   
+    document.getElementById("colorAnimationCheckbox").onchange = doAnimationCheckbox;
+    document.getElementById("vertexAnimationCheckbox").onchange = doAnimationCheckbox;
+    document.getElementById("showWireframeCheckbox").onchange = doShowWireframeCheckbox;
+    document.getElementById("colorCheckbox").onchange = doColorCheckbox;
+    document.getElementById("resetVertices").onclick = resetVertices;
     render();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 
@@ -329,18 +339,18 @@ function init() {
 
 <div id="tools">
 
-<p style="margin-top:0px"><input type="checkbox" id="colorCheckbox" onchange="doColorCheckbox()"> 
+<p style="margin-top:0px"><input type="checkbox" id="colorCheckbox"> 
     <label for="colorCheckbox">Use Vertex Colors</label></p>
 
-<p style="margin-top:0px"><input type="checkbox" id="colorAnimationCheckbox" onchange="doAnimationCheckbox()"> 
+<p style="margin-top:0px"><input type="checkbox" id="colorAnimationCheckbox"> 
     <label for="colorAnimationCheckbox">Animate Colors</label></p>
     
-<p style="margin-top:20px"><input type="checkbox" id="vertexAnimationCheckbox" onchange="doAnimationCheckbox()"> 
+<p style="margin-top:20px"><input type="checkbox" id="vertexAnimationCheckbox"> 
     <label for="vertexAnimationCheckbox">Animate Vertices</label></p>
     
-<p><button onclick="resetVertices()" id="resetVertices">Reset Vertices</button></p>
+<p><button id="resetVertices">Reset Vertices</button></p>
 
-<p style="margin-top: 20px"><input type="checkbox" id="showWireframeCheckbox" onchange="doShowWireframeCheckbox()">
+<p style="margin-top: 20px"><input type="checkbox" id="showWireframeCheckbox">
     <label for="showWireframeCheckbox">Show Wireframe</label>
 
 <p style="margin-top: 20px"><b>Use mouse to Rotate.</b></p>

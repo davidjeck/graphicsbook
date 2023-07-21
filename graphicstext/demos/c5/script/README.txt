@@ -1,10 +1,9 @@
-The three.min.js in this folder and the scripts in the threejs folder are from the
-three.js download from threejs.org, version 89 of December 2017, and are distributed
-under this MIT open-source license:
+The scripts in this folder are from the three.js download from threejs.org, 
+version 154 of July 2023, and are distributed under this MIT open-source license:
 
 The MIT License
 
-Copyright © 2010-2017 three.js authors
+Copyright © 2010-2023 three.js authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

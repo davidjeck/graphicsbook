@@ -8,9 +8,9 @@
    input { margin-left:15px; }
 </style>
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
 <script src="../script/slider-canvas.js"></script>
-<script>
+<script type="module">
+import * as THREE from "./script/three.module.min.js";
 
 var canvas, scene, renderer, camera;  // Standard basic objects for three.js
 
@@ -225,9 +225,11 @@ function init() {
     render();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 

@@ -2,9 +2,16 @@
 <head>
 <meta charset="UTF-8">
 <title>Three.js Skybox</title>
-<script src="three.min.js"></script>
-<script src="OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js"
+     }
+  }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 
 /* This page shows two scenes that use a cubemap texture.
@@ -67,7 +74,7 @@ function loadCubemapTexture(textureURLs, callback) {
 }
 
 
-/*  This page uses THREE.OrbitControls to let the user use the mouse to rotate
+/*  This page uses OrbitControls to let the user use the mouse to rotate
  *  either view. 
  *     The first parameter is the camera that will be rotated by the controls.
  *  The second is the canvas where the scene is rendered.  The second
@@ -75,7 +82,7 @@ function loadCubemapTexture(textureURLs, callback) {
  *  should be the function that renders the scene.
  */
 function installOrbitControls(camera, canvas, callback) {
-    let controls = new THREE.OrbitControls(camera,canvas);
+    let controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change", callback);
@@ -214,7 +221,7 @@ function init() {
     }
 }
 
-window.onload = init; // Arranges for init to be called when page has loaded.
+window.onload = init; 
 
 </script>
 </head>

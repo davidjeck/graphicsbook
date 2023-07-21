@@ -5,10 +5,13 @@
 <title>Three.js Mesh Animation</title>
 <link rel="stylesheet" href="../demo.css">
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script src="../script/threejs/GLTFLoader.js"></script>
-<script src="../script/threejs/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  { "imports": { "three" : "./script/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {GLTFLoader} from "./script/loaders/GLTFLoader.js";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 /* Can show animated models of a horse and of a stork.
    The basic outline is the same as my sample program
@@ -86,7 +89,7 @@ function modelLoaded(dataFromModel, rotation) {
     /* Determine the ranges of x, y, and z in the vertices of the geometry. */
 
     var geometry = object.geometry;
-    vertices = geometry.getAttribute("position");
+    let vertices = geometry.getAttribute("position");
     var xmin = Infinity;
     var xmax = -Infinity;
     var ymin = Infinity;
@@ -161,7 +164,7 @@ function installModel(modelNumber) {
        doAnimationCheckbox();
     }
     document.getElementById("animate").disabled = true;
-    var loader = new THREE.GLTFLoader();
+    var loader = new GLTFLoader();
     loader.load(modelURLs[modelNumber], callback, undefined, error);
     function callback(data) {  // callback function to be executed when loading finishes.
         modelLoaded(data, modelRotations[modelNumber]);
@@ -238,18 +241,21 @@ function init() {
     document.getElementById("animate").onchange = doAnimationCheckbox;
     document.getElementById("horse").onchange = function() { installModel(0); };
     document.getElementById("stork").onchange = function() { installModel(1); };
+    document.getElementById("reset").onclick = resetControls;
     renderer.setClearColor(0xAAAAAA);
     createWorld();
-    controls = new THREE.OrbitControls(camera,canvas);
+    controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change", render);
     installModel(0);
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 
@@ -259,7 +265,7 @@ function init() {
 <label><input type="checkbox" id="animate">Animate</label>
 <label style="margin-left: 50px"><input type="radio" name="model" id="horse">Horse</label>
 <label style="margin-left: 10px"><input type="radio" name="model" id="stork">Stork</label>
-<button style="margin-left: 40px" onclick="resetControls()">Reset Rotation</button>
+<button style="margin-left: 40px" id="reset">Reset Rotation</button>
 </p>
 
 <div id="canvas-holder">
@@ -290,9 +296,8 @@ demo to see how the animation is programmed.</p>
 <p>You can use your mouse (or finger) to rotate the model, even when it is animating.</p>
 <p>(Note that this demo won't work if you are trying to load it from your local computer instead
 of from a web server.  This is because of web browser security policies that prevent the
-program from loading the models locally.
-See the documentation about
-<a href="https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally">running three.js examples locally</a>.)</p>
+program from loading the models locally.  You can solve the problem by running a local
+web server or by enabling local file access in your web browser.)</p>
 </div>
 
 

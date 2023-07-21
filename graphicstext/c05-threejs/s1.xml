@@ -4,9 +4,10 @@
 <section title="Three.js Basics" id="threejs.1">
 
 <p1><i>Three.js</i> is an object-oriented JavaScript library for 3D graphics.  It is an
-open-source project created by Ricardo Cabello (who goes by the handle "mr.doob", 
+open-source project originally created by Ricardo Cabello (who goes by the handle "mr.doob", 
 <a href="https://mrdoob.com/">https://mrdoob.com/</a>), with contributions from other programmers.
 It seems to be the most popular open-source JavaScript library for 3D web applications.
+(Another popular option is <a href="https://www.babylonjs.com/">Babylon.js</a>.)
 <i>Three.js</i> uses concepts
 that you are already familiar with, such as geometric objects, transformations, lights,
 materials, textures, and cameras.  But it also has additional features that build on 
@@ -14,47 +15,151 @@ the power and flexibility of WegGL.</p1>
 
 <p>You can download <i>three.js</i> and read the documentation at its main web site,
 <a href="https://threejs.org">https://threejs.org</a>.  The download is quite large,
-since it includes many examples and support files.  In this book, I use Release 129 of the
-software, from June, 2021.  Version 1.2 of this book used Release 89.  There have
-been a number of significant changes in the API since that release, and many programs
-written for older releases will not run under Release 129.  You should be aware that
-some of the material about three.js that you might find on the Internet does not
-apply to the most recent version.</p>
+since it includes many examples and support files.  This book uses Release 154 of the
+software, from July, 2023. You should be aware that
+some of the material about <i>three.js</i> that you might find on the Internet does not
+apply to the most recent release.</p>
 
-<p>One of the changes in three.js is that it is now written as a "modular" JavaScript
-program.  Modules are relatively independent components.  A module only has access
-to an identifier from another module if the identifier is explicitly "exported" by one module
-and "imported" by the other.  You will see modules used in many three.js examples,
-which include the appropriate input and export commands.
-However, modules are <b>not</b> used in this textbook.  It is possible to build a non-modular
-Javascript program from modular source code, and it is the non-modular version of three.js
-that is used in this textbook.</p>
+<p>The current release of <i>three.js</i> is a "modular" JavaScript library.  The older,
+non-modular form is still available, but it is deprecated and is scheduled to be removed
+in Release 160.  Previous versions of this textbook used the non-modular version.  Version 1.4
+of the textbook has been updated to use <i>three.js</i> modules; aside from that, the <i>three.js</i>
+material has been changed only to account for some minor differences between <i>three.js</i>
+releases. (Notably, I found that I had to significantly increase the specular component of
+material colors.)</p>
 
-<p>The core features of <i>three.js</i> are defined in a single large JavaScript file named
-"three.js", which can be found in a <i>build</i> directory in the three.js download.  This
-version is designed to be used with either modular or non-modular programs. 
-There is also a smaller "minified" version, <i>three.min.js</i>, that contains the same definitions
-in a format that is not meant to be human-readable.  
-To use <i>three.js</i> on a web page,
-you can load either script with a &lt;script&gt; element on the page.
-For example, assuming that <i>three.min.js</i> is in the same folder as the web page,
-then the script element would be:</p>
-
-<pre>&lt;script src="three.min.js">&lt;/script&gt;</pre>
-
-<np>In addition to this core, the <i>three.js</i> download has a directory containing many
-examples and a variety of support files that are used in the examples.  The examples
-use many features that are not part of the <i>three.js</i> core.  These add-ons can be
-found in a folder named <i>js</i> inside the folder named <i>examples</i> in the
-download (or in a folder named <i>jsm</i> for the modular versions).  Several of the
-add-ons are used in this textbook.</np>
-
-<p>Copies of <i>three.js</i>, <i>three.min.js</i>, and several add-on scripts can be found in
-the <sourceref href="threejs"/> folder in the <i>source</i> folder 
+<p>Copies of all <i>three.js</i> scripts that are used in this textbook can be found in
+the <sourceref href="threejs/script"/> folder in the <i>source</i> folder 
 of this textbook's web site. The <i>three.js</i> license allows these files to be freely
 redistributed.  But if you plan to do any serious work with <i>three.js</i>, you should read
 the documentation on its web site about how to use it and how to deploy it.</p>
 
+<p>The core features of <i>three.js</i> are defined in a single large JavaScript file named
+"three.module.js", which can be found in a <i>build</i> directory in the three.js download.
+There is also a smaller "minified" version, <i>three.module.min.js</i>, that contains the same definitions
+in a format that is not meant to be human-readable.  It is the minified version that is usually
+used on web pages.  In addition to this core, the <i>three.js</i> download has a directory containing many
+examples and a variety of support files that are used in the examples.  The examples
+use many features that are not part of the <i>three.js</i> core.  These add-ons can be
+found in a folder named <i>jsm</i> inside the folder named <i>examples</i> in the <i>three.js</i>
+download.  Several of the add-ons are used in this textbook and are included in the
+<sourceref href="threejs/script"/> folder.</p>
+
+
+<subsection title="About JavaScript Modules" id="threejs.1.0">
+
+<p>The term "module" refers in general to a relatively independent component of a system.
+Modules interact in limited, well-defined ways.  They are an important tool for building
+complex systems.  In JavaScript, a module is a script that is isolated from other scripts,
+except that a module can "export" identifiers that it defines.  Identifiers that are 
+exported by one script can then be "imported" by another script. A module only has access
+to an identifier from another module if the identifier is explicitly exported by one module
+and imported by the other.  Modules can also access identifiers from non-modular
+scripts, without having to import them.</p>
+
+<p>A JavaScript module can export an identifier by adding the <code>export</code>
+modifier to its declaration.  For example,</p>
+
+<pre>export const RED="0xFF0000";
+export function setColor(c) { . . .
+export class FancyDraw { . . .</pre>
+
+<np>Alternatively, it can list the identifiers that it wants to export in an
+<code>export</code> statement.  For example,</np>
+
+<pre>export { RED, setColor, FancyDraw };</pre>
+
+<np>The <code>export</code> statement has many other options.  However, here we
+are mostly interested in importing from <i>three.js</i> modules.</np>
+
+<p>To use modular <i>three.js</i>, you will need to write a modular script.
+You can do that on a web page by adding the attribute <code>type="module"</code>
+to the <code>&lt;script&gt;</code> element:</p>
+
+<pre>&lt;script type="module">
+     .
+     . 
+     .
+&lt;/script></pre>
+
+<np>The script can then use <code>import</code> statements to access identifiers
+from other modules.  For example,</np>
+
+<pre>&lt;script type="module">
+import { FancyDraw, setColor } from "./drawutil.js";
+   .
+   . // Use FancyDraw and setColor as usual!
+   .
+</pre>
+
+<np>This assumes that the module that exports the identifiers is defined
+in a script named <code>drawutil.js</code> in the same directory as the
+web page.  Note that if the path to the script starts in the current
+directory, then the script name must start with "<code>./</code>".</np>
+
+<p>My <i>three.js</i> examples use the file <code>three.module.min.js</code>
+from a directory named <code>script</code> in the same directory as the
+web page.  They can import everything from that file using:</p>
+
+<pre>import * as THREE from "./script/three.module.min.js";</pre>
+
+<np>This form of the <code>import</code> statement gets all the 
+exports from <code>three.module.min.js</code> and makes them properties
+of a new object named <code>THREE</code>.  For example, the
+exported identifier <code>Mesh</code> is imported as <code>THREE.Mesh</code>.
+Again, the <code>import</code> statement has other forms, which are not
+covered here.</np>
+
+<break/>
+
+<p>Many of my examples use add-ons that are not part of the main
+<i>three.js</i> script.  I have placed the files that use them
+in subdirectories of my <sourceref href="threejs/script">script&nbsp;directory</sourceref>.
+All of the files come from the <code>examples/jsm</code> folder in the
+<i>three.js</i> download.  I have used the same subdirectory structure as
+that folder, because some of the files refer to files in other subdirectories
+by name. One of the add-on scripts is "OrbitControls.js" in the "controls"
+subdirectory.  It exports a class named <code>OrbitControls</code>, which 
+can be imported using</p>
+
+<pre>import { Orbitcontrols } from "./script/controls/OrbitControls.js";</pre>
+
+<p>The add-on modules import many resources from the main <i>three.js</i>
+module.  Unfortunately, they don't know where to find that file.  They
+rely on something called an "import map" to specify its location.
+An import map can be defined by another kind of script, with
+<code>type="importmap"</code>.  So, you will see that the
+scripts in many of my examples start something like this:</p>
+
+<pre>&lt;script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js",
+        "addons/": "./script/"
+     }
+  }
+&lt;/script>
+&lt;script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "addons/controls/OrbitControls.js";
+import { GLTFLoader } from "addons/loaders/GLTFLoader.js";</pre>
+
+<np>The content of an "importmap" script is a <word>JSON</word> object.
+The import map here defines "three" to refer to the main
+<i>three.js</i> file, and it defines "addons/" to refer to the
+script directory.  The add-on files refer to the main <i>three.js</i>
+module as "three", so that mapping is necessary.  The
+"addons/" mapping is actually not needed for my examples.</np>
+
+<break/>
+
+<p>I have given you only a very brief overview of JavaScript modules&mdash;enough, I hope
+to let you understand my sample programs and write some similar programs of your own. For
+more complex projects, you should look at what the <i>three.js</i> developers have to
+say about setting up a development environment.
+See the "Installation" section of the Manual at <a href="https://threejs.org/docs/">https://threejs.org/docs/</a>.</p>
+
+</subsection>
 
 <subsection title="Scene, Renderer, Camera" id="threejs.1.1">
 
@@ -75,17 +180,17 @@ properties of the scene graph between frames.</p>
 Three of the most basic are
 <classname>THREE.Scene</classname>, <classname>THREE.Camera</classname>,
 and <classname>THREE.WebGLRenderer</classname>.  (There are actually several renderer
-classes available.  <classname>THREE.WebGLRenderer</classname> is by far the most common.
-It uses WebGL&nbsp;2.0 if available, but can also use WebGL&nbsp;1.0 if not. 
-One alternative is <classname>THREE.WebGL1Renderer</classname>, with a "1" in the name,
-which forces the use of WebGL&nbsp;1.0.)  A&nbsp;<i>three.js</i> program
+classes available.  <classname>THREE.WebGLRenderer</classname> is by far the most common.)
+A&nbsp;<i>three.js</i> program
 will need at least one object of each type.  Those objects are often stored in global variables</p>
 
 <pre>let scene, renderer, camera;</pre>
 
 <p>Note that almost all of the <i>three.js</i> classes and constants that we will use 
 are properties  of an object named <i>THREE</i>,
-and their names begin with "<classname>THREE.</classname>".  I will sometimes
+and their names begin with "<classname>THREE.</classname>".  (The name "THREE" is defined in
+the <code>import</code> statement that imports the <i>three.js</i> features; you can use a
+different name.)  I will sometimes
 refer to classes without using this prefix, and it is not usually used in the
 <i>three.js</i> documentation, but the prefix must always be included in actual 
 program code.</p>
@@ -160,8 +265,7 @@ I will cover that later when I talk about transformations more generally.</p>
 <break/>
 
 
-<p>A renderer is an instance of the class <classname>THREE.WebGLRenderer</classname> (or
-<classname>THREE.WebGL1Renderer</classname>, which is used in exactly the same way).
+<p>A renderer is an instance of the class <classname>THREE.WebGLRenderer</classname>.
 Its constructor has
 one parameter, which is a JavaScript object containing settings that
 affect the renderer.  The settings you are most likely to specify are
@@ -538,9 +642,8 @@ object, whose properties can include <i>color</i> and <i>linewidth</i>.  For exa
     linewidth: 2       // 2 pixels; the default is 1
 } );</pre>
 
-<np>(The <i>three.js</i> documentation says that the <i>linewidth</i> property
-might not be respected.  Curiously, on my computer, it was respected by
-a <classname>WebGL1Renderer</classname> but not by a <classname>WebGLRenderer</classname>.)</np>
+<np>(The <code>linewidth</code> property might not be respected. According to the
+specification, a WebGL implementation can set the maximum line width to&nbsp;1.)</np>
 
 <p>As with points, it is possible to specify a different color for each purpose
 by adding a "color" attribute to the geometry and setting the value of the
@@ -718,7 +821,7 @@ detail parameter equal to 0, 1, 2, and&nbsp;3.</np>
 <p>To create a mesh object, you need a material as well as a geometry.  There are
 several kinds of material suitable for mesh objects, including  <classname>THREE.MeshBasicMaterial</classname>,
 <classname>THREE.MeshLambertMaterial</classname>, and <classname>THREE.MeshPhongMaterial</classname>.
-(There are also two newer mesh materials, <classname>THREE.MeshStandardMaterial</classname>
+(There are more mesh materials, including two newer ones, <classname>THREE.MeshStandardMaterial</classname>
 and <classname>THREE.MeshPhysicalMaterial</classname>, that implement techniques associated
 with <word term="PBR">physically based rendering</word>, an approach to improved rendering that
 has become popular.  However, I will not cover them here.)</p>  
@@ -738,7 +841,7 @@ material.  For example:
 <pre>let mat = new THREE.MeshPhongMaterial( {
           color: 0xbbbb00,     // reflectivity for diffuse and ambient light
           emissive: 0,         // emission color; this is the default (black)
-          specular: 0x070707,  // reflectivity for specular light
+          specular: 0x303030,  // reflectivity for specular light
           shininess: 50        // controls size of specular highlights
     } );</pre>
 
@@ -774,7 +877,7 @@ Except for <i>flatShading</i>, these apply to all three kinds of mesh material:<
     <i>THREE.DoubleSide</i>.  Otherwise, parts of the object that should be in view won't
     be drawn.</li>
     <li><code>flatShading</code> &mdash; a <i>boolean</i> value,
-    with the default being <i>false</i>.  This works only for <classname>MeshPhongMaterial</classname>.
+    with the default being <i>false</i>.  This does not work for <classname>MeshBasicMaterial</classname>.
     For an object that is supposed to look "faceted," with flat sides, it is
     important to set this property to <i>true</i>.  That would be the case, for
     example, for a cube or for a cylinder with a small number of sides.</li>
@@ -948,40 +1051,6 @@ spotlight.position.set(0,0,5);
 spotlight.target.position.set(2,2,0);
 scene.add(spotlight);
 scene.add(spotlight.target);</pre>
-
-<p>The interaction of spotlights with material illustrates an important difference between
-Phong and Lambert shading.  With a <classname>MeshLambertMaterial</classname>, the 
-<word>lighting equation</word> is applied at the vertices of a primitive, and the vertex colors computed by that
-equation are then interpolated to calculate colors for the pixels in the primitive.
-With <classname>MeshPhongMaterial</classname>, on the other hand, the lighting equation is
-applied at each individual pixel.  The following illustration shows what can happen when we shine
-a spotlight onto a square that was created using <classname>THREE.PlaneGeometry</classname>:
-</p>
-
-<img src="spotlight-and-shading.png" width="572" height="171" bordered="true"
-          tex="spotlight-and-shading.eps" texscale="0.75"/>
-          
-<np>For the two squares on the left, the square was not subdivided; it is made up of two
-triangular faces.  The square at the far left, which uses Phong shading, shows the expected spotlight
-effect. The spotlight is pointed at the center of the square.  Note how the illumination
-falls off with distance from the center.  When I used the same square and spotlight
-with Lambert shading in the second picture, I got no illumination at all!
-The vertices of the square lie outside the cone of light from the spotlight.
-When the lighting equation is applied, the vertices are black, and the black color
-of the vertices is then applied to all the pixels in the square.</np>
-
-<p>For the third and fourth squares in the illustration, plane geometries with horizontal
-and vertical subdivisions were used with Lambert shading.  In the third picture, the
-square is divided into three subdivisions in each direction, giving 18 triangles, 
-and the lighting equation is applied only at
-the vertices of those triangles.  The result is still a very poor approximation for
-the correct illumination.  In the fourth square, with 10 subdivisions in each direction, the approximation
-is better but still not perfect.</p>
-
-<p>The upshot is, if you want an object to be properly illuminated by a spotlight, use a
-<classname>MeshPhongMaterial</classname> on the object, even if it has no specular reflection.
-A <classname>MeshLambertMaterial</classname> will only give acceptable results if the
-faces of the object are very small.</p>
 
 
 

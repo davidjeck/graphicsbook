@@ -2,13 +2,22 @@
 <head>
 <meta charset="UTF-8">
 <title>Three.js Model Loader Demo</title>
-<script src="three.min.js"></script>
-<script src="GLTFLoader.js"></script>
-<script src="OBJLoader.js"></script>
-<script src="ColladaLoader.js"></script>
-<script src="OrbitControls.js"></script>
 <script src="models/teapot-model-IFS.js"></script>
-<script>
+<script type="importmap">
+  {
+     "imports": {
+        "three": "./script/three.module.min.js",
+        "addons/": "./script/"
+     }
+  }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "addons/controls/OrbitControls.js";
+import {GLTFLoader} from "addons/loaders/GLTFLoader.js";
+import {OBJLoader} from "addons/loaders/OBJLoader.js";
+import {ColladaLoader} from "addons/loaders/ColladaLoader.js";
+
 
 /* Uses various model loaders to load objects that have been saved
  * in various formats.  Requires the folder named "models"
@@ -69,7 +78,7 @@ function modelLoaded(object, rotation) {
     /* Determine the ranges of x, y, and z in the vertices of the geometry. */
 
     let geometry = object.geometry;
-    vertices = geometry.getAttribute("position");
+    let vertices = geometry.getAttribute("position");
     let xmin = Infinity;
     let xmax = -Infinity;
     let ymin = Infinity;
@@ -145,7 +154,7 @@ function installModel(modelNum) {
         }
     }
     
-    // Load a model in GLTF format, using a THREE.GLTFLoader.  GTLF files
+    // Load a model in GLTF format, using a GLTFLoader.  GLTF files
     // can refer to textures and other resources that have to be loaded
     // separately.  The LoadingManager is used to make sure that all
     // resources are loaded before it calls modelLoaded().
@@ -156,7 +165,7 @@ function installModel(modelNum) {
          let manager = new THREE.LoadingManager(function() {
             modelLoaded(object,rotation);
          }, undefined, loaderError);
-         loader = new THREE.GLTFLoader(manager);
+         let loader = new GLTFLoader(manager);
 		   loader.load( path, function ( data ) {
              for (let child of data.scene.children) {
                     // Search the children of data.scene to find a mesh object.
@@ -173,7 +182,7 @@ function installModel(modelNum) {
     // single object, so it should be save to use its first
     // child as the model.
     function loadOBJ(path, material, rotation) {
-         loader = new THREE.OBJLoader();
+         let loader = new OBJLoader();
 		   loader.load( path, function ( data ) {
              let object = data.children[0];
              if (material) {
@@ -183,7 +192,7 @@ function installModel(modelNum) {
          }, undefined, loaderError);
     }
     
-    // Load a model in Collada format, using a THREE.ColladaLoader.  Models
+    // Load a model in Collada format, using a ColladaLoader.  Models
     // can refer to textures and other resources that have to be loaded
     // separately.  The LoadingManager is used to make sure that all
     // resources are loaded before it calls modelLoaded().
@@ -192,7 +201,7 @@ function installModel(modelNum) {
         let manager = new THREE.LoadingManager(function() {
             modelLoaded(object,rotation);
         }, undefined, loaderError);
-        loader = new THREE.ColladaLoader(manager);
+        let loader = new ColladaLoader(manager);
         loader.load( path, function( data ) { 
                // Note:  The object that we want might not actually
                // be the first child of data.scene.  For the general
@@ -211,8 +220,8 @@ function installModel(modelNum) {
         teapotGeom.setAttribute("normal", new THREE.BufferAttribute( teapotModel.vertexNormals, 3));
         teapotGeom.setIndex(new THREE.BufferAttribute( teapotModel.indices, 1 ));
         let teapotMaterial = new THREE.MeshPhongMaterial( {
-                color: new THREE.Color(0.780392, 0.568627, 0.113725),  
-                specular: 0x171615,
+                color: new THREE.Color(0.8, 0.5, 0.1),  
+                specular: 0x605858,
                 shininess: 28,
                 side: THREE.DoubleSide  // required since some parts of the inside are visible
             } );
@@ -226,8 +235,8 @@ function installModel(modelNum) {
          break;
     case 3: // tree
          let treeMaterial = new THREE.MeshPhongMaterial({
-                  color: 0x88DD88,
-                  specular: 0x001000
+                  color: 0x66CC66,
+                  specular: 0x008000
               });
          // treeMaterial will replace the default material from the OBJLoader
          loadOBJ("models/tree.obj",treeMaterial);
@@ -279,7 +288,7 @@ function init() {
     document.getElementById("r5").onchange = function() { installModel(5); };
     document.getElementById("r6").onchange = function() { installModel(6); };
     createWorld();
-    controls = new THREE.OrbitControls(camera,canvas);
+    controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change", render);
@@ -351,10 +360,8 @@ The Arrowhead is a fairly small model, with 768 faces in 22 kilobytes.
 provided along with the examples in the <i>three.js</i> download.  Note that<br>
 because of security restrictions in web browsers, the loaders will probably<br>
 fail if this page comes from your local disk instead of from a web server.<br>
-See the documentation about
-<a href="https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally">running three.js examples locally</a>.<br>
-(But note that the problem only applyes to some <i>three.js</i> programs.)
-</p>
+You can solve that problem by running a local web server or by enabling<br>
+local file access in your web browser.</p>
 
 </div>
 

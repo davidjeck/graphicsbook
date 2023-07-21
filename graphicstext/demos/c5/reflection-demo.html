@@ -10,10 +10,13 @@
     }
 </style>
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script src="../script/threejs/GLTFLoader.js"></script>
-<script src="../script/threejs/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  { "imports": { "three" : "./script/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {GLTFLoader} from "./script/loaders/GLTFLoader.js";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 var canvas, scene, renderer, camera;
 
@@ -76,7 +79,7 @@ function createSkybox(textureNumber) {
        }
        if (reflectiveObject) {
            reflectiveObject.material.envMap = skyboxTexture;
-           reflectiveObject.material.needsUpdate = true;
+           // reflectiveObject.material.needsUpdate = true; // No longer needed in r154.
        }
        document.getElementById("headline").innerHTML = "Skybox and Reflection Mapping";
        render();
@@ -216,7 +219,7 @@ function installGLTFModel(modelNum) {
         scene.remove(model);
         reflectiveObject = null;
     }
-    var loader = new THREE.GLTFLoader();
+    var loader = new GLTFLoader();
     loader.load(gltfModelURL[modelNum], modelLoadedCallback, undefined, errorCallback);
     render();
 }
@@ -230,11 +233,11 @@ function setObjectColor(colorNum) {
     if (model) {
         if (model.material) { // it's a basic geometry model
             model.material = makeReflectionMaterial();
-            model.material.needsUpdate = true;
+            model.material.needsUpdate = true; // No longer needed in r154.
         }
         else { // it's a JSON model and the actual model object is model.children[0]
             model.children[0].material = makeReflectionMaterial();
-            model.children[0].needsUpdate = true;
+            model.children[0].needsUpdate = true; // No longer needed in r154.
         }
     }
     render();
@@ -288,30 +291,43 @@ function init() {
                 e + "</b></p>";
         return;
     }
-    document.getElementById("s1").checked = true;
-    document.getElementById("m1").checked = true;
-    document.getElementById("c1").checked = true;
-    document.getElementById("show1").checked = true;
+    document.getElementById("s0").checked = true;
+    document.getElementById("s0").onchange = function() { createSkybox(0) };
+    document.getElementById("s1").onchange = function() { createSkybox(1) };
+    document.getElementById("g0").checked = true;
+    document.getElementById("g0").onchange = function() { installGLTFModel(0) };
+    document.getElementById("g1").onchange = function() { installGLTFModel(1) };
+    for (let i = 0; i < 4; i++)
+       document.getElementById("m"+i).onchange = function() { installModel(i) };
+    document.getElementById("c0").checked = true;
+    for (let i = 0; i < 4; i++)
+       document.getElementById("c"+i).onchange = function() { setObjectColor(i) };
+    document.getElementById("show3").checked = true;
+    document.getElementById("show1").onchange = function() { show('skybox') };
+    document.getElementById("show2").onchange = function() { show('object') };
+    document.getElementById("show3").onchange = function() { show('both') };
     createWorld();
-    controls = new THREE.OrbitControls(camera,canvas);
+    controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change",render);
     render();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 
 <h3 id="headline">Skybox and Reflection Mapping</h3>
 
 <p><b>Show:</b>
-   <label><input type="radio" name="show" onchange="show('skybox')">Skybox</label>
-   <label><input type="radio" name="show" onchange="show('object')">Object</label>
-   <label><input type="radio" name="show" id="show1" onchange="show('both')">Both</label>
+   <label><input type="radio" name="show" id="show1">Skybox</label>
+   <label><input type="radio" name="show" id="show2">Object</label>
+   <label><input type="radio" name="show" id="show3">Both</label>
 </p>
 
 <div id="canvas-holder">
@@ -320,22 +336,22 @@ function init() {
 
 <div id="tools">
 <p style="margin-top:0"><b>Skybox:</b><br>
-    <label><input type=radio name="pickskybox" id=s1 onchange="createSkybox(0)">Beach</label><br>
-    <label><input type=radio name="pickskybox" onchange="createSkybox(1)">Chapel</label>
+    <label><input type=radio name="pickskybox" id=s0>Beach</label><br>
+    <label><input type=radio name="pickskybox" id=s1>Chapel</label>
 </p>
 <p style="margin-top:20px"><b>Object:</b><br>
-    <label><input type=radio name="pickmodel" id=m1 onchange="installGLTFModel(0)">Arrowhead</label><br>
-    <label><input type=radio name="pickmodel" onchange="installGLTFModel(1)">Horse</label><br>
-    <label><input type=radio name="pickmodel" onchange="installModel(0)">Cube</label><br>
-    <label><input type=radio name="pickmodel" onchange="installModel(1)">Cylinder</label><br>
-    <label><input type=radio name="pickmodel" onchange="installModel(2)">Torus</label><br>
-    <label><input type=radio name="pickmodel" onchange="installModel(3)">Sphere</label>
+    <label><input type=radio name="pickmodel" id=g0>Arrowhead</label><br>
+    <label><input type=radio name="pickmodel" id=g1>Horse</label><br>
+    <label><input type=radio name="pickmodel" id=m0>Cube</label><br>
+    <label><input type=radio name="pickmodel" id=m1>Cylinder</label><br>
+    <label><input type=radio name="pickmodel" id=m2>Torus</label><br>
+    <label><input type=radio name="pickmodel" id=m3>Sphere</label>
 </p>
 <p style="margin-top:20px; margin-bottom:0"><b>Base Color:</b><br>
-    <label><input type=radio name="pickcolor" id=c1 onchange="setObjectColor(0)">White</label><br>
-    <label><input type=radio name="pickcolor" onchange="setObjectColor(1)">Blue</label><br>
-    <label><input type=radio name="pickcolor" onchange="setObjectColor(2)">Pink</label><br>
-    <label><input type=radio name="pickcolor" onchange="setObjectColor(3)">Green</label>
+    <label><input type=radio name="pickcolor" id=c0>White</label><br>
+    <label><input type=radio name="pickcolor" id=c1>Blue</label><br>
+    <label><input type=radio name="pickcolor" id=c2>Pink</label><br>
+    <label><input type=radio name="pickcolor" id=c3>Green</label>
 </p>
 </div>
 

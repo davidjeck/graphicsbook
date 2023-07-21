@@ -598,14 +598,13 @@ First, you can include it inside &lt;script&gt; elements, which have the form</p
 
 <np>The attribute specifies the programming language used for the script.  However,
 the value "text/javascript" is the default and the <i>type</i> attribute is not
-required for JavaScript scripts.  (You might also see a &lt;script&gt; with
+required for JavaScript scripts.  ()You might also see a &lt;script&gt; with
 <i>type=&leftquote;module"</i>, indicating a modular JavaScript program.
-Modules are used in the <word>three.js</word> library, but are not mentioned
-elsewhere in this textbook.  Modules were a new feature in ES6.  They make it possible
+Modules were a new feature in ES6.  They make it possible
 to break up a large program into components and control the sharing of variables
-between components.  Modules are not used in the programs for this textbook,
-but they are used in the <word>three.js</word> 3D graphics library.
-They are covered briefly in the chapter on three.js.)</np>
+between components.  Modules are used in the <word>three.js</word> 3D graphics library.
+They are covered briefly in the chapter on three.js.  They are not used elsewhere
+in this textbook.)</np>
 
 <p>The second way to use JavaScript code is to put it in a separate file, usually with a
 name ending with ".js", and import that

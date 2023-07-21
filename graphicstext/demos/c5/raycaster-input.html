@@ -10,8 +10,8 @@
     }
 </style>
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script>
+<script type="module">
+import * as THREE from "./script/three.module.min.js";
 
 var canvas, scene, renderer, camera;
 
@@ -205,9 +205,11 @@ function init() {
     render();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 

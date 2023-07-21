@@ -5,9 +5,12 @@
 <title>Three.js Demo</title>
 <link rel="stylesheet" href="../demo.css">
 <script src="../script/demo-core.js"></script>
-<script src="../script/three.min.js"></script>
-<script src="../script/threejs/OrbitControls.js"></script>
-<script>
+<script type="importmap">
+  { "imports": { "three" : "./script/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "./script/controls/OrbitControls.js";
 
 var canvas, scene, renderer, camera;
 
@@ -25,6 +28,8 @@ var textureURL = [  // URLs of the available textures.
 var currentTexture;  // The currently used texture.
 var textureOffsetS;  // Horizontal texture offset, for the texture animation.
 var textureOffsetT;  // Vertical texture offset, for the texture animation.
+
+let controls;  // An OrbitControls object for rotating the object.
 
 
 function render() {  
@@ -87,7 +92,7 @@ function updateForFrame() {
     textureOffsetS -= 0.0023;
     textureOffsetT -= 0.00137;
     currentTexture.offset.set(textureOffsetS,textureOffsetT);
-    currentTexture.needsUpdate;  // Essential to tell three.js that texture properties have changed!!
+    //currentTexture.needsUpdate;  // no longer needed in r154
 }
 
 
@@ -98,14 +103,14 @@ function updateForFrame() {
 function installTexture(textureNum) {
    var callback = function() {
          // to be called after the texture is loaded, to show the new texture
-       material.needsUpdate = true;
+       //material.needsUpdate = true; // no longer needed in r154
        try {
            render();
        }
-	   catch (e) {
+	      catch (e) {
             document.getElementById("headline").innerHTML =
-			   "Can't access texture.  Note that some browsers<br>can't use a texture from a local disk.";
-	   }
+			            "Can't access texture.  Note that some browsers<br>can't use a texture from a local disk.";
+	      }
    };
    var error = function() { // Function to be called if there is an error loading texture
          document.getElementById("headline").innerHTML =
@@ -113,11 +118,16 @@ function installTexture(textureNum) {
       };
    
    let loader = new THREE.TextureLoader();
-   texture = loader.load(textureURL[textureNum], callback, undefined, error);
+   let texture = loader.load(textureURL[textureNum], callback, undefined, error);
+   texture.colorSpace = THREE.SRGBColorSpace; // reequired for proper color
+       // The colors look washed out without this.
+       // three.js documentation says "PNG or JPEG Textures containing color information
+       // (like .map or .emissiveMap) use the closed domain sRGB color space,
+       // and must be annotated with texture.colorSpace = SRGBColorSpace."
    
    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;  // Important to set repeat mode!!
    material.map = texture; // Applies this texture to the material and hence to the object.
-   material.needsUpdate = true;  // Essential to tell three.js that material properties have changed!!
+   //material.needsUpdate = true;  // no longer needed in r154
    textureOffsetS = 0;  // we start the texture with no texture offset
    textureOffsetT = 0;
    currentTexture = texture;
@@ -148,8 +158,7 @@ function doObjectSelect() {
     scene.remove(currentObject);
     scene.add(objects[objNum]);
     currentObject = objects[objNum];
-    material.flatShading = objNum == 5;  // icosahedron needs flat shading
- //   material.needsUpdate = true; // I'm not sure why this is required??
+    material.flatShading = objNum == 5;  // icosahedron needs flat shading -- actually not needed, since icosahedron is always flat!
     controls.reset();
     if (! animating) {
         render();
@@ -220,7 +229,7 @@ function init() {
     document.getElementById("object").addEventListener("change",doObjectSelect,false);
     document.getElementById("animate").addEventListener("change",doAnimationCheckbox,false);
     createWorld();
-    controls = new THREE.OrbitControls(camera,canvas);
+    controls = new OrbitControls(camera,canvas);
     controls.enablePan = false;
     controls.enableZoom = false;
     controls.addEventListener("change", render);
@@ -228,9 +237,11 @@ function init() {
     render();
 }
 
+window.onload = init;
+
 </script>
 </head>
-<body onload="init()">
+<body>
 
 <div id="content">
 

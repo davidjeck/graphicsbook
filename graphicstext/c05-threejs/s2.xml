@@ -289,7 +289,13 @@ with curves and surfaces that are defined mathematically.  Some of the possibili
 illustrated in the sample program <sourceref href="threejs/curves-and-surfaces.html"/>, and I will
 discuss a few of them here.</p>
 
-<p>Parametric surfaces are the easiest to work with.  A parametric surface is defined by
+<p>Parametric surfaces are the easiest to work with.  They are represented by a <i>three.js</i>
+add-on named <classname>ParametricGeometry</classname>.  As an add-on, it must be imported
+separately from the main <i>three.js</i> module.  In my sample program, it is imported with</p>
+
+<pre>import {ParametricGeometry} from "addons/geometries/ParametricGeometry.js";</pre>
+
+<p>A parametric surface is defined by
 a mathematical function of two parameters (<i>u,v</i>), where <i>u</i> and <i>v</i> are numbers,
 and each value of the function is a point in space.  The surface consists of all the points
 that are values of the function for <i>u</i> and <i>v</i> in some specified ranges.
@@ -303,7 +309,7 @@ collection of points on the surface, which are then connected to give a polygona
 of the surface.  In <i>three.js</i>, the values of both <i>u</i> and <i>v</i> are always in the
 range 0.0 to 1.0.  The geometry is created by a constructor</p>
 
-<pre>new THREE.ParametricGeometry( func, slices, stacks )</pre>
+<pre>new ParametricGeometry( func, slices, stacks )</pre>
 
 <np>where <i>func</i> is the JavaScript function that defines
 the surface, and <i>slices</i> and <i>stacks</i> determine
@@ -441,15 +447,24 @@ In <i>three.js</i>, an image texture is represented by an object of type
 for a <i>three.js</i> texture is generally loaded from a web address.  Image textures are usually created
 using the <i>load</i> function in an object of type
 <classname>THREE.TextureLoader</classname>.  The function takes a
-URL (a web address, usually a relative address) as parameter and returns a <classname>Texture</classname> object:</p>
+URL (a web address, usually a relative address) as parameter and returns 
+a <classname>Texture</classname> object:</p>
 
 <pre>let loader = new THREE.TextureLoader();
 let texture = loader.load( imageURL );</pre>
 
+<np>(It is also advisable to set</np>
+
+<pre>tex.colorSpace = THREE.SRGBColorSpace;</pre>
+
+<np>to display the colors correctly.  The <i>three.js</i> documentation says,
+"PNG or JPEG Textures containing color information (like .map or .emissiveMap) 
+use the closed domain sRGB color space, and must be annotated with texture.colorSpace
+= SRGBColorSpace.")</np>
+
 <np>A texture in <i>three.js</i> is considered to be part of a material.  To apply
 a texture to a mesh, just assign the <classname>Texture</classname> object to the
-<i>map</i> property of the mesh material that is used on the mesh:
-</np>
+<i>map</i> property of the mesh material that is used on the mesh:</np>
 
 <pre>material.map = texture;</pre>
 
@@ -489,11 +504,14 @@ scene, then <i>render</i> itself could be used as the <i>onLoad</i> function:</n
 
 <np>Another possible use of <i>onLoad</i> would be to delay assigning
 the texture to a material until the image has finished loading.  If you do
-change the value of <i>material.map</i>, be sure to set</np>
+add the texture later, be sure to set</np>
 
 <pre>material.needsUpdate = true;</pre>
    
-<np>to make sure that the change will take effect when the object is redrawn.</np>
+<np>to make sure that the change will take effect when the object is redrawn.
+(When exactly <code>needsUpdate</code> needs to be set on various objects
+is not always clear.  See the <a href="https://threejs.org/docs/#manual/en/introduction/How-to-update-things">"Updating Resources"</a>
+section of the <i>three.js</i> documentation.)</np>
     
 <p>A <classname>Texture</classname> has a number of properties that can be
 set, including properties to set the <word term="minification filter">minification</word>
@@ -704,16 +722,18 @@ can be found in the <i>examples</i> folder in the <i>three.js</i> download.</p>
 <p>The preferred format for model files is <newword>GLTF</newword>.  A GLTF model can be stored
 in a text file with extension .gltf or in a binary file with extension .glb.
 Binary files are smaller and more efficient, but not human-readable.
-A <i>three.js</i> loader for GLTF files is defined by the file <i>GLTFLoader.js</i>.
+A <i>three.js</i> loader for GLTF files is defined by the class <classname>GLTFLoader</classname>,
+which can be imported from the module <i>GLTFLoader.js</i>.
 from the <i>three.js</i> download.  Copies of that script, as well as scripts for
 other model loaders, can be found in the
-<sourceref href="threejs"/> folder in the <i>source</i> folder for this textbook.
-</p>
+<sourceref href="threejs/script/loaders"/> folder in the <i>source</i> folder for this textbook,
+or in the <code>examples/jsm/loaders</code> folder in the <i>three.js</i> download.
+(Note that <classname>GLTFLoader</classname> is not part of the object <code>THREE</code>.)</p>
 
-<p>If <i>loader</i> is an object of type <classname>THREE.GTLFLoader</classname>,
+<p>If <i>loader</i> is an object of type <classname>GLTFLoader</classname>,
 you can use its <i>load</i>() method to start the process of loading a model:</p>
 
-<pre>loader = new THREE.GLTFLoader()
+<pre>loader = new GLTFLoader()
 loader.load( url, onLoad, onProgress, onError );</pre>
 
 <np>Only the first parameter is required; it is a URL for the file that contains the model.
@@ -748,11 +768,6 @@ the same way.  The technique for loading the models is actually a little
 more general that what I've described here.  See the source code for
 the example program for details.</p>
 
-<p>(If you try to run the sample program from a download of the web site
-version of this textbook, it probably won't work because of security
-restrictions in most web browsers.  See the section on 
-<a href="https://threejs.org/docs/index.html#manual/en/introduction/How-to-run-things-locally">running things locally</a>
-in the <i>three.js</i> documentation.  The same applies to the demo below.)</p>
 
 <demo src="c5/mesh-animation.html" width="550" height="520"><p>I'll also mention that GLTF models can include
 animations.  <i>Three.js</i> has several classes that support animation, including
