@@ -78,7 +78,7 @@ track down the error:</p>
        .</pre>
 
 <p>Instead of relying on the Web browser console, it is possible to have a
-program check for errors.  Thinks are complicated by the fact that errors
+program check for errors.  Things are complicated by the fact that errors
 are detected by the GPU side of the program.  To get the error report
 back to the JavaScript side, you can use <code>device.pushErrorScope()</code>
 to add an error check to the GPU.  Later, you can retrieve the result
@@ -304,7 +304,7 @@ would do that in a render pipeline descriptor:</p>
 <np>Other values for the <code>writeMask</code> property include
 <code>GPUColorWrite.GREEN</code>, <code>GPUColorWrite.BLUE</code>, and
 <code>GPUColorWrite.ALPHA</code>.  You can also combine several
-of these constants with the or ("|") operator to write several
+of these constants with the or ("<code>|</code>") operator to write several
 components.  For example,</np>
 
 <pre>writeMask: GPUColorWrite.GREEN | GPUColorWrite.BLUE</pre>

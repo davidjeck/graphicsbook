@@ -34,10 +34,10 @@ is used, and for a 3D texture, the coordinate system is referred to as (u,v,w).<
 <p>When applying a 2D texture image to a surface, the two texture coordinates for a point 
 on the surface map that surface point to a point in the (u,v) coordinate system.  
 The sampling process uses the (u,v) coordinates to look up a color from the image.  
-The look up process can be non-trivial.
+The look-up process can be nontrivial.
 It is referred to as "filtering" and can involve looking at the colors of multiple 
 texels in the image and its <word term="mipmap">mipmaps</word>.
-(Note that <word term="pixel">pixels</word> in a texture are often referred 
+(Remember that <word term="pixel">pixels</word> in a texture are often referred 
 to as <word term="texel">texels</word>.)</p>
 
 <p>By convention, we can take texture coordinates (0,0) to refer to the top-left
@@ -66,7 +66,7 @@ color for that point.  (There is no texture image.  This is a trivial example
 of a <word>procedural texture</word> (<localref href="webgl3d.3.3"/>).)
 The square on the right uses an image texture, where the "Mona Lisa" image comes from a file.
 The middle square also uses an image texture, but in this case the colors for the image
-comes from an array of pixel colors that is part of the program.  The image is a tiny
+come from an array of pixel colors that is part of the program.  The image is a tiny
 four-pixel image, with two rows of pixels and two columns.  The original texture coordinates
 on the square are multiplied by 5 before sampling the texture, so that we see 5 copies of
 the texture across and down the square.  (This is a very simple example of a 
@@ -135,7 +135,7 @@ f32; that is, the color returned by sampling the texture will be of type vec4f.
 A 1D texture with floating point samples would use type name <code>texture_1d&lt;f32></code>,
 and there are similar names for 3D and cube textures. (There are 
 also integer textures with type names like <code>texture_2d&lt;u32></code> and <code>texture_1d&lt;i32></code>,
-they are not used with samplers.  They are discussed later in this section.)</np>
+but they are not used with samplers.  They are discussed later in this section.)</np>
 
 <p>Note that a texture variable is declared using <code>var</code> with no address space.
 (Not like <code>var&lt;uniform></code> for variables in the uniform address space.)
@@ -153,8 +153,8 @@ whether to use <word>anisotropic filtering</word>.</np>
 
 <p>Values for texture and sampler variables are constructed on the JavaScript side.
 A shader program has no direct access to the internal structure of a texture or sampler.
-In fact, the only thing you can do with them is pass them as parameters to functions.
-There are several builtin functions for working with textures (most of them too obscure
+In fact, the only thing you can do with them in WGSL is pass them as parameters to functions.
+There are several built-in functions for working with textures (most of them too obscure
 to be covered here).  The main function for sampling textures is <code>textureSample()</code>.
 Its parameters are a floating-point texture, a sampler, and texture coordinates.  For example,</p>
 
@@ -165,8 +165,8 @@ For a 1D texture, the <code>texcoords</code> parameter is an f32; for a 2D textu
 it is a vec2f; and for a 3D or cube texture, it's a vec3f.  The return value is a vec4f
 representing an <word>RGBA color</word>.  The return value is always a vec4f, even
 when the texture does not actually store four color components.  For example, 
-a <word>grayscale</word> texture might store just one color component; when it is
-sampled using <code>textureSample()</code>, the gray value from the texture will be
+a texture might store just one color component; when it is
+sampled using <code>textureSample()</code>, the color value from the texture will be
 used as the red component of the color, the green and blue color components will
 be set to 0.0, and the alpha component will be&nbsp;1.0.</np>
 
@@ -237,7 +237,7 @@ the maximum; in that case, the maximum value will be used.</p>
 <break/>
 
 <p>Textures are created on the JavaScript side using <code>device.createTexture()</code>.
-But is important to understand that this function only allocates the memory on the GPU
+But it is important to understand that this function only allocates the memory on the GPU
 that will hold the texture data.  The actual data will have to be stored later.
 This is similar to creating a GPU buffer.
 Here is how the checkerboard texture is created in the sample program:</p>
@@ -277,11 +277,8 @@ purpose textures that are used for multisampling and for the depth test.  See,
 for example, <sourceref href="webgpu/depth_test.html"/>.  Those textures were used
 as render attachments, and the data for the textures were created by drawing an image.</p>
 
-<p>Creating a texture just means allocating the memory that it will occupy.  It is
-still necessary to fill that memory with data.  Data for image textures often comes
-from the JavaScript side of the program.  It is also possible to render an image into
-a texture.  And data can be copied from one texture to another and between buffers
-and textures.  When the data comes from an <classname>ArrayBuffer</classname> or
+<p>Data for image textures often comes from the JavaScript side of the program. 
+When the data comes from an <classname>ArrayBuffer</classname> or
 typed array, the data can be copied to the texture using the function
 <code>device.queue.writeTexture()</code>.  In the sample program, the data for
 the tiny checkerboard texture comes from a <classname>Uint8Array</classname>
@@ -641,7 +638,7 @@ are not covered in this textbook.)</p>
 
 <p>For example, the formats "r8uint", "r16uint", and "r32uint" are unsigned integer
 formats with one color channel and storing one 8-, 16-, or 32-bit unsigned integer per 
-texel.  For two 16-bit signed integers per texel, the format would be "r16sint".
+texel.  For two 16-bit signed integers per texel, the format would be "rg16sint".
 The format "rgba32float" uses four 32-bit floating-point numbers per texel.</p>
 
 <p>All textures can be passed into shader programs as resources in bind groups,
@@ -766,6 +763,7 @@ fn fragmentMain(@builtin(position) position : vec4f) -> @location(0) vec4f {
    let boardSize = textureDimensions(inputBoard);
    let cell = vec2u(position.xy); // Integer pixel coords of this fragment.
    let alive = textureLoad( inputBoard, cell, 0 ).r;  // Get current state.
+                  // (Note that the state is in the r color component.)
       .
       . // (Compute newAlive, the state of the cell in the next generation,)
       .
@@ -826,8 +824,8 @@ must specify two targets:</p>
     },
        ...</pre>
        
-<np>Then the render pass descriptor specifies a view of the output texture as
-a second color attachment:</np>
+<np>Then the render pass descriptor uses a view of the output texture as
+the second color attachment:</np>
 
 <pre>let renderPassDescriptor = {
    colorAttachments: [
@@ -838,7 +836,7 @@ a second color attachment:</np>
          view: context.getCurrentTexture().createView()
       },
       <newcode>{  // The second color attachment is a r8unorm texture.
-         loadOp: "load", // ()OK here since contents are entirely replaced.)
+         loadOp: "load", // (OK here since contents are entirely replaced.)
          storeOp: "store",
          view: outputTexture.createView()
       }</newcode>

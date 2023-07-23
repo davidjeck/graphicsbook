@@ -40,4 +40,9 @@ be found on the Mozilla Developer Network:
 Hopefully, though, this chapter has enough information to get you
 started with WebGPU.</p>
 
+<p>As this chapter is being written in July 2023, the official WebGPU documentation
+describes itself as a "Working Draft."  Some details need to be filled in, and there
+could still be some minor changes in the API.  It is unlikely that changes in the
+final version will affect anything in this textbook, but that can't be guaranteed.</p>
+
 </intro>

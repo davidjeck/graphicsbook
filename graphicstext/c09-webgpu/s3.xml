@@ -241,7 +241,7 @@ types have official names like <code>vec3&lt;f32&gt;</code> for a vector of thre
 and <code>vec4&lt;bool&gt;</code> for a vector of four <code>bools</code>.  But the type
 names for numeric vectors have "aliases" that are more commonly used instead of the official names:
 <code>vec4f</code> is an alias for <code>vec4&lt;f32&gt;</code>, <code>vec2i</code> is an alias for 
-<code>vec2&lt;i32&gt;</code>.</p>
+<code>vec2&lt;i32&gt;</code>, and <code>vec3u</code> is an alias for <code>vec3&lt;u32&gt;</code>.</p>
 
 <p>Vectors are similar to arrays, and the elements of a vector can be referred to using
 array notation.  For example, if <code>V</code> is a <code>vec4f</code>, then its
@@ -252,7 +252,7 @@ By using multiple letters after the dot, you can construct vectors made up of
 selected elements of <code>V</code>.  For example, <code>V.yx</code> is a <code>vec4f</code>
 containing the first two elements of <code>V</code> in reversed order, and
 <code>V.zzzz</code> is a <code>vec4f</code> made up of four copies of the third element of&nbsp;<code>V</code>.
-The letters <code>rgba</code> can also be used, instead of <code>xyzw</code>.
+The letters <code>rgba</code> can also be used instead of <code>xyzw</code>.
 (All this is similar to GLSL, <localref href="webgl.3.1"/>.)</p>
 
 <p>WGSL also has matrix types, but only for matrices of floating point values.
@@ -343,7 +343,8 @@ var i = vec4i(2);              // Same as vec4i(2,2,2,2); the 2 is repeated</pre
 <code>A</code> is an address space.  Local variables in functions can be
 declared using either <code>var&lt;function&gt;</code> or simply <code>var</code>.
 For global variables, an address space&mdash;private, uniform, storage, or
-workgroup&mdash;is required.</p>
+workgroup&mdash;is required (but texture-related global variables follow a
+different rule).</p>
 
 <p>The type of a variable can be specified in a declaration by following
 the variable name with a colon and then the name of the type.  For example</p>
@@ -403,7 +404,7 @@ their formal parameters and return types and to members of structs that
 are used to specify the type of their formal parameters and return types.
 The meaning depends on context.  On an input to a vertex shader entry point, it
 specifies the source of the input in a vertex buffer (<localref href="webgpu.1.6"/>).
-On a fragment shader entry point, it specifies the color attachment that is the
+On the return type of a fragment shader entry point function, it specifies the color attachment that is the
 destination of that output (<localref href="webgpu.1.3"/>.)
 And when used on a vertex shader output or a fragment shader input,
 it associates a particular output of the vertex shader with the corresponding
@@ -507,7 +508,7 @@ the L in the illustration in that section points from the surface towards the li
 <li><code>refract(L,N,ior)</code>, where L and N are unit vectors, and 
 <word term="IOR">ior</word> is the ratio of indices of refraction, computes the 
 <word term="refraction">refracted</word> vector when light from direction 
-L hits a surface with normal V separating regions with different indices of refraction.</li>
+L hits a surface with normal vector N separating regions with different indices of refraction.</li>
 
 </ul>
 
@@ -576,7 +577,7 @@ shader entry points.  The entry point functions to be used by a pipeline are spe
 in a pipeline descriptor (<localref href="webgpu.1.3"/>).</p>
 
 <p>A function is defined using <code>fn</code> followed by the function name, then the
-formal parameter list, followed optionally by <code>-></code>, and finally
+formal parameter list, followed optionally by <code>-></code> and the return type, and finally
 the function body, which must be enclosed in braces.  A user-defined function, other than
 an entry point function, can be called from anywhere in the same shader module.</p>
 
@@ -585,6 +586,7 @@ There is no nesting: a function definition cannot be inside another function def
 Array parameters must have a specified size.  Pointer types for parameters must be in
 the function or private namespace.  Function names can't be overloaded; that is,
 you can't have two functions with the same name, even if they have different parameter lists.
+(But some of the built-in functions are overloaded.)
 Also, a function cannot have the same name as a global variable.</p>
 
 <p>To finish this section, here are a few user-defined functions:</p>
@@ -595,7 +597,7 @@ Also, a function cannot have the same name as a global variable.</p>
 
 fn grayify( color : ptr&lt;function,vec4f> ) { // modify color in place
     let c = *color;
-    let gray = c.r * 0.3 + c.g * 0.11 + c.b * 0.59;
+    let gray = c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
     *color = vec4f( gray, gray, gray, c.a );  
 }
 

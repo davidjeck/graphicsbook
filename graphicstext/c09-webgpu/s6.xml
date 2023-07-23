@@ -74,7 +74,7 @@ However, I suspect that that optimization really needs to
 be tuned to a particular GPU structure.  For a WebGPU program that is designed
 to run on multiple platforms, I'm not sure how much optimization can be done.
 In any case, such optimization is beyond my expertise, and none of my examples
-use workgroups in a significant way.</p>
+use workgroups in a significant way.)</p>
 
 </subsection>
 
@@ -416,7 +416,7 @@ be used on the JavaScript side of the program.</p>
 <p>A compute shader can output data to a storage buffer.  A storage buffer is typically
 stored in GPU memory that is not accessible to JavaScript, so we need a way to copy
 the contents of the buffer into memory that JavaScript can access.  The solution
-is to use a buffer whose <code>usage</code> property includes <code>MAP_READ</code>
+is to use a second buffer whose <code>usage</code> property includes <code>MAP_READ</code>
 and <code>COPY_DST</code>.  Such buffers are often referred to as "staging buffers."
 The GPU can copy data into a staging buffer, and JavaScript can then "map" that
 staging buffer for reading.  Once JavaScript has retrieved the data from the
@@ -500,7 +500,7 @@ done in the following function:</p>
 
 <p>Note in particular the use of <code>stagingBuffer.unmap()</code> at the end.
 The buffer must be unmapped before it can be reused by the GPU.  If processing
-the data will take a non-trivial amount of time, it is a good idea to make a
+the data will take a nontrivial amount of time, it is a good idea to make a
 copy of the data and unmap the buffer before doing the processing.</p>
 
 <p>It is also possible to map a buffer for writing, to provide input to the GPU.

@@ -26,7 +26,7 @@ provide the <word>depth buffer</word> that is used to hold depth information abo
 pixels in the image, and you have to attach that buffer to the rendering <word>pipeline</word>.</p>
 
 <p>The sample program <sourceref href="webgpu/depth_test.html"/> uses the depth test in a 
-2D scene, which draws fifty colored disks with black outlines.  All of the disks are
+2D scene that draws fifty colored disks with black outlines.  All of the disks are
 drawn before all of the outlines.  The shader programs apply a different depth to each 
 disk and to each outline to ensure that the disks and outlines are seen to follow the
 correct back-to-front order, even though they are not drawn in that order.  See the
@@ -72,7 +72,7 @@ for this property.  Setting the <code>depthWriteEnabled</code> property
 to <code>true</code> means that when a new fragment passes the depth test, its
 depth value is written to the depth buffer.  In some applications, it's necessary
 to apply the depth test without saving the new depth value. This is sometimes
-done, for example, when drawing translucent objects (see <localref href="webgl3d.4.1"/>).</np>
+done, for example, when drawing translucent objects (see <localref href="webgl3d.4.1"/>).)</np>
 
 <p>Finally, when drawing the image, the depth buffer must be attached to the
 pipeline as part of the render pass descriptor:</p>
@@ -82,8 +82,7 @@ pipeline as part of the render pass descriptor:</p>
        clearValue: { r: 1, g: 1, b: 1, a: 1 },
        loadOp: "clear", 
        storeOp: "store",
-       view: textureViewForMultisampling,
-       resolveTarget: context.getCurrentTexture().createView()
+       view: context.getCurrentTexture().createView()
    }],
    depthStencilAttachment: {  // Add depth buffer to the colorAttachment
      view: depthTexture.createView(),
@@ -112,6 +111,18 @@ sample program makes this change before the second render pass:</p>
 
 <pre>renderPassDescriptor.depthStencilAttachment.depthLoadOp = "load";
 renderPassDescriptor.colorAttachments[0].loadOp = "load";</pre>
+
+<break/>
+
+<p>The sample program actually uses multisampling (<localref href="webgpu.2.5"/>), which requires a small
+change when creating the depth texture:</p>
+
+<pre>depthTexture = device.createTexture({
+    size: [context.canvas.width, context.canvas.height],
+    format: "depth24plus",
+    <newcode>sampleCount: 4, // Required when multisampling is used!</newcode>
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+});</pre>
 
 </subsection>
 
@@ -261,8 +272,8 @@ and the support in WGSL for matrix and vector math.
 The eye coordinates of the vertex are obtained by multiplying the 
 homogeneous object coordinate vector by the modelview matrix.  This gives the
 homogeneous (x,y,z,w) eye coordinates, which are converted to ordinary
-(x,y,z) coordinates by dividing the <code>vec3f</code> <code>eyeCoords.xyz</code>,
-by the w-coordinate, <code>eyeCoords.w</code>.  The output position, which must
+(x,y,z) coordinates by dividing the <code>vec3f</code> <code>eyeCoords.xyz</code>
+by the w-coordinate, <code>eyeCoords.w</code>.  The <code>position</code> output, which must
 be given in clip coordinates, is obtained by multiplying the eye coordinate
 vector by the projection matrix.</np>
 
@@ -287,7 +298,7 @@ program.  For that, it is convenient to use a JavaScript library that supports
 matrix and vector math.  For WebGL, we used glMatrix (<localref href="webgl3d.1.2"/>).
 For WebGPU, we need a different library, for several reasons.  One reason is that
 the range for z in clip coordinates in WGSL is from 0 to 1 while in <word>GLSL</word>,
-the range is from -1 to&nbsp;1.  This means that projections matrices will be
+the range is from -1 to&nbsp;1.  This means that projection matrices will be
 different in the two shading languages.  A&nbsp;second reason is that a 3-by-3
 matrix in WGSL contains 12 floats, because of alignment issues (<localref href="webgpu.3.1"/>),
 while in GLSL, a 3-by-3 matrix contains 9 floats.</p>
@@ -348,7 +359,7 @@ radians, <code>aspect</code> is the ratio of the width of the image to its heigh
 and <code>far</code> is the distance of the far clipping plane.
 This is essentially the same as the <code>gluPerspective()</code> function
 in OpenGL (<localref href="gl1geom.3.3"/>) except for measuring the angle in
-radians instead of degrees; equivalents of <code>glOrtho()</code>
+radians instead of degrees.  Equivalents of <code>glOrtho()</code>
 and <code>glFrustum()</code> are also available in wgpu-matrix.</np>
 
 <p>For the modelview matrix, it is usual to start with a viewing transformation.
@@ -474,7 +485,7 @@ matrix is at offset 512. (But that's information for the JavaScript side.)</np>
 is called by the fragment shader entry point function for each enabled light:</p>
 
 <pre>fn lightingEquation( light: LightProperties, material: MaterialProperties,
-                            eyeCoords: vec3f, N: vec3f, V: vec3f )-> vec3f {
+                            eyeCoords: vec3f, N: vec3f, V: vec3f ) -> vec3f {
        // N is normal vector, V is direction to viewer; both are unit vectors.
     var L : vec3f;  // unit vector pointing towards the light
     var R : vec3f;  // reflected light direction; reflection of -L through N

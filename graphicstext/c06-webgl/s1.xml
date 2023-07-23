@@ -451,7 +451,7 @@ by doing so.</p>
 <p>Turning now to attributes, the situation is more complicated, because an attribute can take a
 different value for each vertex in a primitive.  The basic idea is that the complete set of data 
 for the attribute is copied in a single operation from a JavaScript array into memory that is 
-accessible to the GPU.  Unfortunately, setting things up to make that operation possible is non-trivial.</p>
+accessible to the GPU.  Unfortunately, setting things up to make that operation possible is nontrivial.</p>
 
 <p>First of all, a regular JavaScript array is not suitable for this purpose.  For efficiency, we need
 the data to be in a block of memory holding numerical values in successive memory locations, and

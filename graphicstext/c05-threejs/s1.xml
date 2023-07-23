@@ -35,7 +35,7 @@ redistributed.  But if you plan to do any serious work with <i>three.js</i>, you
 the documentation on its web site about how to use it and how to deploy it.</p>
 
 <p>The core features of <i>three.js</i> are defined in a single large JavaScript file named
-"three.module.js", which can be found in a <i>build</i> directory in the three.js download.
+"three.module.js", which can be found in a <i>build</i> directory in the <i>three.js</i> download.
 There is also a smaller "minified" version, <i>three.module.min.js</i>, that contains the same definitions
 in a format that is not meant to be human-readable.  It is the minified version that is usually
 used on web pages.  In addition to this core, the <i>three.js</i> download has a directory containing many
@@ -147,7 +147,7 @@ import { GLTFLoader } from "addons/loaders/GLTFLoader.js";</pre>
 <np>The content of an "importmap" script is a <word>JSON</word> object.
 The import map here defines "three" to refer to the main
 <i>three.js</i> file, and it defines "addons/" to refer to the
-script directory.  The add-on files refer to the main <i>three.js</i>
+script directory.  The add-on modules refer to the main <i>three.js</i>
 module as "three", so that mapping is necessary.  The
 "addons/" mapping is actually not needed for my examples.</np>
 

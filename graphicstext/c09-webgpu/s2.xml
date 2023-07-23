@@ -26,7 +26,7 @@ can see the difference.</tex></p>
 
 <p>Instanced drawing makes it possible to draw multiple copies, or "instances," of the
 same primitive with a single function call.  Instanced drawing
-in <word>WebGL</word> 2.0 was covered <localref href="webgl.1.8"/>.
+in <word>WebGL</word> 2.0 was covered in <localref href="webgl.1.8"/>.
 The sample program <sourceref href="webgpu/instanced_draw.html"/>
 shows how to do it in WebGPU.  (Again, I urge you to read the
 comments in the source code for all sample programs!)</p>
@@ -422,7 +422,7 @@ fn vertMain(
     @builtin(instance_index) pointNum: u32
 ) -> VertexOutput { . . .</pre>
 
-<np>If this function is invoked by a call to <code>draw(vertexCt,instanceCT)</code> in
+<np>If this function is invoked by a call to <code>draw(vertexCt,instanceCt)</code> in
 a render pass encoder, the effect is similar to this pseudocode:</np>
 
 <pre>for (instance_index = 0; instance_index &lt; instanceCt; instance_index++)

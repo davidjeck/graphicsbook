@@ -106,7 +106,7 @@ is waiting for a result.)</np>
 "premultiplied" allows the <word term="alpha color component">alpha</word> 
 value of a pixel in the canvas to
 determine the degree of transparency of that pixel when the canvas
-is drawn on the web page.  The alternative value, "opaque" means that
+is drawn on the web page.  The alternative value, "opaque", means that
 the alpha value of a pixel is ignored, and the pixel is opaque.</p>
 
 <p>This initialization code does some error checking and can throw an
@@ -129,7 +129,7 @@ some computation for each pixel (or "fragment") that is part of the primitive.  
 WebGPU programmer must define functions to specify those computations.  Those functions
 are <word term="shader">shaders</word>.  To render an image, a WebGPU program must
 provide a vertex shader main function and a fragment shader main function.  In the documentation,
-those function are referred to as the vertex shader entry point and the fragment shader entry point.
+those functions are referred to as the vertex shader entry point and the fragment shader entry point.
 Shader functions and
 supporting code for WebGPU are written in <newword>WGSL</newword>, the WebGPU Shader Language.
 Shader source code is given as an ordinary JavaScript string. The
@@ -473,10 +473,10 @@ is the easiest way to copy the data into a GPU buffer.  For example the function
 
 <pre>device.queue.writeBuffer(vertexBuffer, 0, vertexCoords);</pre>
 
-<p>Copies the entire contents of the <code>vertexCoords</code> array
+<np>copies the entire contents of the <code>vertexCoords</code> array
 into <code>vertexBuffer</code>, starting at byte number 0 in the buffer.
 It is possible to a copy a subarray of a typed array to any position in the buffer.
-The general form is</p>
+The general form is</np>
 
 <pre>device.queue.writeBuffer(<bnf>buffer</bnf>,<bnf>startByte</bnf>,<bnf>array</bnf>,<bnf>startIndex</bnf>,<bnf>count</bnf>)</pre>
 
@@ -590,7 +590,7 @@ other options, multiple draw commands, and other commands.</np>
 <p>You should note that all of this has not actually done any drawing!
 It has just encoded the commands that are needed to do the drawing, and has
 added them to the command encoder.  The final step is to get
-the list of encoded commands from the command encoded and submit
+the list of encoded commands from the command encoder and submit
 them to the GPU for execution:</p>
    
 <pre>let commandBuffer = commandEncoder.finish();
@@ -659,10 +659,10 @@ fn fragmentMain(@location(0) fragColor : vec3f) -> @location(0) vec4f {
 the interpolated version of the <code>color</code> output from the vertex shader,
 even though the name is not the same.  In fact, the names don't matter at all;
 the association between the two values is specified by the <code>@location(0)</code>
-modifier on both the <code>color</code> vertex shader output and the <code>fragColor</code>
-fragment shader parameter.  Note that the meaning of <code>@location(0)</code>
+modifier on both the vertex shader output, <code>color</code>, and the 
+fragment shader parameter, <code>fragColor</code>.  Note that the meaning of <code>@location(0)</code>
 here is very different from the <code>@location(0)</code> annotation on
-the vertex shader <code>coords</code> parameter.  (Recall that a
+the vertex shader parameter, <code>coords</code>.  (Recall that a
 <code>@location</code> annotation on a vertex shader parameter corresponds
 to a <code>shaderLocation</code> in the vertex buffer layout on the JavaScript
 side, and it specifies where the values for that parameter come from.)</np>
