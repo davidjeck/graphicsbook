@@ -431,7 +431,7 @@ draws the disk outline using a triangle-strip primitive and shows how to use two
 in one command buffer.  From <localref href="webgpu.2.2"/>.</li>
 <li><sourceref href="webgpu/draw_multiple.html"/>  &mdash; Draws multiple outlined disks using different rendering
 passes for each disk.  Also illustrates using <code>copyBufferToBuffer()</code> to set
-the value of a uniform variable between rendering passes.  Also, <sourceref href="draw_multiple_2.html"/>
+the value of a uniform variable between rendering passes.  Also, <sourceref href="webgpu/draw_multiple_2.html"/>
 is a variation on the program that does the same thing using <code>writeBuffer()</code>,
 which requires a separate command encoder for drawing each disk.  From <localref href="webgpu.2.3"/>.</li>
 <li><sourceref href="webgpu/indices_in_shader.html"/> &mdash; An example of using the vertex index and the
@@ -455,7 +455,7 @@ to WebGPU.  It is an example of the implementation of hierarchical 3D graphics a
 From <localref href="webgpu.4.5"/></li>
 <li><sourceref href="webgpu/first_texture.html"/> &mdash; A first example of using textures in WebGPU.  The user
 can select among three different kinds of texture, applied to a triangle.  From <localref href="webgpu.5"/>.</li>
-<li><sourceref href="webgpu/textured_shapes.html"/> &mdash; Applies texture images to 3D shapes, with
+<li><sourceref href="webgpu/textured_objects.html"/> &mdash; Applies texture images to 3D shapes, with
 basic lighting.  From <localref href="webgpu.5"/>.</li>
 <li><sourceref href="webgpu/texture_from_canvas.html"/> &mdash; Takes the image for a texture from
 another canvas on the same page and applies it to 3D shapes.  The user can do some very simple drawing

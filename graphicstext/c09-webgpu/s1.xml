@@ -155,7 +155,7 @@ similar in many ways to <word>GLSL</word>, the shading language for WebGL,
 but its variable and function declarations are very different.  I will give
 just a short discussion here, to help you understand the relationship between
 the JavaScript part and the WGSL part of a WebGPU application.  Here is the short
-shader source code from our <sourceref href="webgpu/basic_webGPU_1.html">first WebGPU example</sourceref>.
+shader source code from our <sourceref href="webgpu/basic_webgpu_1.html">first WebGPU example</sourceref>.
 It is defined (on the JavaScript side) as a template string, which can extend over
 multiple lines:</p>
 
