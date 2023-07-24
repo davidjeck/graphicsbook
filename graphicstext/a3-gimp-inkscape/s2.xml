@@ -15,9 +15,8 @@ ignored by other programs.</p1>
 
 <p>Inkscape can be downloaded from its web site at <a href="https://inkscape.org">inkscape.org</a>.
 It is available for Windows, Mac&nbsp;OS, and Linux. 
-The latest version as of July, 2021 is 1.1.  This section was written based on Inkscape&nbsp;0.92.
-Although there are some differences in the newer version, especially in the management of dialog boxes,
-everything here applies to both versions.</p>
+The latest version as of July, 2023 is 1.3.  This section was written based on Inkscape&nbsp;1.1,
+but it is still valid for version&nbsp;1.3.</p>
 
 <break/>
 
@@ -35,10 +34,10 @@ You can zoom in by typing "+" and zoom out by typing&nbsp;&leftquote;-".  There 
 submenu in the "View" menu.</p>
 
 <p>A toolbar that contains the Inkscape drawing tools runs along the left edge of the window.  
-You might not see exactly the same set of tools that is shown here.
+You might not see exactly the same set of tools that is shown here, depending the Inkscape version that you are using.
 The tools that you  are most likely to use are labeled in this illustration:</p>
 
-<img src="inkscape-tools.png" width="202" height="485" tex="inkscape-tools.eps" texscale="0.75"/>
+<img src="inkscape-tools.png" width="203" height="388" tex="inkscape-tools.eps" texscale="0.75"/>
 
 <np>You can also get a description of a tool by hovering your mouse over its icon.  (The same is true for most
 interface elements.)  It's a good idea to learn some of the keyboard equivalents, such
@@ -81,8 +80,8 @@ To make them go away, you can switch to the Select Tool.</np>
 and/or <word term="filling a shape">filled</word>.  There is a dialog box for setting
 stroke and fill properties, which you can open by selecting "Fill and Stroke" from the
 "Object" menu.  The dialog box applies to the currently selected object or objects.
-It has tabs for setting the stroke
-and the fill colors.  There is also a "Stroke Style" tab, where you can set the stroke
+It has tabs for setting the stroke color
+and the fill color.  There is also a "Stroke Style" tab, where you can set the stroke
 width and other attributes. There is a shortcut for setting colors, using
 the "Color Palette" near the bottom of the window:</p>
 
@@ -101,13 +100,13 @@ learn how to use Inkscape!  Here, for example, is part of the Star/Polygon tool 
 which appears when the Star/Polygon tool is being used and applies to the star/polygon shape
 that is being edited:</p>
 
-<img src="inkscape-options.png" width="614" height="156" tex="inkscape-options.eps" texscale="0.7"/>
+<img src="inkscape-options.png" width="584" height="147" tex="inkscape-options.eps" texscale="0.75"/>
 
 <np>As you can probably see, it's not possible to use this tool effectively unless you
 are aware of its options and how to change them.  Without using the options, you can't
 even change a shape from the default star-shape into a polygon.  The Star/Polygon
 tool can produce a wide variety of interesting shapes by changing the "Rounded" and
-"Randomized" options for a star.</np>
+"Randomized" options.</np>
 
 <break/>
 
@@ -129,11 +128,11 @@ at the ends of the handles to adjust the shape.  (This is all very much like edi
 Bezier paths in Gimp.) You should note these four button icons in the tool options bar for the Control
 Point Editing Tool:</p>
 
-<img src="inkscape-handle-types.png" width="128" height="47" tex="inkscape-handle-types.eps" texscale="0.7"/>
+<img src="inkscape-handle-types.png" width="159" height="37" tex="inkscape-handle-types.eps" texscale="0.75"/>
 
 <np>Click one of these buttons while a node is selected to set how the handles for
 that node work.  The left button allows you to freely adjust the two handles separately.
-This is the default setting.  With that setting, you get a sharp point or corner.
+This is the default setting.  With that setting, you can get a sharp point or corner.
 The second button forces the control points and the node to lie on a line, giving a shape
 that is smooth at that node. The third button makes an even smoother shape by forcing the two control handles
 to have the same length.</np>
@@ -147,14 +146,16 @@ more to learn.  I will mention just a few more features.</p>
 with several sets of "symbols" that can be added to an image. 
 A symbol in Inkscape is just a predefined image.  For example, there is a set of "Word Balloons" and
 a set of "Logic symbols" for use in circuit diagrams.  A popup menu in the dialog box selects
-the symbol set.  You can drag an image from a symbol set into the drawing area of the window.
+the symbol set.  (Note that the default selection in that popup menu will probably no symbols at all.)
+You can drag an image from a symbol set into the drawing area of the window.
 Once it's part of the drawing, you can resize and edit it just like other shapes.  Remember that
 one of the advantages of vector graphics is that shapes can be resized without any loss of quality, so you 
 get nice looking symbols at any size!  Also, in general, you can change the stroke and fill properties
 of a symbol.</p>
 
 <p>In fact, you can add arbitrary images to the scene, using the "Import" command in the
-"File" menu.  Once an image is part of the scene, it can be scaled and rotated just like
+"File" menu.  You can also simply drag an image onto the Inkscape window to add it to the
+scene.  Once an image is part of the scene, it can be scaled and rotated just like
 any other object.</p>
 
 <p>Here's an example of a shape that you can make as a "difference" of

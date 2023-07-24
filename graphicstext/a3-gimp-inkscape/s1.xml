@@ -12,41 +12,29 @@ documentation and tutorials on Gimp, starting with its "Help" menu.</p1>
 
 <p>Gimp can be downloaded from <a href="https://www.gimp.org">https://www.gimp.org</a>.  It is 
 available for Linux, Mac&nbsp;OS, and Windows. (For Linux, consider installing it from your
-distribution's software repository.)  This section was originally written for
-Gimp&nbsp;2.8.  The current stable version as of July, 2021 is Gimp&nbsp;2.10,
-and version 3.00 is under development.  If you are using version 2.10, you will see additional
-tools and options, but everything covered in this section is still valid.  I will note
-a few differences as we go along.
-User manuals are available on-line at <a href="https://docs.gimp.org/2.8/en/">https://docs.gimp.org/2.8/en</a>
-and <a href="https://docs.gimp.org/2.10/en/">https://docs.gimp.org/2.10/en/</a>.
+distribution's software repository.)  This section uses Gimp&nbsp;2.10,
+the current version in July, 2023. Version 3.00 is under development.
+A user manual is available on-line at
+<a href="https://docs.gimp.org/2.10/en/">https://docs.gimp.org/2.10/en/</a>.
 </p>
 
-<p><b>About Gimp 2.8</b>: Note that when you start Gimp 2.8 for the first time, it will be in 
-"multi-window mode."  I find it much easier to use "single-window mode,"
-which organizes all of Gimp's open images and dialogs into one window.
-To use it, just  enable the option "Single-Window Mode" in the "Windows" menu.
-You will then see a window with a central area where you can work on
-images, with dialogs along the left and right edges.  The central
-editing area uses tabs when multiple images are open. 
-If you ever mess up the original window layout, it can be difficult to
-figure out how to get it back.  To do that:  Select the "Preferences" command
-from the menu.  Go to the "Window Management" section
-of the preferences.  Click "Reset Saved Window Positions to Default
-Values."  Restart Gimp for the changes to take effect.  And finally,
-switch back to single-window mode by selecting the option in the "Windows"
-menu.</p>
-
-<p><b>About Gimp 2.10</b>:  Gimp 2.10 will start up in single-window mode by
-default, but there is still an option for multi-window mode in the "Windows" menu
-if you prefer that mode.
-However, I would recommend changing some interface preferences.  Open the
+<p>I&nbsp;recommend changing some of Gimp's interface preferences.  Open the
 "Preferences" dialog from the "Edit" menu (or from the
 "Gimp&nbsp;2.10" menu on Mac), and look under the "Interface" section in the list on the
-left.  Under the "Toolbox" section, I strongly recommend turning off the
+left.  Under the "Toolbox" section, I recommend turning off the
 "Use tool groups" option.  This will let you see all the tools at once, similar
 to what is shown in the image below, rather than hiding many of them in groups.
 Under "Theme" in the "Interface" section, I prefer the "Light" or "System"
-theme.  And under "Icon Theme", I much prefer "Color" or "Legacy".</p>
+theme.  And under "Icon Theme", I much prefer "Color" or "Legacy".
+The Gimp screen captures in this section use "Color" icons and the "Light"
+theme. Gimp 2.10 will start up in single-window mode by
+default, but there is an option for multi-window mode in the "Windows" menu
+if you prefer that mode.</p>
+
+<p>It is easy to accidently change the configuration of the Gimp window.  If that
+happens, you can reset the configuration.  Look in the Preferences
+under "Window Management", and click "Restore Saved Window Positions to Default
+Values".</p>
 
 <break/>
 
@@ -87,23 +75,23 @@ The appearance of the Toolbox on your computer will depend on the version
 of Gimp and on the theme that you are using, but all the tools shown here should
 be available:</p>
 
-<img src="gimp-tools.png" width="459" height="286" tex="gimp-tools.eps" texscale="0.7"/>
+<img src="gimp-tools.png" width="447" height="354" tex="gimp-tools.eps" texscale="0.7"/>
 
 
 <np>Below the Toolbox is the "Tool Options" dialog, which contains
 options for the drawing tool that is currently selected. The contents of
 the dialog change when you select a new tool.  Here, for example, are the options for
 the Brush tool, which is used for painting on an image in the usual sense.
-(In Gimp&nbsp;2.10, you will see some additional options.)
 The Brush is probably the most basic and useful tool:</np>
 
-<img src="gimp-tool-options.png" width="467" height="518" tex="gimp-tool-options.eps" texscale="0.7"/>
+<img src="gimp-tool-options.png" width="476" height="567" tex="gimp-tool-options.eps" texscale="0.7"/>
 
 
 <p>You'll notice that Gimp does not have tools for drawing shapes
 such as rectangles and circles.  However, it is possible to draw
-such shapes using <i>selections</i>.  Selection tools
-can be used to select regions in the
+such shapes using <i>selections</i>.</p>
+
+<p>Selection tools can be used to select regions in the
 image.  For example, click the Rectangle tool, and drag the
 mouse on the image to select a rectangular region.  
 One of the settings in the "Tool Options" dialog for the Rectangle Select tool allows you
@@ -157,12 +145,8 @@ And you can get much smoother-looking gradients by turning on the "Adaptive supe
 <p>To apply a gradient to an image, press the left mouse button at the point where you want
 the color sequence to start, drag the mouse while holding down the button,
 and release the button at the point where you want the color sequence to end.
-Remember that you can limit the area affected by the gradient by
-making a selection; that is, you can fill a shape with a gradient by creating the shape as a selection
-and then applying the gradient tool.</p>
-
-<p>The gradient tool is somewhat changed in Gimp 2.10.  By default, after you draw
-a gradient, a line remains on the screen with dots along the line showing the
+After you draw
+the gradient, a line remains on the screen with dots along the line showing the
 gradient's color stops.  You can edit the gradient by dragging the dots. Or click
 one of the dots and you will get a dialog where you can edit the color.  Press return
 to finish editing.  This can get annoying if you don't actually want to edit the
@@ -353,15 +337,15 @@ layer is active.  It can be especially annoying if the active layer is hidden in
 visible image or has been made completely transparent!</p>
 
 <p>Layers are listed in the Layer Dialog, one of the tabbed dialogs in the 
-upper right or lower right corner of
+lower right corner of
 the Gimp window. In the list of layers, the active layer is highlighted.  Click a different
-layer in the list to make it active.  Right-click the dialog for a popup menu of commands for
+layer in the list to make that one active.  Right-click the dialog for a popup menu of commands for
 working with layers.  Some of the commands are duplicated in the "Layer" menu.
 If you right-click one of the layers in the list, the popup menu 
 will also include commands that apply to that individual layer.  Here is an illustration of the
 Layer Dialog from a project that uses four layers:</p>
 
-<img src="gimp-layers.png" width="455" height="415" tex="gimp-layers.eps" texscale="0.8"/>
+<img src="gimp-layers.png" width="422" height="388" tex="gimp-layers.eps" texscale="0.8"/>
 
 <p>A new image will only have one layer.  You can add a new layer with a command in the
 "Layer" menu or in the popup menu that you get by right-clicking the Layer Dialog.  New layers
