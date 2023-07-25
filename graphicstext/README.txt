@@ -1,14 +1,21 @@
          Introduction to Computer Graphics, Version 1.4, Summer 2023
 
-This is the README file for the full graphicsbook source files.
-Note that using the source download will require a fair amount 
-of expertise as well as some additional software (TeX, Java, and
-Xalan-J).
+This is the README file for the full graphicsbook source files,
+which are available in the GitHub repository
+
+    https://github.com/davidjeck/graphicsbook
+    
+The free textbook itself can be found on the web at:
+
+    http://math.hws.edu/graphicsbook/
+
+Note that using the sources will require a fair amount of
+expertise as well as some additional software (LaTeX, Java,
+Xalan-J, and the bash shell).
                                                     
-Directory graphicstext-1.4-source contains the source files that are used 
+The graphicstext directory contains the source files that are used 
 to produce the web site and PDF versions of "Introduction to Computer 
-Graphics", Version 1.4.  This free textbook can be found on the web at:
-http://math.hws.edu/graphicsbook/
+Graphics", Version 1.4.  
 
       Everything that I wrote in this directory is released under a 
       Creative Commons Attribution-NonCommercial-ShareAlike 4.0 License,
@@ -21,7 +28,10 @@ http://math.hws.edu/graphicsbook/
       provided that you include a clear attribution  to the author of 
       the original work and make clear any modifications that you 
       have made.  The attribution should include a reference to the 
-      web site, http://math.hws.edu/graphicsbook.  
+      web site, http://math.hws.edu/graphicsbook.  More specifically,
+      this material is released under a creative commons attribution,
+      non-commercial, share-alike license:
+      http://creativecommons.org/licenses/by-nc-sa/4.0/
       
       ADDITIONALLY, permission is given to use source code from this 
       work in programming projects without restriction and without
@@ -45,9 +55,16 @@ of expertise in a variety of technologies.  The source was not
 originally designed for publication and comes with minimal instructions
 and help.  It is provided as-is, with no guarantee of usefulness or
 usability.
+                              * * *
+                         
+To use the source files, you will need to edit the script named
+"export-source.sh" in the "graphicstext" folder to adapt it to your
+own environment.  When it is run, it will create a folder named
+"graphicstext-1.4-source", which is the working directory for
+producting the PDF and web site versions of the book.
 
-To use the source files, you will need Java and the Xalan-J Java 
-XSLT processor (tested with version 2.7.2).  To build the PDF versions,
+The build the book, you will need Java and the Xalan-J Java XSLT 
+processor (tested with version 2.7.2).  To build the PDF versions,
 you will also need the TeX typesetting system -- in particular the
 latex and dvipdf commands.  
 
@@ -55,7 +72,7 @@ For information on getting TeX, see https://www.latex-project.org/get/.
 The build scripts for the PDF versions assume that the command
 "latex" is available on your system, and also that "dvipdf" is
 available.  Alternative command names, or full paths to the commands, can 
-be set by editing the script BUILD-env.sh and providing new definitions 
+be set by editing the script "BUILD-env.sh" and providing new definitions 
 for the appropriate variables.
 
 Xalan can be obtained from https://xalan.apache.org/ with downloads
@@ -99,6 +116,10 @@ finished successfully.
 Here is a little more information for people who would like
 to try producing modified versions of the textbook...
 
+The original "graphicstext" folder is actually a project for the
+Eclipse IDE.  If you would like to edit the sources in Eclipse,
+you should install the Eclipse XML tools.
+
 The XML files that define the sections of the various chapters
 in the book can be found in one directory per chapter.  The
 directories are named c1-introduction, c2-graphics2d, c3-gl1geom,
@@ -108,7 +129,9 @@ the book.  Most of the source code examples are in the
 sources directory, but the in-line demos for the web site
 are in the demos directory, and Java source code is in 
 directories src-java2d and src-jogl.  JOGL jar files, which
-are required for OpenGL in Java, are in the directory jogl-support.  
+are required for OpenGL in Java, are in the directory jogl-support.
+To use them, you will have to add them to the project, as
+described in Section 3.6.2 in the book.
 
 The syntax of the XML files is defined by the DTD file,
 graphicstext.dtd.  This is a fairly simple, home-brewed DTD.

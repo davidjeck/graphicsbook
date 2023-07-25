@@ -21,19 +21,23 @@ In the web site download, they can be found in the folder named <i>demos</i>.
 
 <p>(Note: Examples and demos for <word>HTML canvas</word> graphics, <word>three.js</word>, <word>WebGL</word>, and
 <word>WebGPU</word>
-are html files, which can be opened in a web browser.  Many of the html programs use images and other files.
-In certain browsers, the  programs that use such resources will not work when the html files
-are loaded from a local hard drive.  That is, they will fail in some web browsers when run
+are html files, which can be opened in a web browser.  To see the source code, you
+can open the file in a plain text editor, or you can open it in a Web browser and
+use the browser's "View Source" command. Many of the html programs load graphical
+models and other files.
+In most browsers, the  programs that use such resources will not work when the html files
+are loaded from a local hard drive.  That is, they will fail in those web browsers when run
 from the <i>source</i> or <i>demo</i> folder in the web site download of this book.
-The programs should work OK when loaded through a web server.  It might be possible to configure
-your web browser to use resources in local files.)</p>
+The programs should work OK when loaded through a web server.  It is possible to run
+a web server locally.  It might be possible to configure your web browser to use resources 
+from local files, but it is generally not recommended to browse the web with that setting.)</p>
 
 <subsection title="Java Graphics2D Examples" id="source.1">
 
 <p>There are a few examples in <localref href="graphics2d.4"/> and 
 <localref href="graphics2d.5"/> that uses the 2D graphics API that is part of Java's Swing GUI toolkit.
 In the web site download, the source code for these examples can be found
-in the folder named <i>java2d</i> inside the <i>source</i> folder.  Each example
+in the folder named <i><sourceref href="java2d/">java2d</sourceref></i> inside the <i>source</i> folder.  Each example
 is a single file that can be compiled to produce an application; no
 additional Java files are needed.</p>
 
@@ -75,7 +79,8 @@ look at the web page in a browser to see what it does.  However, you are also me
 the source code.  And the first four examples are meant to be used as a basis for your own
 experimentation.  (Note that all of the live demos in <localref href="graphics2d"/> use
 the canvas API, but you are not necessarily meant to understand the source code of the
-demos.)  In the web site download of this book, you can find these examples in the <i>canvas2d</i> 
+demos.)  In the web site download of this book, you can find these examples in the 
+<i><sourceref href="canvas2d/">canvas2d</sourceref></i> 
 folder inside the <i>source</i> folder.</p>
 
 <ul>
@@ -108,7 +113,8 @@ examples can be opened in a web browser to see the images they produce.  View th
 for the web page to see the program that produces the image.  You can also open the files
 in a text editor to read the source.  Some of the examples produce
 animated images.  SVG images should work in almost all modern web browsers.
-These examples can be found in the <i>svg</i> folder inside the <i>source</i> folder.</p>
+These examples can be found in the <i><sourceref href="svg/">svg</sourceref></i>
+folder inside the <i>source</i> folder.</p>
 
 <ul>
 <li><sourceref href="svg/first-svg-example.svg">first-svg-example.svg</sourceref> is a very
@@ -143,9 +149,11 @@ and in the JavaScript demo <demoref href="c2/cart-and-windmills.html"/>.</li>
 Examples in those chapters primarily use the C API for OpenGL.  However, the Java API,
 <word term="JOGL">JOGL</word>, is also discussed.  Most program examples are
 available in both the C and the Java APIs.  The JOGL versions can be found in the
-directory named <i>jogl</i> inside the <i>source</i> directory.  The C versions, which
+directory named <i><sourceref href="jogl/">jogl</sourceref></i> inside the 
+<i>source</i> directory.  The C versions, which
 use the <word>GLUT</word> library to create and manage OpenGL windows, can be 
-found in the directory named <i>glut</i> inside <i>source</i>.  (Many of these
+found in the directory named <i><sourceref href="glut/">glut</sourceref></i> 
+inside <i>source</i>.  (Many of these
 programs use a "<word>camera</word>" API defined in <sourceref href="jogl/Camera.java"/>
 for Java and in <sourceref href="glut/camera.c"/> and <sourceref href="glut/camera.h"/> 
 for&nbsp;C.)</p>
@@ -154,7 +162,8 @@ library that implements a small subset of the C API for OpenGL&nbsp;1.1
 on top of WebGL&nbsp;1.0.  Information about
 glsim can be found in <sourceref href="glsim/glsim-doc.html"/>.  Some of 
 the program examples are available in <word>HTML</word> versions that use the <i>glsim</i>
-library.  They can be found in the <i>glsim</i> directory inside the <i>source</i> directory.</p>
+library.  They can be found in the <i><sourceref href="glsim/">glsim</sourceref></i> 
+directory inside the <i>source</i> directory.</p>
 
 <ul>
 <li><sourceref href="glut/first-triangle.c"/>, <sourceref href="jogl/FirstTriangle.java"/>
@@ -237,8 +246,8 @@ of the web site download.  All of the examples use the JavaScript file
 <sourceref href="threejs/script/three.module.min.js">three.module.min.js</sourceref>, 
 which is a "minified" version of the library, not meant for human readers.  
 A&nbsp;human-readable version, <sourceref href="threejs/script/three.module.js">three.module.js</sourceref>
-is also available.  The examples also use other three.js scripts, which can be found in the
-<sourceref href="threejs/script/">script</sourceref> inside the <i>threejs</i> folder.
+is also available.  The examples also use other <i>three.js</i> scripts, which can be found in the
+<sourceref href="threejs/script/">script</sourceref> folder inside the threejs folder.
 The version is <i>three.js</i> Release 154.  <i>Three.js</i> is an open-source project.
 It can be downloaded from <a href="http://threejs.org">threejs.org</a>.</p>
 
@@ -410,7 +419,9 @@ From <localref href="webgl3d.5"/>.</li>
 scratch to incorporate some of the features of more modern APIs such as 
 <word>Vulkan</word>, <word>Direct3D</word>, and <word>Metal</word>.  It is covered
 in <localref href="webgpu"/>.  These programs require a web browser that supports WebGPU.
-In a download of the web site, they can be found in the directory named <i>webgpu</i> in
+As of July, 2023, WebGPU is enabled by default in the Chrome and Edge browsers on Windows
+and MacOS.  In some other browsers, it is an experimental feature that can be enabled by the user.
+In a download of the web site, they can be found in the directory named <i><sourceref href="webgpu/">webgpu</sourceref></i> in
 the <i>source</i> directory.</p>
 
 <ul>
@@ -423,7 +434,7 @@ adding a second parameter to the vertex shader program. The first program does t
 vertex buffers; the second, by using a single vertex buffer with interleaved values for the two
 input parameters.  From <localref href="webgpu.1.6"/>.</li>
 <li><sourceref href="webgpu/instanced_draw.html"/>  &mdash;  Uses <word>instanced drawing</word> to draw multiple colored 
-disks using a single call to draw.  Shows how to use instance attributes in 
+disks using a single call to <code>draw()</code>.  Shows how to use instance attributes in 
 <word term="vertex buffer">vertex buffers</word>.  From <localref href="webgpu.2.1"/>.</li>
 <li><sourceref href="webgpu/indexed_draw.html"/>  &mdash;  Uses the <code>drawIndexed()</code> method to 
 draw a single disk as an <word>indexed face set</word> using a triangle-list primitive.  Also
@@ -454,7 +465,7 @@ From <localref href="webgpu.4.2"/></li>
 to WebGPU.  It is an example of the implementation of hierarchical 3D graphics and of the OpenGL lighting model.
 From <localref href="webgpu.4.5"/></li>
 <li><sourceref href="webgpu/first_texture.html"/> &mdash; A first example of using textures in WebGPU.  The user
-can select among three different kinds of texture, applied to a triangle.  From <localref href="webgpu.5"/>.</li>
+can select among three different kinds of texture, applied to a square.  From <localref href="webgpu.5"/>.</li>
 <li><sourceref href="webgpu/textured_objects.html"/> &mdash; Applies texture images to 3D shapes, with
 basic lighting.  From <localref href="webgpu.5"/>.</li>
 <li><sourceref href="webgpu/texture_from_canvas.html"/> &mdash; Takes the image for a texture from
@@ -473,10 +484,10 @@ using two "r8unorm" textures, one used for sampling in the shader and one used a
 for the render pipeline.  From <localref href="webgpu.5.5"/>.</li>
 <li><sourceref href="webgpu/diffusion.html"/> &mdash; Uses compute shaders to run a simulation
 of Brownian motion.  White particles move randomly.  When they hit a yellow or cyan particle,
-they change color and stop moving.  Over time, an interesting dendrite-like pattern will forms.
+they change color and stop moving.  Over time, an interesting dendrite-like pattern will form.
 From <localref href="webgpu.6.3"/>.</li>
 <li><sourceref href="webgpu/map_buffer_for_read.html"/> &mdash; Illustrates reading data from a GPU buffer
-into the JavaScript side of the program.  The application (which is really not the point or the exercise)
+into the JavaScript side of the program.  The application (which is really not the point of the exercise)
 is to use the trapezoid rule to approximate a definite integral.  From <localref href="webgpu.6.4"/>.</li>
 <li><sourceref href="webgpu/viewport_and_scissor.html"/> &mdash; Another moving disk animation, showing
 four copies of the scene in different viewports.  A scissor rect is also applied in two of the viewports.
@@ -487,7 +498,7 @@ the <code>blend</code> property of the target in a render pipeline.  From <local
 in a render pipeline by letting the user select which color channels to write. From <localref href="webgpu.7.5"/>.</li>
 <li><sourceref href="webgpu/polyhedra.html"/> &mdash; Lets the user view several polyhedra.  Demonstrates depth bias in 
 a render pipeline by drawing the faces of the polyhedra with a depth bias, to make sure that parts of the edges
-are not hidden by the faces.  From <localref href="webgpu.7.5"/>.</li>
+are not hidden by the faces.  Also uses face culling. From <localref href="webgpu.7.5"/>.</li>
 </ul>
 </subsection>
 
@@ -508,8 +519,7 @@ files on which it depends.</p>
 <p>The demos from <localref href="graphics2d"/> use the 2D canvas graphics API,
 which will work in almost all modern web browsers, 
 Demos from Chapters&nbsp;3 through&nbsp;8 use WebGL, which will also work with almost all
-modern desktop browsers, and many browsers
-on mobile devices.  (However, WebGL might still have
+modern web browsers.  (However, WebGL might still have
 problems in some of these browsers on some machines.)  All demo programs that use
 WebGL will work with WebGL&nbsp;1.0.  The demos in Chapter&nbsp;9 require
 a web browser that supports WebGPU.</p>
