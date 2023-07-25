@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION='graphicstext-1.4-work'
+VERSION='graphicstext-1.4'
 PROJECT='graphicstext'
 
 SOURCE_DIR='/home/eck/git/graphicsbook'
