@@ -4,12 +4,13 @@
 <section id="introduction.3" title="Hardware and Software">
 
 <p1>We will be using OpenGL as the primary basis for 3D graphics programming.
-The original version of OpenGL was released in 1992 by a company named
+The original version of <word>OpenGL</word> was released in 1992 by a company named
 Silicon Graphics, which was known for its graphics workstations&mdash;powerful,
 expensive computers designed for intensive graphical applications.  (Today,
-you probably have more graphics computing power on your smart phone.)  OpenGL
+you have more graphics computing power on your smart phone.)  OpenGL
 is supported by the graphics hardware in most modern computing devices, including
-desktop computers, laptops, and many mobile devices.  This section will give
+desktop computers, laptops, and many mobile devices.  In the form of <word>WebGL</word>,
+it is the used for most 3D graphics on the Web.  This section will give
 you a bit of background about the history of OpenGL and about the graphics 
 hardware that supports it.</p1>
 
@@ -38,22 +39,24 @@ OpenGL in the sense that they can understand OpenGL commands, or at least
 that OpenGL commands can efficiently be translated into commands that the
 GPU can understand.</p>
 
-<p>OpenGL is not the only graphics API.  The best-known alternatives are probably
-the proprietary APIs used by Apple and Microsoft.  Apple's MacOS uses an API known
-as Metal, while Microsoft Windows uses Direct3D.  Nevertheless, OpenGL
-can still be used on MacOS and Windows.  Furthermore, a newer open API named
-Vulkan has been defined as a replacement for OpenGL itself.
-Vulkan is a complex, low-level
-API designed more for speed and efficiency rather than ease-of-use, and it will likely
-not completely replace OpenGL for some time, if ever.  Metal, Direct3D, and Vulkan
-are not covered in this textbook.  We are using OpenGL since it provides an easier
-introduction to 3D graphics and because it is still the basis for 3D graphics in
-Web browsers. </p>
+<p>OpenGL is not the only graphics API.  In fact, it is in the process of
+being replaced by more modern alternatives, including <word>Vulkan</word>
+an open API from the same group that is responsible for OpenGL.  There
+are also proprietary APIs used by Apple and Microsoft: <word>Metal</word>
+and <word>Direct3D</word>.  As for the Web, a new API called <word>WebGPU</word>
+has been under development for some time and is already implemented in
+some Web browsers.  These newer APIs are complex and low-level.
+They are designed more for speed and efficiency rather than ease-of-use.  Metal, 
+Direct3D, and Vulkan are not covered in this textbook, but WebGPU
+is introduced in <localref href="webgpu"/>.  For most of the book, we will
+use OpenGL, because it provides an easier
+introduction to 3D graphics, and WebGL, because it is still the major
+API for 3D graphics in Web browsers.</p>
 
 <break/>
 
 <p>I have said that OpenGL is an API, but in fact it is a series of APIs that have
-been subject to repeated extension and revision.  The current version, in 2021,
+been subject to repeated extension and revision.  In 2023, the current (and perhaps final) version
 is 4.6, which was first released in 2017.  It is very different from the 1.0 version from 1992.
 Furthermore,
 there is a specialized version called OpenGL&nbsp;ES for "embedded systems" such

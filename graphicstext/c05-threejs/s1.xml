@@ -180,7 +180,8 @@ properties of the scene graph between frames.</p>
 Three of the most basic are
 <classname>THREE.Scene</classname>, <classname>THREE.Camera</classname>,
 and <classname>THREE.WebGLRenderer</classname>.  (There are actually several renderer
-classes available.  <classname>THREE.WebGLRenderer</classname> is by far the most common.)
+classes available.  <classname>THREE.WebGLRenderer</classname> is by far the most common.
+A&nbsp;renderer for <word>WebGPU</word> is available but is still under development.)
 A&nbsp;<i>three.js</i> program
 will need at least one object of each type.  Those objects are often stored in global variables</p>
 

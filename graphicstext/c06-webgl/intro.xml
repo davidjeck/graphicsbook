@@ -30,8 +30,8 @@ as <i>glColor*</i> or <i>glNormal*</i> to specify attributes of vertices.
 WebGL 1.0 is supported in almost every web browser.  (On some devices, WebGL might
 be disabled because of hardware limitations.)</p>
 
-<p>WebGL 2.0, which is based on OpenGL ES 3.0, is already supported in many devices, but is
-still not as widely supported as the 1.0 version.  Most programs written for WebGL&nbsp;1.0 will
+<p>WebGL 2.0, which is based on OpenGL ES 3.0, is now supported on almost all devices that
+suport WebGL&nbsp;1.0.  Most programs written for WebGL&nbsp;1.0 will
 also work under WebGL&nbsp;2.0, so almost everything that you learn about the 1.0 version
 will carry over to the newer version.  In this textbook, I will concentrate on WebGL&nbsp;1.0,
 but I will also cover some of the new features of WebGL&nbsp;2.0.
