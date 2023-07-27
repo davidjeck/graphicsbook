@@ -7,13 +7,15 @@
 <p>This page contains links to source code for the programs that are used as examples in 
 <a href="../index.html">this&nbsp;book</a>.
 In the web site download of the book, the source code examples can be found in the folder
-named <i>source</i>.  This page also contains a list of links to all of the "live demos" that
+named <i>source</i>.  
+This page also contains a list of links to all of the "live demos" that
 are used in the book; they can be found in the folder named <i>demos</i>.</p>
 </webdiv>
 <texdiv>
 <p>This appendix contains a list of the programs that are used as examples in this book.
 If you have downloaded the web site version of the book, you can find the source code examples in the folder
-named <i>source</i>.  This page also contain a list of the "live demos" that are used in the book.
+named <i>source</i>.  
+This page also contain a list of the "live demos" that are used in the book.
 In the web site download, they can be found in the folder named <i>demos</i>.
 (The web site download is available on book's web page,
 <a href="http://math.hws.edu/graphicsbook">http://math.hws.edu/graphicsbook</a>.)</p>
@@ -422,7 +424,8 @@ in <localref href="webgpu"/>.  These programs require a web browser that support
 As of July, 2023, WebGPU is enabled by default in the Chrome and Edge browsers on Windows
 and MacOS.  In some other browsers, it is an experimental feature that can be enabled by the user.
 In a download of the web site, they can be found in the directory named <i><sourceref href="webgpu/">webgpu</sourceref></i> in
-the <i>source</i> directory.</p>
+the <i>source</i> directory.  Some of the examples use <i>wgpu-matrix</i> (<localref href="webgpu.4.4"/>)
+and other scripts and resources that can be found in the same directory</p>
 
 <ul>
 <li><sourceref href="webgpu/basic_webgpu_1.html"/> &mdash; A first WebGPU example, which just

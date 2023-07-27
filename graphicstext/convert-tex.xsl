@@ -43,7 +43,7 @@
 \setlength{\oddsidemargin}{0.25 true in}
 \setlength{\evensidemargin}{0 true in}
 \setlength{\textheight}{8.9 true in}
-\pretolerance=1000
+\pretolerance=2000
 \tolerance=8000
 \input texmacros
 \title{Introduction to Computer Graphics}

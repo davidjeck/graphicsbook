@@ -194,7 +194,7 @@ zero and <code>depthMax</code> will be one.  For example, when drawing to
 an 800-by-600 pixel canvas, you can map the scene to the right half of
 the canvas using</np>
 
-<pre>passEncoder.setViewport( 400, 0, 400, 300, 0, 1 );</pre>
+<pre>passEncoder.setViewport( 400, 0, 400, 600, 0, 1 );</pre>
 
 <p>In addition, you can restrict drawing to a smaller rectangle within the
 viewport using <code>setScissorRect()</code>, which has the

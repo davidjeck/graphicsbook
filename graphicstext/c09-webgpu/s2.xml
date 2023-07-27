@@ -255,7 +255,7 @@ a rendering pass, we need to encode two render passes:</p>
 }</pre>
 
 <np>Note that for the first render pass, the <code>loadOp</code> is "clear",
-since we what to fill the image with the background color before rendering
+since we want to fill the image with the background color before rendering
 the disk.  For the second render pass, we want to draw the outline on
 top of the existing image, so the <code>loadOp</code> must be "load".  The same
 <code>renderPassDescriptor</code> can be used for both passes, with just the
@@ -269,7 +269,7 @@ top of the existing image, so the <code>loadOp</code> must be "load".  The same
 <p>I would like to draw the outlines of the colored disks in my moving disk example.  However
 I can't simply use instanced drawing to draw all the disks, then use it again to draw the outlines,
 since that would show the complete outline of every disk, even parts of the outline that
-should be hidden by other disks.  (Actually, I could do that if I add a <word>depth test</word>
+should be hidden by other disks.  (Actually, I can do that if I add a <word>depth test</word>
 to the program (see <localref href="webgpu.4.1"/>).)  A&nbsp;solution is to abandon
 instanced drawing and draw each disk separately.  That's what I do in the sample program
 <sourceref href="webgpu/draw_multiple.html"/>.  That program also introduces a few new

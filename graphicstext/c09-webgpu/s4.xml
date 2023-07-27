@@ -151,7 +151,8 @@ a fragment shader uses the <code>@builtin(position)</code> input, its
 values are given in viewport coordinates.  Ordinarily the xy coordinates
 for a pixel in the fragment shader will be the center of that pixel,
 with half-integer coordinates such as (0.5,0.5) for the pixel in
-the upper left corner of the viewport.</p>
+the upper left corner of the viewport.  For multisampling, other points
+within the pixel are used.</p>
 
 <p>But we want to be able to use the coordinate system of our choice when drawing.
 That brings in several new coordinate systems: <word>object coordinates</word>, 

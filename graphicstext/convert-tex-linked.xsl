@@ -55,7 +55,7 @@
 \renewcommand{\sectionautorefname}{Section}
 \renewcommand{\subsectionautorefname}{Subsection}
 \renewcommand{\chapterautorefname}{Chapter}
-\pretolerance=1000
+\pretolerance=2000
 \tolerance=8000
 \input texmacros
 \title{Introduction to Computer Graphics}

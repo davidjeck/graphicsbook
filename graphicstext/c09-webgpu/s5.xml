@@ -171,8 +171,8 @@ used as the red component of the color, the green and blue color components will
 be set to 0.0, and the alpha component will be&nbsp;1.0.</np>
 
 <p>You should now be able to understand the fragment shader source code from the
-sample program.  The code is quite simple.  Most of the work is on the JavaScript
-side.</p>
+sample program.  Most of the work is on the JavaScript
+side, so the shader code is quite simple:</p>
 
 <pre>@group(0) @binding(0) var samp : sampler;  // Sampler resource from JavaScript.
 @group(0) @binding(1) var tex : texture_2d&lt;f32>;  // Image texture resource.
@@ -259,7 +259,7 @@ color value.  (The scaling is referred to as "normalizing" the values&mdash;yet
 another meaning of the overworked term "normal.")  In the <code>usage</code>
 property, <code>TEXTURE_BINDING</code>, means that the texture can be
 sampled in a shader program, and <code>COPY_DST</code> means that data can
-be copied into the texture from elsewhere.  It is also possible to fill the
+be copied into the texture from elsewhere.  It is also possible to fill a
 texture with data by attaching the texture to a pipeline as a render target;
 that requires the usage <code>GPUTextureUsage.RENDER_ATTACHMENT</code>.
 The other possible usage is <code>COPY_SRC</code>, which allows the
@@ -563,7 +563,7 @@ So, the fragment shader for drawing the skybox background is simply</p>
 to a point on the reflective object, and use the reflection of that
 ray from the surface as the texture coordinate vector: The point where
 the reflected ray hits the skybox is the point that will be seen
-by the user on reflective object.  Since the skybox in the sample program
+by the user on the reflective object.  Since the skybox in the sample program
 can be rotated, the direction of the ray has to be adjusted to take that
 rotation into account.  See <localref href="webgl3d.3.5"/> for a full discussion of
 the math.  Here is the fragment shader for drawing the reflected object:</np>
@@ -587,8 +587,8 @@ the math.  Here is the fragment shader for drawing the reflected object:</np>
 <break/>
 
 <p>On the JavaScript side, again, cubemap textures are used similarly to 2D textures.
-The samplers that are used for cubemap textures are the same as those used for 2D textures,
-and for use in a shader program, a view of the cubemap texture is passed to the shader program
+The samplers that are used for cubemap textures are the same as those used for 2D textures.
+And a view of the cubemap texture is passed to the shader program
 as a bind group resource.  One difference is that when creating a view, you need to specify
 that you want to view the texture as a cube texture:</p>
 
@@ -598,7 +598,7 @@ that you want to view the texture as a cube texture:</p>
 mipmaps for the texture, I needed views of the texture to represent a
 single mipmap level of a single side of the cube.  For example,</np>
 
-<pre>let outputView = texture.createView({
+<pre>let outputView = cubeTexture.createView({
                     dimension: "2d",
                     baseMipLevel: mipmap, mipLevelCount: 1,
                     baseArrayLayer: side, arrayLayerCount: 1
@@ -617,7 +617,7 @@ texture and a view of a texture.)</np>
 <p>The format of a texture specifies what kind of data is stored for each
 texel.  The format specifies the number of color channels, the type of data,
 and in some cases how the data is interpreted.  In the common 2D image format
-"rgba8unorm", there are four color channels ("r", "g", "b", and&nbsp;"a").  The data for
+"rgba8unorm", there are four color channels ("r", "g", "b", and&nbsp;&leftquote;a").  The data for
 a texel consists of 8 bits per color channel.  And the value for a color
 channel is an unsigned integer ("u") in the range 0 to 255, which is divided
 by 255 to give a float value in the range 0.0 to 1.0 ("norm").  The format
@@ -672,7 +672,7 @@ can be done with various texture formats. The rules are summarized in a
 table of <a href="https://www.w3.org/TR/webgpu/#texture-format-caps">Texture Format Capabilities</a>
 in Section 26.1 of the WebGPU specification.)</p>
 
-<p>In a shader program, a storage texture has a type such as
+<p>In a shader, a storage texture has a type such as
 <code>texture_storage_2d&lt;r32uint,write></code>.  The first type
 parameter, <code>r32uint</code>, is the texture format, and the second,
 <code>write</code>, specifies the access mode. (Currently, <code>write</code>

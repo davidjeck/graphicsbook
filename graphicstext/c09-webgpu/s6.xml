@@ -153,8 +153,10 @@ components. The task for one invocation of the compute shader is to
 update the position and velocity of one disk in either the x or y direction.
 If there are <code>N</code> disks, we need <code>2*N</code> invocations of the shader.</p>
 
-<p>The positions and velocities are passed to the compute shader in two storage buffers, which
-are represented in the program by variables of type <code>array&lt;32></code>.  An additional
+<p>The positions and velocities are stored in two storage buffers, which
+are represented in the shader program by variables of type <code>array&lt;32></code>.  Initial values
+are written to the buffers by the JavaScript side of the program.  After that, the buffers
+are used entirely on the GPU side.  An additional
 storage buffer holds an array of three floats giving other data needed for the computation: 
 the number of disks, the radius of the disks, and the change in time since the previous update.
 The shader variables are declared as</p>
@@ -245,7 +247,7 @@ and render passes.</np>
 <p>My second compute shader example is <sourceref href="webgpu/life_3.html"/>, which implements
 Conway's Game of Life. It is a modification of <sourceref href="webgpu/life_1.html">life_1.html</sourceref> 
 from <localref href="webgpu.5.5"/>.  The original version computed the new generation of the board
-in the fragment shader, at the same time that it was dispaying the current generation.  The
+in the fragment shader, at the same time that it was displaying the current generation.  The
 new version moves that computation into a compute shader.  The compute shader version is,
 if anything, <b>less</b> efficient than the original version&mdash;which can be taken as
 a reminder that fragment shaders can do computational work.</p>
@@ -527,7 +529,7 @@ length <code>N</code>,</p>
 <pre>for (index = 0; index &lt; N/2; index++)
     A[index] = A[index] + A[index+N/2]</pre>
 
-<np>This loop can be replace by one application of a simple
+<np>This loop can be replaced by one application of a simple
 compute shader.  The result is that the sum of the numbers in the original
 array is equal to the sum of the numbers in the first N/2 elements of
 the modified array.  Now, consider those N/2 elements to be a new, shorter

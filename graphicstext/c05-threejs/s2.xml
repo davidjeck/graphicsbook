@@ -510,7 +510,7 @@ add the texture later, be sure to set</np>
    
 <np>to make sure that the change will take effect when the object is redrawn.
 (When exactly <code>needsUpdate</code> needs to be set on various objects
-is not always clear.  See the <a href="https://threejs.org/docs/#manual/en/introduction/How-to-update-things">"Updating Resources"</a>
+is not always clear.  See the <a href="https://threejs.org/docs/#manual/en/introduction/How-to-update-things">&leftquote;Updating Resources"</a>
 section of the <i>three.js</i> documentation.)</np>
     
 <p>A <classname>Texture</classname> has a number of properties that can be

@@ -312,7 +312,7 @@ You can add additional lights, using the "Light" submenu in
 the "Add" menu. You will probably need to
 add several lights to light your scene well.</p>
 
-<p>There are several kinds of light in the "light" submenu.  A <word term="point light">"Point" light</word> gives off
+<p>There are several kinds of light in the "light" submenu.  A <word term="point light">&leftquote;Point" light</word> gives off
 light in all directions.  The light in the initial
 scene is a point light.  A "Sun" is a <word term="directional light">directional light</word>
 that shines in parallel rays from some direction, indicated by a line drawn

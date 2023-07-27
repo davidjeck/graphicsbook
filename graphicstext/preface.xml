@@ -93,7 +93,7 @@ a graphics API that was in common use for an extended period.  OpenGL&nbsp;1.1 i
 fundamental graphics concepts&mdash;vertices, normal vectors, coordinate transformations,
 lighting, and material&mdash;in a way that is transparent and fairly easy to use.  Newer
 graphics APIs are more flexible and more powerful, but they have a much steeper learning
-curve.  I&nbsp;believe that any introductory compute science course benefits from starting
+curve.  I&nbsp;believe that any introductory computer science course benefits from starting
 with a simpler framework or library, and OpenGL 1.1 serves that purpose well.</p>
 
 <p>OpenGL is still

@@ -176,14 +176,14 @@ multiple lines:</p>
 
 <np>The syntax for a function definition in WGSL is</np>
 
-<pre>fn <bnf>function_name</bnf> ( <bnf>parameter_list</bnf> ) -&gt; <bnf>return_type</bnf></pre>
+<pre>fn <bnf>function_name</bnf> ( <bnf>parameter_list</bnf> ) -&gt; <bnf>return_type</bnf> { . . . }</pre>
 
 <np>The types used in this example&mdash;<code>vec2f</code>, <code>vec3f</code>, and
 <code>vec4f</code>&mdash;represent vectors of two, three, and four 32-bit floating point numbers.
 Variable declarations can have several forms.  The one example in this code has the
 form</np>
 
-<pre>var&lt;uniform&gt; <bnf>variable_name</bnf> : <bnf>type</bnf></pre>
+<pre>var&lt;uniform&gt; <bnf>variable_name</bnf> : <bnf>type</bnf> ;</pre>
 
 <np>This declares a global variable in the "uniform address space," which will be discussed below.
 A variable in the uniform address space gets its value from the JavaScript side.</np>
@@ -723,7 +723,7 @@ vertex buffer layout reflects the layout of the data in the buffer:</np>
 <np>Note that the data for each buffer takes up 20 bytes (five 4-byte floats).
 This becomes the <code>arrayStride</code> in the layout, which gives the distance,
 in bytes, from the values for one vertex to the values for the next vertex.
-The <code>offset</code> properties for each <code>attribute</code> tells
+The <code>offset</code> property for an <code>attribute</code> tells
 where to find the value for that attribute within the block of data for
 a given vertex: The offset for <code>coords</code> is 0 because it
 is found at the start of the data; the offset for <code>color</code>

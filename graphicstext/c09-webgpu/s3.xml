@@ -491,7 +491,7 @@ of floats.  There are several functions that do operations that are common in co
 <li><code>clamp(value, min, max)</code>  clamps value to the range min to max, that is, returns value if value is
 between min and max, returns min if value&nbsp;&lt;=&nbsp;min, and returns max if value&nbsp;>=&nbsp;max.</li>
 
-<li><code>mix(a, b, blend_factor)</code> returns the weighted average of a and b, that is,
+<li><code>mix(a, b, blend_factor)</code> returns the weighted average of a and b, that is, returns
 (1-blend_factor)*a + blend_factor*b.</li>
 
 <li><code>step(edge, x)</code> returns 0 if x &lt;= edge and 1 if x > edge.</li>
