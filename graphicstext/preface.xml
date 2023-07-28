@@ -174,7 +174,7 @@ very limited support for people who might be interested in working on them.</np>
 <p>The sources include images, HTML files, Java and C source code, XML files, XSLT transformations, 
 bash shell scripts, and LaTeX macros.  Using the sources requires additional software 
 (LaTeX, Xalan-J, Java, and the bash shell).  For more information, see the
-<web><a href="README-git.txt">README&nbsp;file</a></web><tex><a href="https://math.hws.edu/graphicsbook/README-git.txt">README&nbsp;file</a></tex>.</p>
+<web><a href="README.txt">README&nbsp;file</a></web><tex><a href="https://math.hws.edu/graphicsbook/README.txt">README&nbsp;file</a></tex>.</p>
 
 <break/> 
 

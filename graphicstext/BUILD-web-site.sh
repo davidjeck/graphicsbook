@@ -52,7 +52,7 @@ if  $XALAN_COMMAND -xsl convert-web.xsl -in graphicstext.xml ; then
    cp -r src-java2d/* web/source/java2d
    mkdir web/source/jogl
    cp -r src-jogl/* web/source/jogl
-   cp README.txt web/README-git.txt
+   cp README.txt web/README.txt
 
    copyfiles c02-graphics2d c2
    copyfiles c03-gl1geom c3

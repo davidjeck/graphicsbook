@@ -27,8 +27,8 @@ limited to OpenGL&nbsp;1.1.  OpenGL 1.1 is a large API, and we will
 only cover a part of it. The goal is to introduce 3D graphics concepts, 
 not to fully cover the API.  A significant part of what we cover here
 has been removed from the most modern versions of OpenGL, including WebGL.  However,
-modern OpenGL in its pure form has a very steep initial learning curve,
-and it is really not a good starting place for someone who is encountering
+more modern graphics APIs have a very steep initial learning curve,
+and they are not really the best starting place for someone who is encountering
 3D graphics for the first time.  Some additional support is needed&mdash;if not OpenGL 1.1
 then some similar framework.  Since OpenGL 1.1 is
 still supported, at least by all desktop implementations of OpenGL,

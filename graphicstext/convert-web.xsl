@@ -26,8 +26,8 @@
         <p><big>W</big>ELCOME TO <i>Introduction to Computer Graphics</i>,
          a free, on-line textbook covering the fundamentals of computer graphics and
          computer graphics programming.  This book is meant for use as a textbook in
-         a one-semester course that would typically be taken by undergraduate computer science majors
-         in their third or fourth year of college.  Version 1.4 adds a new chapter on WebGPU.
+         a one-semester course that would typically be taken by undergraduate computer science majors,
+         with at least two semesters of programming as a prerequisite.  Version 1.4 adds a new chapter on WebGPU.
          See the <a href="preface.html">preface</a> for more information.
         </p>
         <p>The web pages for this book include live, interactive demos that require a modern
