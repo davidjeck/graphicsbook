@@ -83,7 +83,7 @@
         <li>
           <b>Full Web Site Download:</b>
           <ul>
-          <li><b><a href="http://math.hws.edu/eck/cs424/downloads/graphicsbook-web-site.zip">http://math.hws.edu/eck/cs424/downloads/graphicsbook-web-site.zip</a></b> &#8212;
+          <li><b><a href="https://math.hws.edu/eck/cs424/downloads/graphicsbook-web-site.zip">https://math.hws.edu/eck/cs424/downloads/graphicsbook-web-site.zip</a></b> &#8212;
           This "zip" archive contains a complete copy of the web site for this textbook.  You can publish a copy of the web site on
           your own web server, or you can use it locally on your own computer.  
           Size:&#160;26&#160;Megabytes.
@@ -94,14 +94,14 @@
           <b>PDF Downloads:</b>
           <ul>
           <li>
-          <b><a href="http://math.hws.edu/eck/cs424/downloads/graphicsbook-linked.pdf">http://math.hws.edu/eck/cs424/downloads/graphicsbook-linked.pdf</a></b> &#8212;
+          <b><a href="https://math.hws.edu/eck/cs424/downloads/graphicsbook-linked.pdf">https://math.hws.edu/eck/cs424/downloads/graphicsbook-linked.pdf</a></b> &#8212;
           a PDF version with internal links for navigation and external links to source code
           files and other resources that are not included in the PDF.
           Recommended for on-screen reading. 533&#160;pages.
           Size:&#160;6.0&#160;Megabytes.
           </li>
           <li>
-          <b><a href="http://math.hws.edu/eck/cs424/downloads/graphicsbook.pdf">http://math.hws.edu/eck/cs424/downloads/graphicsbook.pdf</a></b> &#8212;
+          <b><a href="https://math.hws.edu/eck/cs424/downloads/graphicsbook.pdf">https://math.hws.edu/eck/cs424/downloads/graphicsbook.pdf</a></b> &#8212;
           a PDF version without links, more suitable for printing. 541&#160;pages.
           Size:&#160;5.6&#160;Megabytes.
           </li>
