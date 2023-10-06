@@ -112,7 +112,7 @@ the mathematical constant&nbsp;&pi;,</np>
            b1 = y + r2*sin(angle1)
            a2 = x + r1*cos(angle2)
            b2 = y + r2*sin(angle2)
-           Draw Line from (x1,y1) to (x2,y2)</pre>
+           Draw Line from (a1,b1) to (a2,b2)</pre>
 
 <np>For a circle, of course, you would just have r1 = r2.  This is the first time
 we have used the sine and cosine functions, but it won't be the last.  These
