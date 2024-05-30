@@ -491,8 +491,8 @@ This would move an object originally at (0,0,0) to (0,0,-10), placing the object
 10 units directly in front of the viewer.  (Remember that
 modeling transformations are applied to objects in the order opposite to their order in the code.)
 What do these commands do as a viewing transformation?  The effect on the view is the inverse
-of the effect on objects.  The inverse of "translate 90 then rotate 10" is "rotate -10
-then translate -90."  That is, to do the inverse, you have to undo the rotation <b>before</b>
+of the effect on objects.  The inverse of "translate 10 then rotate 90" is "rotate -90 then translate -10".
+That is, to do the inverse, you have to undo the rotation <b>before</b>
 you undo the translation.   The effect as a viewing transformation is first to rotate the view
 by -90 degrees about the <i>y</i>-axis (which would leave the viewer at the origin, but now
 looking along the positive <i>x</i>-axis), then to translate the viewer by -10 along the 
