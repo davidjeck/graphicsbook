@@ -134,8 +134,10 @@ variable that is used in the vertex shader to give the coordinates of the
 vertex.  <i>gl_Position</i> is of type <i>vec4</i>, requiring four numbers, 
 because the coordinates are specified as <word>homogeneous coordinates</word>
 (<localref href="gl1geom.5.3"/>).  The special variable <i>gl_FragCoord</i> in
-the fragment shader is also a <i>vec4</i>, giving the coordinates of
-the pixel as homogeneous coordinates.  And <i>gl_FragColor</i> is a <i>vec4</i>,
+the fragment shader is also a <i>vec4</i>; its <i>x</i>  and <i>y</i> coordinates
+are <word>device coordinates</word> for the fragment, while its <i>z</i> coordinate
+is the fragment's depth value for the <word>depth test</word>.
+And <i>gl_FragColor</i> is a <i>vec4</i>,
 giving the four <word>RGBA color</word> components for the pixel.</np>
 
 <p>A vertex shader needs, at a minimum, an attribute to give the coordinates

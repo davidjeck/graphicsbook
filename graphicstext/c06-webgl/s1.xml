@@ -304,14 +304,16 @@ The primitive is then <word term="rasterization">rasterized</word>; that is, it 
 determined which pixels lie inside the primitive. The GPU then calls the fragment shader once for
 each pixel that lies in the primitive.  The fragment shader has access to uniform variables
 (but not attributes).  It can also use a special variable named <i>gl_FragCoord</i>
-that contains the clip coordinates of the pixel.  Pixel coordinates are computed
-by <word term="interpolation">interpolating</word> the values of <i>gl_Position</i>
-that were specified by the vertex shader.  The interpolation is done by another fixed-function 
-stage that comes between the vertex shader and the fragment shader.
+that contains coordinates for the pixel that is being rendered.  To compute pixel coordinates, WebGL
+must first <word term="interpolation">interpolate</word> the values of <i>gl_Position</i>
+that were specified by the vertex shader; this gives <word>clip coordinates</word> for the pixel.  
+The interpolation is done by another fixed-function stage that comes between the vertex shader
+and the fragment shader. (Then WebGL applies the <word>viewport transformation</word> to
+the clip coordinates to get the value of <i>gl_FragCoord</i>.)
 </p>
 
-<p>Other quantities besides coordinates can work in much that same way.  That is, the vertex shader
-computes a value for the quantity at each vertex of a primitive.  An interpolator takes the values
+<p>Other quantities besides coordinates use interpolation in much that same way.  That is, the vertex shader
+provides a value for the quantity at each vertex of a primitive.  An interpolator takes the values
 at the vertices and computes a value for each pixel in the primitive.  The value for a given
 pixel is then input into the fragment shader when the shader is called to process that pixel.
 For example, color in OpenGL follows this pattern: The color of an interior pixel of a primitive

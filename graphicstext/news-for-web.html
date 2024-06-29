@@ -48,11 +48,19 @@ downloads.</p>
 <li><b>Section 2.2.1</b>: In the pseudocode for drawing an oval 
 near the end of the subsection, where it says <span class="error">Draw Line from (x1,y1) to (x2,y2)</span>,
 it should say  <span class="fix">Draw Line from <b>(a1,b1)</b> to <b>(a2,b2)</b></span>.
-<span class="date">(1&nbsp;December&nbsp;2023</span></li>
+<span class="date">(1&nbsp;December&nbsp;2023)</span></li>
+
 <li><b>Section 3.3.4</b>: The sentence <span class="error"><i>The inverse of "translate 90 then rotate 10" is "rotate -10
 then translate -90"</i></span> is technically correct, but in the context of inverting the modeling transformation
 "<tt>glRotate(90,0,1,0); glTranslate(10,0,0)</tt>", it should be <span class="fix"><i>The inverse of "translate 10 then rotate 90" is 
-"rotate -90 then translate -10"</i></span>.</li>
+"rotate -90 then translate -10"</i></span>. <span class="date">(30&nbsp;May&nbsp;2024)</span></li>
+
+<li><b>Section 6.1.3</b>: It is stated incoorectly that the special fragment shader variable
+<i>gl_FragCoords</i> <span class="error">contains the clip coordinates of the pixel</span>.  In fact, 
+<i>gl_FragCoords</i> contains device coordinates, that is, pixel coordinates in the window that is being rendered.
+Device coordinates are computed by applying the viewpoint transformation to the interpolated clip coordinates
+for the pixel. This has been updated online in the web site version of this book, and the description of <i>gl_FragCoords</i> in Section 6.2.2 has
+also been updated online. <span class="date">(29&nbsp;June&nbsp;2024)</span></li>
 </ul>
 <hr>
 
