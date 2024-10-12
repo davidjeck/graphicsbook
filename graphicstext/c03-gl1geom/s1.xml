@@ -354,7 +354,7 @@ depth buffer is generally not used, and the appropriate parameter for
 
 <subsection title="glColor and glVertex with Arrays" id="gl1geom.1.3">
 
-<p>We have see that there are versions of <i>glColor*</i> and <i>glVertex*</i>
+<p>We have seen that there are versions of <i>glColor*</i> and <i>glVertex*</i>
 that take different numbers and types of parameters.  There are also versions
 that let you place all the data for the command in a single array parameter.
 The names for such versions end with "v".  For example:  <i>glColor3fv</i>,
